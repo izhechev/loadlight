@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { Brain, Loader2, CheckCircle, Trash2, Plus, Calendar, ArrowLeft, Zap, AlertTriangle, RefreshCw } from "lucide-react"
 import { AppLayout } from "@/components/app-layout"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
+import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 
 type DemandType = 'cognitive' | 'emotional' | 'creative' | 'routine' | 'physical'
 

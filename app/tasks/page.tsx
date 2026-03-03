@@ -69,6 +69,10 @@ export default function TasksPage() {
     const sevenDaysAgo = (now || Date.now()) - 604800000
     const demandTypeCounts: Record<DemandType, number> = { cognitive: 0, emotional: 0, creative: 0, routine: 0, physical: 0 }
     undone.forEach(t => { demandTypeCounts[t.demand_type]++ })
+    
+    const totalUndoneDifficulty = undone.reduce((acc, t) => acc + (t.difficulty || 2), 0)
+    const totalUndoneMinutes = undone.reduce((acc, t) => acc + (t.estimated_minutes || 30), 0)
+
     const data: TaskSignalData = {
       undoneCount: undone.length,
       doneCount: updated.filter(t => t.done).length,
@@ -77,6 +81,8 @@ export default function TasksPage() {
       tasksWithDeadlines: undone.filter(t => t.deadline).length,
       tasksDueWithin48h: undone.filter(t => isDueWithin48h(t.deadline, now || Date.now())).length,
       demandTypeCounts,
+      totalUndoneDifficulty,
+      totalUndoneMinutes,
     }
     computeAndTransition(data)
   }, [computeAndTransition, now])
@@ -255,7 +261,7 @@ export default function TasksPage() {
                   </div>
                 </div>
                 <div className="flex flex-col items-center gap-1.5 ml-1">
-                    {!task.done && (
+                  {!task.done && (
                       <button 
                         onClick={() => breakdownTask(task.id)} 
                         disabled={breakingDownId === task.id}

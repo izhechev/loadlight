@@ -95,6 +95,10 @@ export default function DashboardPage() {
     const undoneTasks = tasks.filter(t => !t.done)
     const demandTypeCounts: Record<DemandType, number> = { cognitive: 0, emotional: 0, creative: 0, routine: 0, physical: 0 }
     undoneTasks.forEach(t => { demandTypeCounts[t.demand_type]++ })
+    
+    const totalUndoneDifficulty = undoneTasks.reduce((acc, t) => acc + (t.difficulty || 2), 0)
+    const totalUndoneMinutes = undoneTasks.reduce((acc, t) => acc + (t.estimated_minutes || 30), 0)
+
     computeAndTransition({
       undoneCount: undoneTasks.length,
       doneCount: tasks.filter(t => t.done).length,
@@ -103,6 +107,8 @@ export default function DashboardPage() {
       tasksWithDeadlines: undoneTasks.filter(t => t.deadline).length,
       tasksDueWithin48h: undoneTasks.filter(t => isDueWithin48h(t.deadline)).length,
       demandTypeCounts,
+      totalUndoneDifficulty,
+      totalUndoneMinutes,
     } as TaskSignalData)
   }, [tasks, computeAndTransition])
 

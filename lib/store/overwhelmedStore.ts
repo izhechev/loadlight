@@ -12,6 +12,8 @@ export interface TaskSignalData {
   tasksWithDeadlines: number
   tasksDueWithin48h: number
   demandTypeCounts: Record<DemandType, number>
+  totalUndoneDifficulty: number
+  totalUndoneMinutes: number
 }
 
 interface Signals {
@@ -36,8 +38,8 @@ interface OverwhelmedStore {
 }
 
 const WEIGHTS = {
-  taskAccumulation: 0.25,
-  demandConcentration: 0.20,
+  taskAccumulation: 0.30, // Increased weight since it's smarter now
+  demandConcentration: 0.15,
   completionVelocity: 0.25,
   temporalPressure: 0.15,
   explicitSelfReport: 0.15,
@@ -50,8 +52,13 @@ function clamp(val: number, min = 0, max = 1): number {
 }
 
 function computeSignals(data: TaskSignalData, selfReportCount: number): Signals {
-  // 1. Task accumulation: 20+ undone = max load
-  const taskAccumulation = clamp(data.undoneCount / 20)
+  // 1. Task accumulation: Smart calculation based on volume, difficulty, and time
+  const diffScore = data.totalUndoneDifficulty / 30; // 30+ difficulty points is heavy (e.g. 10 hard tasks)
+  const timeScore = data.totalUndoneMinutes / 480; // 480 mins (8 hours) of active work is heavy
+  const countScore = data.undoneCount / 15; // 15+ active tasks is heavy
+  
+  // Use the highest metric so we catch overwhelming loads of *any* type (many small tasks vs few huge ones)
+  const taskAccumulation = clamp(Math.max(diffScore, timeScore, countScore))
 
   // 2. Demand concentration: dominant type % of total tasks
   const totalTasks = Object.values(data.demandTypeCounts).reduce((a, b) => a + b, 0)
