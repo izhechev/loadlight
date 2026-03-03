@@ -68,42 +68,46 @@
 }
 
 /* ─── Frutiger Aero / Skeuomorphic Core ─── */
+@keyframes bg-pan {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 .aero-bg {
   min-height: 100vh;
   position: relative;
-  /* Deep emerald/teal gradient matching the reference image */
-  background: linear-gradient(135deg, #18987b 0%, #1eaf8d 40%, #17c196 100%);
+  /* Replaced previous gradient with the new background image */
+  background-image: url('/background.png');
+  background-size: cover;
   background-attachment: fixed;
+  background-position: center;
   overflow-x: hidden;
+  animation: bg-pan 60s ease-in-out infinite;
 }
 
 .aero-bg::before {
   content: '';
   position: fixed;
   inset: 0;
-  /* Glowing light waves/lines typical of 2000s tech aesthetics */
-  background-image: radial-gradient(circle at 50% -20%, rgba(255,255,255,0.4) 0%, transparent 60%),
-                    radial-gradient(circle at -20% 80%, rgba(180,255,220,0.3) 0%, transparent 50%),
-                    radial-gradient(circle at 120% 80%, rgba(180,255,220,0.3) 0%, transparent 50%);
+  background-image: url('/background.png');
+  background-size: cover;
+  background-position: center;
+  /* Added the requested blur */
+  filter: blur(8px) saturate(1.2);
+  opacity: 0.8;
   z-index: -2;
   pointer-events: none;
 }
 
-/* Swooping light rays to match the background lines in the image */
+/* Iconic 2000s Sunburst/Lens Flare */
 .aero-bg::after {
   content: '';
   position: fixed;
-  width: 200%;
-  height: 200px;
-  top: 50%;
-  left: -50%;
-  transform: rotate(-15deg);
-  background: radial-gradient(ellipse at center, rgba(255,255,255,0.2) 0%, transparent 70%);
-  border-top: 2px solid rgba(255,255,255,0.1);
-  border-bottom: 2px solid rgba(255,255,255,0.05);
+  inset: 0;
+  background: radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.1) 25%, transparent 60%);
   z-index: -1;
   pointer-events: none;
-  filter: blur(4px);
 }
 
 /* ─── Bubbles & Orbs (Floating) ─── */
