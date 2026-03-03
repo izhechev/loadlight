@@ -154,7 +154,7 @@ export async function POST(req: Request) {
     balanceMode?: string
   }
   const { mode, tasks, balanceMode } = body
-  const categories = body.categories ?? ['Work', 'Study', 'Personal', 'Creative', 'Admin']
+  const categories = body.categories ?? ['Work', 'Study', 'Personal', 'Exercise', 'Creative', 'Admin']
   const text = body.text ? sanitise(body.text) : ''
 
   if (mode === 'extract') {

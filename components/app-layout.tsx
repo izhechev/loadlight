@@ -135,7 +135,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex max-w-6xl mx-auto w-full px-3 py-4 gap-4 pb-24 md:pb-6">
 
         {/* ── Desktop sidebar (md+) ── */}
-        <nav className="hidden md:flex glass-panel p-3 flex-col gap-1 w-52 shrink-0 h-fit sticky top-20 self-start">
+        <nav className="hidden md:flex glass-panel p-3 flex-col gap-1 w-52 shrink-0 h-fit sticky top-20 self-start border border-white/10 shadow-2xl">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
             return (
@@ -144,8 +144,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 href={href}
                 className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-150 ${
                   active
-                    ? "bg-gradient-to-r from-sky-400/20 to-teal-400/10 text-sky-700 shadow-inner-sm border border-sky-200/60"
-                    : "text-slate-600 hover:bg-white/60"
+                    ? "bg-white/20 text-white shadow-inner-sm border border-white/30"
+                    : "text-slate-300 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <Icon className="w-4 h-4 shrink-0" />
@@ -162,7 +162,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* ── Mobile bottom nav ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 glass-panel-strong rounded-none rounded-t-3xl px-2 py-2 flex justify-around border-t border-white/60">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 glass-panel-strong rounded-none rounded-t-3xl px-2 py-2 flex justify-around border-t border-white/20">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
@@ -171,8 +171,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               href={href}
               className={`flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all text-xs font-semibold ${
                 active
-                  ? "text-sky-600 bg-sky-50/80"
-                  : "text-slate-500"
+                  ? "text-white bg-white/20 shadow-inner"
+                  : "text-slate-400"
               }`}
             >
               <Icon className="w-5 h-5" />

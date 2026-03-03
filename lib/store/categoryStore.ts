@@ -9,16 +9,16 @@ export interface Category {
 }
 
 export const COLOR_OPTIONS = [
-  { key: 'blue',    bg: 'bg-blue-100',    text: 'text-blue-700',    dot: 'bg-blue-400' },
-  { key: 'indigo',  bg: 'bg-indigo-100',  text: 'text-indigo-700',  dot: 'bg-indigo-400' },
-  { key: 'teal',    bg: 'bg-teal-100',    text: 'text-teal-700',    dot: 'bg-teal-400' },
-  { key: 'emerald', bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-400' },
-  { key: 'pink',    bg: 'bg-pink-100',    text: 'text-pink-700',    dot: 'bg-pink-400' },
-  { key: 'amber',   bg: 'bg-amber-100',   text: 'text-amber-700',   dot: 'bg-amber-400' },
-  { key: 'purple',  bg: 'bg-purple-100',  text: 'text-purple-700',  dot: 'bg-purple-400' },
-  { key: 'rose',    bg: 'bg-rose-100',    text: 'text-rose-700',    dot: 'bg-rose-400' },
-  { key: 'sky',     bg: 'bg-sky-100',     text: 'text-sky-700',     dot: 'bg-sky-400' },
-  { key: 'orange',  bg: 'bg-orange-100',  text: 'text-orange-700',  dot: 'bg-orange-400' },
+  { key: 'blue',    bg: 'bg-blue-500/20',    text: 'text-blue-100',    dot: 'bg-blue-400' },
+  { key: 'indigo',  bg: 'bg-indigo-500/20',  text: 'text-indigo-100',  dot: 'bg-indigo-400' },
+  { key: 'teal',    bg: 'bg-teal-500/20',    text: 'text-teal-100',    dot: 'bg-teal-400' },
+  { key: 'emerald', bg: 'bg-emerald-500/20', text: 'text-emerald-100', dot: 'bg-emerald-400' },
+  { key: 'pink',    bg: 'bg-pink-500/20',    text: 'text-pink-100',    dot: 'bg-pink-400' },
+  { key: 'amber',   bg: 'bg-amber-500/20',   text: 'text-amber-100',   dot: 'bg-amber-400' },
+  { key: 'purple',  bg: 'bg-purple-500/20',  text: 'text-purple-100',  dot: 'bg-purple-400' },
+  { key: 'rose',    bg: 'bg-rose-500/20',    text: 'text-rose-100',    dot: 'bg-rose-400' },
+  { key: 'sky',     bg: 'bg-sky-500/20',     text: 'text-sky-100',     dot: 'bg-sky-400' },
+  { key: 'orange',  bg: 'bg-orange-500/20',  text: 'text-orange-100',  dot: 'bg-orange-400' },
 ] as const
 
 export type ColorKey = typeof COLOR_OPTIONS[number]['key']
@@ -31,6 +31,7 @@ const DEFAULT_CATEGORIES: Category[] = [
   { id: 'work',     name: 'Work',     emoji: '💼', color: 'blue' },
   { id: 'study',    name: 'Study',    emoji: '📚', color: 'indigo' },
   { id: 'personal', name: 'Personal', emoji: '🏠', color: 'teal' },
+  { id: 'exercise', name: 'Exercise', emoji: '🏃', color: 'emerald' },
   { id: 'creative', name: 'Creative', emoji: '🎨', color: 'pink' },
   { id: 'admin',    name: 'Admin',    emoji: '📋', color: 'amber' },
 ]
@@ -45,7 +46,7 @@ interface CategoryStore {
 
 export const useCategoryStore = create<CategoryStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       categories: DEFAULT_CATEGORIES,
 
       addCategory(cat) {
@@ -68,6 +69,17 @@ export const useCategoryStore = create<CategoryStore>()(
         set({ categories: DEFAULT_CATEGORIES })
       },
     }),
-    { name: 'loadlight-categories' }
+    { 
+      name: 'loadlight-categories',
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Migration: Ensure Exercise category exists
+          const hasExercise = state.categories.some(c => c.name.toLowerCase() === 'exercise')
+          if (!hasExercise) {
+            state.addCategory({ name: 'Exercise', emoji: '🏃', color: 'emerald' })
+          }
+        }
+      }
+    }
   )
 )

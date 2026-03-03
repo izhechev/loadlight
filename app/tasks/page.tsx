@@ -172,8 +172,8 @@ export default function TasksPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black text-slate-800">Tasks</h1>
-            <p className="text-sm text-slate-500">{tasks.filter(t => !t.done).length} active · {tasks.filter(t => t.done).length} done</p>
+            <h1 className="text-2xl font-black text-white">Tasks</h1>
+            <p className="text-sm text-slate-300 font-bold">{tasks.filter(t => !t.done).length} active · {tasks.filter(t => t.done).length} done</p>
           </div>
           <Link href="/tasks/new" className="glow-button text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2">
             <Plus className="w-4 h-4" /> Add Tasks
@@ -186,22 +186,22 @@ export default function TasksPage() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                filter === f ? 'bg-sky-100 text-sky-700 border border-sky-200' : 'bg-white/50 text-slate-500 border border-white/40 hover:bg-white/70'
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                filter === f ? 'bg-white/20 text-white shadow-inner border border-white/30' : 'bg-black/20 text-slate-400 border border-white/5 hover:bg-black/30'
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
-          <span className="ml-auto flex items-center gap-1 text-xs text-slate-400">
+          <span className="ml-auto flex items-center gap-1 text-xs text-slate-400 font-bold">
             <Filter className="w-3.5 h-3.5" /> {visible.length} shown
           </span>
         </div>
 
         {/* Rest mode notice */}
         {overwhelmedState !== 'normal' && (
-          <div className={`rounded-2xl px-4 py-3 text-sm flex items-center gap-2 ${
-            overwhelmedState === 'elevated' ? 'bg-amber-50 border border-amber-200 text-amber-700' : 'bg-pink-50 border border-pink-200 text-pink-700'
+          <div className={`rounded-2xl px-4 py-3 text-sm font-bold flex items-center gap-2 border ${
+            overwhelmedState === 'elevated' ? 'bg-amber-900/40 border-amber-500/30 text-amber-200' : 'bg-pink-900/40 border-pink-500/30 text-rose-100'
           }`}>
             {overwhelmedState === 'elevated'
               ? '⚠ Elevated state — consider completing tasks before adding more.'
@@ -210,7 +210,7 @@ export default function TasksPage() {
         )}
 
         {/* Task list */}
-        <div className="glass-panel p-4 space-y-2">
+        <div className="glass-panel p-4 space-y-2 border border-white/5 shadow-2xl">
           <AnimatePresence>
             {visible.map(task => {
               const catName = (task.category || 'Personal').toLowerCase()
@@ -226,32 +226,32 @@ export default function TasksPage() {
                   transition={mc}
                   className={`flex items-start gap-3 rounded-2xl p-4 border-l-4 transition-all ${
                     cls.bg.replace('bg-', 'border-l-')
-                  } ${task.done ? 'bg-black/30 opacity-60' : 'bg-black/20 hover:bg-black/30'} skeu-card border-none border-l-4`}
+                  } ${task.done ? 'bg-black/40 opacity-50' : 'bg-black/20 hover:bg-black/30'} skeu-card border-none border-l-4 shadow-lg`}
                 >
                   <button onClick={() => toggle(task.id)} className="shrink-0 mt-0.5">
                     {task.done
-                      ? <CheckCircle className="w-5 h-5 text-emerald-500" />
-                      : <Circle className="w-5 h-5 text-slate-300 hover:text-slate-400" />}
+                      ? <CheckCircle className="w-5 h-5 text-emerald-400" />
+                      : <Circle className="w-5 h-5 text-slate-400 hover:text-white" />}
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className={`font-semibold text-sm ${task.done ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                    <p className={`font-bold text-sm ${task.done ? 'line-through text-slate-500' : 'text-white'}`}>
                       {task.name}
                     </p>
                     <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${cls.bg} ${cls.text} badge-skeu shrink-0`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${cls.bg} ${cls.text} badge-skeu shrink-0 shadow-sm border border-white/10`}>
                         {cat?.emoji ?? '📌'} {task.category}
                       </span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DEMAND_COLORS[task.demand_type]}`}>{task.demand_type}</span>
-                      <span className="text-xs text-slate-400 font-mono">{difficultyDots(task.difficulty)}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${DEMAND_COLORS[task.demand_type]} border border-white/5 shadow-sm`}>{task.demand_type}</span>
+                      <span className="text-xs text-slate-400 font-mono tracking-tighter">{difficultyDots(task.difficulty)}</span>
                     {task.recurring && task.recurring !== 'none' && (
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-600 flex items-center gap-1">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-900/40 text-emerald-200 border border-emerald-500/20 flex items-center gap-1">
                         <RefreshCw className="w-3 h-3" /> {task.recurring}
                       </span>
                     )}
-                    {task.estimated_minutes && <span className="text-xs text-slate-400">{task.estimated_minutes}m</span>}
+                    {task.estimated_minutes && <span className="text-[10px] text-slate-400 font-bold">{task.estimated_minutes}m</span>}
                     {task.deadline && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${
-                        isDueWithin48h(task.deadline, now) ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border ${
+                        isDueWithin48h(task.deadline, now) ? 'bg-red-900/40 text-red-200 border-red-500/20' : 'bg-white/5 text-slate-400 border-white/5'
                       }`}>
                         <Calendar className="w-3 h-3" />
                         {new Date(task.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
@@ -265,13 +265,13 @@ export default function TasksPage() {
                       <button 
                         onClick={() => breakdownTask(task.id)} 
                         disabled={breakingDownId === task.id}
-                        className="text-sky-400 hover:text-sky-600 transition-colors mt-0.5 disabled:opacity-50"
+                        className="text-sky-300 hover:text-white transition-colors mt-0.5 disabled:opacity-50"
                         title="AI Break Down"
                       >
                         {breakingDownId === task.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                       </button>
                     )}
-                    <button onClick={() => remove(task.id)} className="text-slate-300 hover:text-red-400 transition-colors mt-0.5">
+                    <button onClick={() => remove(task.id)} className="text-slate-500 hover:text-red-400 transition-colors mt-0.5">
                       <Trash2 className="w-4 h-4" />
                     </button>
                     </div>
@@ -281,11 +281,11 @@ export default function TasksPage() {
           </AnimatePresence>
 
           {visible.length === 0 && (
-            <div className="text-center py-10 text-slate-400">
-              <CheckCircle className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            <div className="text-center py-10 text-slate-500 font-bold">
+              <CheckCircle className="w-10 h-10 mx-auto mb-2 opacity-20" />
               <p className="text-sm">{filter === 'done' ? 'No completed tasks yet.' : 'No tasks. Add some!'}</p>
               {filter !== 'done' && (
-                <Link href="/tasks/new" className="inline-flex items-center gap-1.5 mt-3 text-sky-500 text-sm font-medium hover:text-sky-700">
+                <Link href="/tasks/new" className="inline-flex items-center gap-1.5 mt-3 text-sky-300 text-sm font-bold hover:text-white transition-colors">
                   <Plus className="w-4 h-4" /> Add your first task
                 </Link>
               )}

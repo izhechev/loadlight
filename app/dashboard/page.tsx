@@ -30,7 +30,7 @@ interface AnalysisResult {
   suggestion: string
 }
 
-const WORK_CATEGORIES = ['work', 'study', 'administrative', 'creative', 'Work', 'Study', 'Admin', 'Creative', 'Administrative']
+const WORK_CATEGORIES = ['work', 'study', 'administrative', 'creative', 'Work', 'Study', 'Admin', 'Creative', 'Administrative', 'Exercise', 'exercise']
 
 function isDueWithin48h(d: string | null) {
   if (!d) return false
@@ -41,25 +41,25 @@ function isDueWithin48h(d: string | null) {
 const STATE_INFO = {
   normal: {
     icon: Smile,
-    color: 'text-emerald-600',
-    bg: 'from-emerald-50 to-teal-50',
-    border: 'border-emerald-200',
+    color: 'text-emerald-400',
+    bg: 'from-emerald-900/40 to-teal-900/40',
+    border: 'border-emerald-500/30',
     headline: "You're managing well",
     sub: "Your workload looks balanced. Keep it up!",
   },
   elevated: {
     icon: Meh,
-    color: 'text-amber-600',
-    bg: 'from-amber-50 to-yellow-50',
-    border: 'border-amber-200',
+    color: 'text-amber-400',
+    bg: 'from-amber-900/40 to-yellow-900/40',
+    border: 'border-amber-500/30',
     headline: "Your plate is getting full",
     sub: "Things are building up. Consider completing a task before adding more.",
   },
   overwhelmed: {
     icon: Frown,
-    color: 'text-rose-600',
-    bg: 'from-rose-50 to-pink-50',
-    border: 'border-rose-200',
+    color: 'text-rose-400',
+    bg: 'from-rose-900/40 to-pink-900/40',
+    border: 'border-rose-500/30',
     headline: "Time to take a breather",
     sub: "Rest mode is active. Focus on what truly matters right now.",
   },
@@ -179,15 +179,15 @@ export default function DashboardPage() {
           className="grid grid-cols-2 sm:grid-cols-4 gap-3"
         >
           {([
-            ['Total tasks', tasks.length, 'text-sky-600', '📋'],
-            ['Completed', tasks.filter(t => t.done).length, 'text-emerald-600', '✅'],
-            ['Hours estimated', `${Math.round(activeMin / 60 * 10) / 10}h`, 'text-purple-600', '⏱'],
-            ['Due soon', dueSoon.length, dueSoon.length > 0 ? 'text-red-500' : 'text-slate-400', '⚡'],
+            ['Total tasks', tasks.length, 'text-sky-300', '📋'],
+            ['Completed', tasks.filter(t => t.done).length, 'text-emerald-300', '✅'],
+            ['Hours estimated', `${Math.round(activeMin / 60 * 10) / 10}h`, 'text-purple-300', '⏱'],
+            ['Due soon', dueSoon.length, dueSoon.length > 0 ? 'text-red-400' : 'text-slate-400', '⚡'],
           ] as [string, string | number, string, string][]).map(([label, val, color, emoji]) => (
-            <div key={label} className="skeu-card p-4 text-center">
+            <div key={label} className="skeu-card p-4 text-center bg-black/20 border-white/5">
               <div className="text-xl mb-1">{emoji}</div>
               <p className={`text-2xl font-black ${color}`}>{val}</p>
-              <p className="text-xs text-slate-500 mt-0.5 font-medium">{label}</p>
+              <p className="text-xs text-slate-300 mt-0.5 font-medium">{label}</p>
             </div>
           ))}
         </motion.div>
@@ -198,14 +198,14 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...mc, delay: 0.08 }}
-            className="skeu-card p-5"
+            className="skeu-card p-5 bg-black/20 border-white/5"
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-emerald-500" />
-                <h2 className="font-black text-slate-800">Balance</h2>
+                <TrendingUp className="w-5 h-5 text-emerald-400" />
+                <h2 className="font-black text-white">Balance</h2>
               </div>
-              <span className="text-xs text-slate-400 bg-white/60 px-2.5 py-1 rounded-full border border-white/60 badge-skeu">
+              <span className="text-xs text-slate-300 bg-white/10 px-2.5 py-1 rounded-full border border-white/10 badge-skeu">
                 {balanceMode === 'beast' ? '⚡ Beast' : balanceMode === 'chill' ? '🌿 Chill' : '⚖️ Average'}
               </span>
             </div>
@@ -213,25 +213,25 @@ export default function DashboardPage() {
             {/* Visual gauge */}
             <div className="mb-3">
               <div className="flex justify-between text-xs font-medium mb-1.5">
-                <span className="text-slate-600">Work <strong>{workPct}%</strong></span>
+                <span className="text-slate-200">Work <strong>{workPct}%</strong></span>
                 <span className="text-slate-400">target {targetWork}%</span>
               </div>
-              <div className="relative h-5 bg-white/50 rounded-full border border-white/60 overflow-hidden skeu-inset">
+              <div className="relative h-5 bg-black/40 rounded-full border border-white/10 overflow-hidden skeu-inset">
                 <div
                   className={`h-full rounded-full transition-all duration-700 ${workPct > targetWork + 15 ? 'bg-gradient-to-r from-orange-400 to-red-400' : 'bg-gradient-to-r from-sky-400 to-teal-400'}`}
                   style={{ width: `${workPct}%` }}
                 />
-                <div className="absolute top-0 h-full w-0.5 bg-slate-300/80" style={{ left: `${targetWork}%` }} />
+                <div className="absolute top-0 h-full w-0.5 bg-white/20" style={{ left: `${targetWork}%` }} />
               </div>
             </div>
 
             {/* Completion bar */}
             <div>
               <div className="flex justify-between text-xs font-medium mb-1.5">
-                <span className="text-slate-600">Progress</span>
+                <span className="text-slate-200">Progress</span>
                 <span className="text-slate-400">{donePct}% done</span>
               </div>
-              <div className="relative h-3 bg-white/50 rounded-full border border-white/60 overflow-hidden skeu-inset">
+              <div className="relative h-3 bg-black/40 rounded-full border border-white/10 overflow-hidden skeu-inset">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-all duration-700"
                   style={{ width: `${donePct}%` }}
@@ -240,13 +240,13 @@ export default function DashboardPage() {
             </div>
 
             {workPct > targetWork + 15 && (
-              <div className="mt-3 bg-red-50 border border-red-100 rounded-2xl p-3 flex items-start gap-2">
-                <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-red-600">Work is taking over. Maybe move some tasks to next week?</p>
+              <div className="mt-3 bg-red-900/30 border border-red-500/20 rounded-2xl p-3 flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-200">Work is taking over. Maybe move some tasks to next week?</p>
               </div>
             )}
 
-            <Link href="/settings" className="flex items-center gap-1 text-xs text-sky-500 hover:text-sky-700 mt-3 font-medium">
+            <Link href="/settings" className="flex items-center gap-1 text-xs text-sky-300 hover:text-white mt-3 font-medium transition-colors">
               Change balance goal <ChevronRight className="w-3 h-3" />
             </Link>
           </motion.div>
@@ -256,14 +256,14 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...mc, delay: 0.1 }}
-            className="skeu-card p-5"
+            className="skeu-card p-5 bg-black/20 border-white/5"
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-sky-500" />
-                <h2 className="font-black text-slate-800">Up next</h2>
+                <CheckCircle className="w-5 h-5 text-sky-400" />
+                <h2 className="font-black text-white">Up next</h2>
               </div>
-              <Link href="/tasks" className="text-xs text-sky-500 hover:text-sky-700 font-medium flex items-center gap-1">
+              <Link href="/tasks" className="text-xs text-sky-300 hover:text-white font-medium flex items-center gap-1 transition-colors">
                 See all <ChevronRight className="w-3 h-3" />
               </Link>
             </div>
@@ -275,27 +275,27 @@ export default function DashboardPage() {
                   const cat = categories.find(c => c.name.toLowerCase() === catName || c.id === t.category)
                   const cls = getCategoryClasses(cat?.color ?? 'sky')
                   return (
-                    <div key={t.id} className="flex items-center gap-3 bg-white/55 rounded-2xl p-3 border border-white/70 skeu-card">
+                    <div key={t.id} className="flex items-center gap-3 bg-black/20 rounded-2xl p-3 border border-white/5 skeu-card shadow-lg">
                       <span className="text-base">{cat?.emoji ?? '📌'}</span>
-                      <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{t.name}</span>
+                      <span className="flex-1 text-sm font-semibold text-white truncate">{t.name}</span>
                       {isDueWithin48h(t.deadline) && (
-                        <span className="text-xs text-red-600 font-bold shrink-0">Due soon!</span>
+                        <span className="text-xs text-red-400 font-bold shrink-0">Due soon!</span>
                       )}
-                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${cls.bg} ${cls.text} badge-skeu shrink-0`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${cls.bg} ${cls.text} badge-skeu shrink-0 shadow-sm border border-white/10`}>
                         {t.category}
                       </span>
                     </div>
                   )
                 })}
                 {tasks.filter(t => !t.done).length > 5 && (
-                  <p className="text-xs text-slate-400 text-center pt-1">+{tasks.filter(t => !t.done).length - 5} more tasks</p>
+                  <p className="text-xs text-slate-400 text-center pt-1 font-bold">+{tasks.filter(t => !t.done).length - 5} more tasks</p>
                 )}
               </div>
             ) : (
               <div className="text-center py-8">
-                <CheckCircle className="w-10 h-10 mx-auto mb-2 text-emerald-300" />
-                <p className="text-sm text-slate-400 font-medium">All clear! Nothing pending.</p>
-                <Link href="/tasks/new" className="inline-flex items-center gap-1.5 mt-3 text-sky-500 text-sm font-semibold">
+                <CheckCircle className="w-10 h-10 mx-auto mb-2 text-emerald-500/40" />
+                <p className="text-sm text-slate-400 font-bold">All clear! Nothing pending.</p>
+                <Link href="/tasks/new" className="inline-flex items-center gap-1.5 mt-3 text-sky-300 text-sm font-bold hover:text-white transition-colors">
                   <Plus className="w-4 h-4" /> Add tasks
                 </Link>
               </div>
@@ -308,13 +308,13 @@ export default function DashboardPage() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...mc, delay: 0.12 }}
-          className="skeu-card p-5"
+          className="skeu-card p-5 bg-black/20 border-white/5"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Brain className="w-5 h-5 text-purple-500" />
-              <h2 className="font-black text-slate-800">AI Tip</h2>
-              <span className="text-xs text-slate-400">Analyses your tasks and gives advice</span>
+              <Brain className="w-5 h-5 text-purple-400" />
+              <h2 className="font-black text-white">AI Tip</h2>
+              <span className="text-xs text-slate-400 font-bold">Analyses workload</span>
             </div>
             <button
               onClick={fetchSummary}
@@ -329,23 +329,23 @@ export default function DashboardPage() {
           {weeklyAnalysis ? (
             <div className="space-y-3">
               <div className={`rounded-2xl px-4 py-3 font-black text-sm border ${
-                weeklyAnalysis.verdict === 'overloaded' ? 'bg-red-50 text-red-700 border-red-100' :
-                weeklyAnalysis.verdict === 'balanced'   ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                                          'bg-sky-50 text-sky-700 border-sky-100'
+                weeklyAnalysis.verdict === 'overloaded' ? 'bg-red-900/40 text-red-200 border-red-500/30' :
+                weeklyAnalysis.verdict === 'balanced'   ? 'bg-emerald-900/40 text-emerald-100 border-emerald-500/30' :
+                                                          'bg-sky-900/40 text-sky-100 border-sky-500/30'
               }`}>
                 {weeklyAnalysis.verdict === 'overloaded' ? '⚠️ Overloaded' : weeklyAnalysis.verdict === 'balanced' ? '✅ Balanced' : '🌿 Light week'}
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed">{weeklyAnalysis.trend}</p>
-              <div className="skeu-inset rounded-2xl p-4">
-                <p className="text-xs font-black text-slate-500 uppercase tracking-wide mb-1.5">Suggestion</p>
-                <p className="text-sm text-slate-600 leading-relaxed">{weeklyAnalysis.suggestion}</p>
+              <p className="text-sm text-slate-200 leading-relaxed font-medium">{weeklyAnalysis.trend}</p>
+              <div className="skeu-inset rounded-2xl p-4 bg-black/30 border-white/5">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-1.5">Suggestion</p>
+                <p className="text-sm text-slate-200 leading-relaxed font-medium">{weeklyAnalysis.suggestion}</p>
               </div>
-              <p className="text-xs text-slate-400">🤖 AI-generated · workload data only · not medical advice</p>
+              <p className="text-[10px] text-slate-500 font-bold italic">🤖 AI-generated · workload data only · not medical advice</p>
             </div>
           ) : (
-            <div className="skeu-inset rounded-2xl p-6 text-center">
-              <Brain className="w-8 h-8 mx-auto mb-2 text-purple-300" />
-              <p className="text-sm text-slate-500">Click Generate for a personalised workload tip</p>
+            <div className="skeu-inset rounded-2xl p-6 text-center bg-black/30 border-white/5">
+              <Brain className="w-8 h-8 mx-auto mb-2 text-purple-400/40" />
+              <p className="text-sm text-slate-400 font-bold">Click Generate for a personalised workload tip</p>
             </div>
           )}
         </motion.div>
