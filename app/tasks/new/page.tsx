@@ -45,6 +45,7 @@ export default function AddTaskPage() {
   const router = useRouter()
   const shouldReduceMotion = useReducedMotion()
   const { state: overwhelmedState } = useOverwhelmedStore()
+  const { categories } = useCategoryStore()
   const [input, setInput] = useState('')
   const [isExtracting, setIsExtracting] = useState(false)
   const [preview, setPreview] = useState<ExtractedTask[] | null>(null)

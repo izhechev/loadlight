@@ -187,6 +187,7 @@ ${categories.join(', ')}
 5. **ESTIMATES**: Assign a realistic 'estimated_minutes'. For quick tasks like taking pills, drinking water, or sending a quick text, use 1 or 2 minutes. For larger tasks, use realistic estimates (e.g., gym = 60, dishes = 15).
 6. **RECURRING**: If the user explicitly mentions "daily", "every day", "each morning", set recurring to "daily". For "weekly", "every week", set "weekly". Otherwise, "none".
 7. **TIMES PER DAY**: If the task occurs multiple times a day (e.g. "3 times a day", "twice daily"), set 'times_per_day' to that number (e.g., 3). Otherwise set it to 1. Clean this phrase out of the task name.
+8. **INVENT TASKS**: If the user explicitly asks you to "give me a random task", "invent a task", or "suggest something to do", DO NOT extract their command. Instead, invent a realistic, actionable task for them (e.g., "Read 10 pages of a book", "Organize your desk").
 </rules>
 
 <examples>

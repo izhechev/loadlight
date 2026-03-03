@@ -71,11 +71,8 @@
 .aero-bg {
   min-height: 100vh;
   position: relative;
-  background: 
-    linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, transparent 40%),
-    radial-gradient(circle at 80% 10%, rgba(0, 162, 255, 0.3) 0%, transparent 50%),
-    radial-gradient(circle at 20% 80%, rgba(57, 255, 20, 0.25) 0%, transparent 55%),
-    linear-gradient(to bottom, #d8f0fa 0%, #e0f8ee 100%);
+  /* Authentic Frutiger Aero sky/aurora gradient */
+  background: linear-gradient(180deg, #b3e5fc 0%, #e0f2fe 50%, #f0fdf4 100%);
   background-attachment: fixed;
   overflow-x: hidden;
 }
@@ -83,13 +80,15 @@
 .aero-bg::before {
   content: '';
   position: fixed;
-  inset: -20px;
-  background-image: url('https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=2232&auto=format&fit=crop');
+  inset: 0;
+  /* Crisp, high-contrast nature vector/image typical of 2006-2009 FA */
+  background-image: url('https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=2000&auto=format&fit=crop');
   background-size: cover;
-  background-position: center bottom;
+  background-position: center 30%;
   background-attachment: fixed;
-  filter: blur(16px) saturate(1.8) brightness(1.15) contrast(1.1);
-  opacity: 0.5;
+  /* Removed extreme blur - kept it crisp with a slight glow and high saturation */
+  filter: saturate(1.4) brightness(1.1) contrast(1.05);
+  opacity: 0.25; /* Light overlay over the gradient */
   z-index: -2;
   pointer-events: none;
 }
@@ -98,7 +97,8 @@
   content: '';
   position: fixed;
   inset: 0;
-  background: linear-gradient(160deg, rgba(0, 150, 255, 0.4) 0%, rgba(0, 220, 255, 0.3) 40%, rgba(100, 255, 150, 0.2) 100%);
+  /* Sunburst/lens flare effect from top left */
+  background: radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.2) 30%, transparent 70%);
   z-index: -1;
   pointer-events: none;
 }
@@ -125,32 +125,32 @@
   opacity: 0.6;
 }
 
-/* ─── Glass Panels & Cards (Maximum Sheumorphism) ─── */
+/* ─── Glass Panels & Cards (Stronger Sheumorphism) ─── */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(35px) saturate(220%);
-  -webkit-backdrop-filter: blur(35px) saturate(220%);
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
   border-radius: 2.5rem;
   box-shadow: 
-    0 20px 50px rgba(0, 50, 150, 0.15),
-    inset 0 3px 0 rgba(255, 255, 255, 1),
-    inset 0 -3px 0 rgba(255, 255, 255, 0.4),
-    0 3px 8px rgba(0, 0, 0, 0.08);
+    0 20px 50px rgba(0, 50, 150, 0.1),
+    inset 0 2px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.3),
+    0 2px 5px rgba(0, 0, 0, 0.05);
   position: relative;
   overflow: hidden;
 }
 
 .glass-panel-strong {
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(40px) saturate(250%);
-  -webkit-backdrop-filter: blur(40px) saturate(250%);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
   border: 2px solid rgba(255, 255, 255, 1);
   border-radius: 2.5rem;
   box-shadow: 
-    0 25px 60px rgba(0, 50, 150, 0.18),
+    0 25px 60px rgba(0, 50, 150, 0.15),
     inset 0 3px 0 rgba(255, 255, 255, 1),
-    inset 0 -3px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -3px 0 rgba(255, 255, 255, 0.4),
     0 3px 8px rgba(0, 0, 0, 0.08);
   position: relative;
   overflow: hidden;
