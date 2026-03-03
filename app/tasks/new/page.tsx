@@ -22,11 +22,11 @@ interface ExtractedTask {
 }
 
 const DEMAND_COLORS: Record<DemandType, string> = {
-  cognitive: 'bg-blue-50 text-blue-600',
-  emotional: 'bg-rose-50 text-rose-600',
-  creative: 'bg-purple-50 text-purple-600',
-  routine: 'bg-slate-100 text-slate-600',
-  physical: 'bg-emerald-50 text-emerald-600',
+  cognitive: 'bg-blue-500/20 text-blue-100',
+  emotional: 'bg-rose-500/20 text-rose-100',
+  creative: 'bg-purple-500/20 text-purple-100',
+  routine: 'bg-slate-500/20 text-slate-100',
+  physical: 'bg-emerald-500/20 text-emerald-100',
 }
 
 function difficultyLabel(d: number): string {

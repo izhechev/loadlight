@@ -110,7 +110,7 @@
   pointer-events: none;
 }
 
-/* ─── Bubbles & Orbs (Floating) ─── */
+/* ─── Bubbles & Shockwaves (Floating) ─── */
 .orb-layer {
   position: fixed;
   inset: 0;
@@ -119,48 +119,59 @@
   overflow: hidden;
 }
 
-.orb {
+@keyframes shockwave {
+  0% { transform: scale(0.8); opacity: 0; border-width: 2px; }
+  20% { opacity: 0.3; }
+  100% { transform: scale(2.2); opacity: 0; border-width: 0.5px; }
+}
+
+.shockwave {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.05) 60%, rgba(255, 255, 255, 0.1) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 
-    inset -10px -10px 25px rgba(0, 50, 50, 0.2),
-    inset 5px 5px 15px rgba(255, 255, 255, 0.6),
-    0 10px 20px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(2px);
-  opacity: 0.4;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 80%);
+  animation: shockwave 8s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+  pointer-events: none;
 }
+
+/* Removing the static orbs that looked like tires */
+.orb { display: none; }
 
 /* ─── Glass Panels & Cards (Darker, Glossy Windows Aero style) ─── */
 .glass-panel {
   /* Dark teal translucent background like the reference window */
-  background: rgba(15, 60, 50, 0.65);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(10, 45, 35, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   box-shadow: 
-    0 15px 30px rgba(0, 0, 0, 0.4),
-    inset 0 1px 1px rgba(255, 255, 255, 0.4),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.6);
+    0 15px 30px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   position: relative;
   color: white;
 }
 
 .glass-panel-strong {
-  background: rgba(10, 45, 35, 0.8);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(8, 35, 28, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   box-shadow: 
-    0 20px 40px rgba(0, 0, 0, 0.5),
-    inset 0 1px 2px rgba(255, 255, 255, 0.5),
-    inset 0 -2px 5px rgba(0, 0, 0, 0.8);
+    0 20px 40px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.6);
   position: relative;
   color: white;
 }
+
+/* Remove white lines/tire look from borders and separators */
+.border-white\/5  { border-color: rgba(255, 255, 255, 0.03) !important; }
+.border-white\/10 { border-color: rgba(255, 255, 255, 0.06) !important; }
+.border-white\/20 { border-color: rgba(255, 255, 255, 0.1) !important; }
+.border-t         { border-top-color: rgba(255, 255, 255, 0.08) !important; }
+.border-b         { border-bottom-color: rgba(255, 255, 255, 0.08) !important; }
 
 /* High-contrast, sharp gloss reflection on the top half (classic Aero style) */
 .glass-panel::after, .glass-panel-strong::after {

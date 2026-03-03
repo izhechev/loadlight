@@ -90,9 +90,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`aero-bg min-h-screen ${stateClass}`}>
       <div className="orb-layer">
-        <div className="orb w-32 h-32 top-[10%] left-[5%]" style={{ animation: 'float-slow 8s infinite alternate' }}></div>
-        <div className="orb w-48 h-48 top-[60%] left-[85%]" style={{ animation: 'float-med 12s infinite alternate' }}></div>
-        <div className="orb w-24 h-24 top-[40%] left-[40%]" style={{ animation: 'float-slow 6s infinite alternate' }}></div>
+        <div className="shockwave w-64 h-64 top-[20%] left-[10%]" style={{ animationDelay: '0s' }}></div>
+        <div className="shockwave w-96 h-96 top-[50%] left-[60%]" style={{ animationDelay: '1s' }}></div>
+        <div className="shockwave w-48 h-48 top-[70%] left-[20%]" style={{ animationDelay: '2s' }}></div>
       </div>
       
       <AnimatePresence>
@@ -135,7 +135,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex max-w-6xl mx-auto w-full px-3 py-4 gap-4 pb-24 md:pb-6">
 
         {/* ── Desktop sidebar (md+) ── */}
-        <nav className="hidden md:flex glass-panel p-3 flex-col gap-1 w-52 shrink-0 h-fit sticky top-20 self-start border border-white/10 shadow-2xl">
+        <nav className="hidden md:flex glass-panel p-3 flex-col gap-1 w-52 shrink-0 h-fit sticky top-20 self-start border border-white/5 shadow-2xl">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
             return (
@@ -144,8 +144,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 href={href}
                 className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-150 ${
                   active
-                    ? "bg-white/20 text-white shadow-inner-sm border border-white/30"
-                    : "text-slate-300 hover:bg-white/10 hover:text-white"
+                    ? "bg-white/10 text-white shadow-inner-sm border border-white/10"
+                    : "text-slate-300 hover:bg-white/5 hover:text-white"
                 }`}
               >
                 <Icon className="w-4 h-4 shrink-0" />
