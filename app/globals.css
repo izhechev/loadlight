@@ -71,8 +71,8 @@
 .aero-bg {
   min-height: 100vh;
   position: relative;
-  /* Authentic Frutiger Aero sky/aurora gradient */
-  background: linear-gradient(180deg, #b3e5fc 0%, #e0f2fe 50%, #f0fdf4 100%);
+  /* Deep emerald/teal gradient matching the reference image */
+  background: linear-gradient(135deg, #18987b 0%, #1eaf8d 40%, #17c196 100%);
   background-attachment: fixed;
   overflow-x: hidden;
 }
@@ -81,26 +81,29 @@
   content: '';
   position: fixed;
   inset: 0;
-  /* Crisp, high-contrast nature vector/image typical of 2006-2009 FA */
-  background-image: url('https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=2000&auto=format&fit=crop');
-  background-size: cover;
-  background-position: center 30%;
-  background-attachment: fixed;
-  /* Removed extreme blur - kept it crisp with a slight glow and high saturation */
-  filter: saturate(1.4) brightness(1.1) contrast(1.05);
-  opacity: 0.25; /* Light overlay over the gradient */
+  /* Glowing light waves/lines typical of 2000s tech aesthetics */
+  background-image: radial-gradient(circle at 50% -20%, rgba(255,255,255,0.4) 0%, transparent 60%),
+                    radial-gradient(circle at -20% 80%, rgba(180,255,220,0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 120% 80%, rgba(180,255,220,0.3) 0%, transparent 50%);
   z-index: -2;
   pointer-events: none;
 }
 
+/* Swooping light rays to match the background lines in the image */
 .aero-bg::after {
   content: '';
   position: fixed;
-  inset: 0;
-  /* Sunburst/lens flare effect from top left */
-  background: radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.2) 30%, transparent 70%);
+  width: 200%;
+  height: 200px;
+  top: 50%;
+  left: -50%;
+  transform: rotate(-15deg);
+  background: radial-gradient(ellipse at center, rgba(255,255,255,0.2) 0%, transparent 70%);
+  border-top: 2px solid rgba(255,255,255,0.1);
+  border-bottom: 2px solid rgba(255,255,255,0.05);
   z-index: -1;
   pointer-events: none;
+  filter: blur(4px);
 }
 
 /* ─── Bubbles & Orbs (Floating) ─── */
@@ -115,71 +118,83 @@
 .orb {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.1) 60%, rgba(255, 255, 255, 0.4) 100%);
-  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.05) 60%, rgba(255, 255, 255, 0.1) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 
-    inset -10px -10px 25px rgba(0, 100, 255, 0.15),
-    inset 5px 5px 15px rgba(255, 255, 255, 1),
-    0 20px 40px rgba(0, 50, 150, 0.15);
-  backdrop-filter: blur(5px);
-  opacity: 0.6;
+    inset -10px -10px 25px rgba(0, 50, 50, 0.2),
+    inset 5px 5px 15px rgba(255, 255, 255, 0.6),
+    0 10px 20px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(2px);
+  opacity: 0.4;
 }
 
-/* ─── Glass Panels & Cards (Stronger Sheumorphism) ─── */
+/* ─── Glass Panels & Cards (Darker, Glossy Windows Aero style) ─── */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(12px) saturate(150%);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
-  border: 1.5px solid rgba(255, 255, 255, 0.9);
-  border-radius: 2.5rem;
+  /* Dark teal translucent background like the reference window */
+  background: rgba(15, 60, 50, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
   box-shadow: 
-    0 20px 50px rgba(0, 50, 150, 0.1),
-    inset 0 2px 0 rgba(255, 255, 255, 0.8),
-    inset 0 -2px 0 rgba(255, 255, 255, 0.3),
-    0 2px 5px rgba(0, 0, 0, 0.05);
+    0 15px 30px rgba(0, 0, 0, 0.4),
+    inset 0 1px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.6);
   position: relative;
-  overflow: hidden;
+  color: white;
 }
 
 .glass-panel-strong {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border: 2px solid rgba(255, 255, 255, 1);
-  border-radius: 2.5rem;
+  background: rgba(10, 45, 35, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
   box-shadow: 
-    0 25px 60px rgba(0, 50, 150, 0.15),
-    inset 0 3px 0 rgba(255, 255, 255, 1),
-    inset 0 -3px 0 rgba(255, 255, 255, 0.4),
-    0 3px 8px rgba(0, 0, 0, 0.08);
+    0 20px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 2px rgba(255, 255, 255, 0.5),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.8);
   position: relative;
-  overflow: hidden;
+  color: white;
 }
 
-/* High-gloss top reflection */
+/* High-contrast, sharp gloss reflection on the top half (classic Aero style) */
 .glass-panel::after, .glass-panel-strong::after {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 55%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.1) 80%, rgba(255, 255, 255, 0) 100%);
-  border-radius: 2.5rem 2.5rem 50% 50% / 10% 10% 20% 20%;
+  height: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.05) 95%, rgba(255, 255, 255, 0) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px 12px 0 0;
   pointer-events: none;
   z-index: 10;
 }
 
+/* Overriding text colors inside dark panels */
+.glass-panel p, .glass-panel h1, .glass-panel h2, .glass-panel h3, .glass-panel span,
+.glass-panel-strong p, .glass-panel-strong h1, .glass-panel-strong h2, .glass-panel-strong h3, .glass-panel-strong span {
+  color: #f8fafc;
+}
+.glass-panel .text-slate-500, .glass-panel .text-slate-600, .glass-panel-strong .text-slate-500 {
+  color: #cbd5e1 !important;
+}
+.glass-panel .text-slate-800, .glass-panel .text-slate-700, .glass-panel-strong .text-slate-800 {
+  color: #ffffff !important;
+}
+
 .skeu-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(230, 245, 255, 0.6) 100%);
-  border: 2px solid rgba(255, 255, 255, 1);
-  border-radius: 1.5rem;
+  background: linear-gradient(180deg, rgba(25, 80, 65, 0.8) 0%, rgba(15, 60, 50, 0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
   box-shadow: 
-    0 15px 35px rgba(0, 50, 150, 0.1),
-    inset 0 2px 0 rgba(255, 255, 255, 1),
-    inset 0 -4px 10px rgba(0, 100, 255, 0.06),
-    0 2px 5px rgba(0, 0, 0, 0.12);
+    0 8px 16px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
   position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
   overflow: hidden;
+  color: white;
 }
 
 .skeu-card::after {
@@ -187,7 +202,7 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 45%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%);
   pointer-events: none;
 }
 
@@ -208,20 +223,19 @@
 
 /* ─── Buttons (Ultimate Gloss) ─── */
 .glow-button {
-  background: linear-gradient(to bottom, #4facfe 0%, #00f2fe 50%, #00d2ff 100%);
+  background: linear-gradient(180deg, #1d6153 0%, #0e3f34 100%);
   color: white;
-  font-weight: 900;
-  padding: 0.75rem 1.5rem;
-  border-radius: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  font-weight: 700;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px; /* Match the pill/tab shape in the image */
+  border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 
-    inset 0 3px 0 rgba(255, 255, 255, 0.8),
-    inset 0 -3px 0 rgba(0, 100, 200, 0.3),
-    0 15px 30px rgba(14, 165, 233, 0.4);
+    0 4px 8px rgba(0, 0, 0, 0.4),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.8);
   position: relative;
   overflow: hidden;
-  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  text-shadow: 0 1px 3px rgba(0, 50, 100, 0.4);
+  transition: all 0.2s ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .glow-button::after {
@@ -229,40 +243,45 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 50%;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 100%);
-  border-radius: 1.5rem 1.5rem 50% 50% / 10% 10% 20% 20%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 90%, rgba(255, 255, 255, 0) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   pointer-events: none;
 }
 
 .glow-button:hover {
-  transform: translateY(-3px) scale(1.04);
-  box-shadow: 0 20px 40px rgba(14, 165, 233, 0.5), inset 0 3px 0 rgba(255, 255, 255, 0.9);
-  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(180deg, #247565 0%, #124d40 100%);
 }
 
 .glow-button:active {
-  transform: translateY(2px) scale(0.96);
-  box-shadow: inset 0 5px 10px rgba(0, 100, 200, 0.4), 0 5px 10px rgba(14, 165, 233, 0.2);
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
 /* ─── Inputs ─── */
 .input-skeu {
-  background: rgba(255, 255, 255, 0.85);
-  border: 2px solid rgba(255, 255, 255, 1);
-  border-radius: 1rem;
+  background: rgba(10, 45, 35, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-top: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
   box-shadow: 
-    inset 0 4px 10px rgba(0, 50, 150, 0.1),
-    0 1px 0 rgba(255, 255, 255, 1);
-  transition: all 0.3s ease;
+    inset 0 4px 8px rgba(0, 0, 0, 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+  color: white;
 }
 
 .input-skeu:focus {
-  background: rgba(255, 255, 255, 1);
+  background: rgba(15, 60, 50, 0.8);
   box-shadow: 
-    inset 0 2px 4px rgba(0, 50, 150, 0.05),
-    0 0 0 4px rgba(0, 150, 255, 0.3);
-  border-color: #00d2ff;
-  transform: translateY(-1px);
+    inset 0 2px 4px rgba(0, 0, 0, 0.5),
+    0 0 0 2px rgba(100, 255, 200, 0.3);
+  border-color: #64ffc8;
+}
+
+.input-skeu::placeholder {
+  color: rgba(255, 255, 255, 0.4);
 }
 
 /* ─── Typography ─── */
@@ -270,20 +289,21 @@
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  background-image: linear-gradient(135deg, #0369a1 0%, #0891b2 100%);
+  background-image: linear-gradient(180deg, #ffffff 0%, #a7f3d0 100%);
   font-weight: 900;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
 }
 
 .gradient-text-green {
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  background-image: linear-gradient(135deg, #047857 0%, #059669 100%);
+  background-image: linear-gradient(180deg, #64ffc8 0%, #10b981 100%);
   font-weight: 900;
 }
 
 h1, h2, h3 {
-  text-shadow: 0 1px 1px rgba(255, 255, 255, 1), 0 2px 5px rgba(0, 0, 0, 0.08);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
   letter-spacing: -0.02em;
 }
 

@@ -226,7 +226,7 @@ export default function TasksPage() {
                   transition={mc}
                   className={`flex items-start gap-3 rounded-2xl p-4 border-l-4 transition-all ${
                     cls.bg.replace('bg-', 'border-l-')
-                  } ${task.done ? 'bg-white/30 opacity-60' : 'bg-white/60'}`}
+                  } ${task.done ? 'bg-black/30 opacity-60' : 'bg-black/20 hover:bg-black/30'} skeu-card border-none border-l-4`}
                 >
                   <button onClick={() => toggle(task.id)} className="shrink-0 mt-0.5">
                     {task.done
