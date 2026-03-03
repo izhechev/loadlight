@@ -77,7 +77,10 @@ export default function DashboardPage() {
   useEffect(() => {
     try {
       const t = localStorage.getItem('loadlight-tasks')
-      if (t) setTasks(JSON.parse(t) as Task[])
+      if (t) {
+        const data = JSON.parse(t) as any[]
+        setTasks(data.map(tsk => ({ ...tsk, category: tsk.category || tsk.life_domain || 'Personal' })) as Task[])
+      }
       const u = localStorage.getItem('loadlight-user')
       if (u) {
         const p = JSON.parse(u) as { balanceMode?: BalanceMode }
@@ -89,15 +92,16 @@ export default function DashboardPage() {
   const updateState = useCallback(() => {
     if (!tasks.length) return
     const sevenDaysAgo = Date.now() - 604800000
+    const undoneTasks = tasks.filter(t => !t.done)
     const demandTypeCounts: Record<DemandType, number> = { cognitive: 0, emotional: 0, creative: 0, routine: 0, physical: 0 }
-    tasks.forEach(t => { demandTypeCounts[t.demand_type]++ })
+    undoneTasks.forEach(t => { demandTypeCounts[t.demand_type]++ })
     computeAndTransition({
-      undoneCount: tasks.filter(t => !t.done).length,
+      undoneCount: undoneTasks.length,
       doneCount: tasks.filter(t => t.done).length,
       addedLast7Days: tasks.filter(t => t.createdAt > sevenDaysAgo).length,
       completedLast7Days: tasks.filter(t => t.done && t.createdAt > sevenDaysAgo).length,
-      tasksWithDeadlines: tasks.filter(t => t.deadline).length,
-      tasksDueWithin48h: tasks.filter(t => isDueWithin48h(t.deadline)).length,
+      tasksWithDeadlines: undoneTasks.filter(t => t.deadline).length,
+      tasksDueWithin48h: undoneTasks.filter(t => isDueWithin48h(t.deadline)).length,
       demandTypeCounts,
     } as TaskSignalData)
   }, [tasks, computeAndTransition])
@@ -261,7 +265,8 @@ export default function DashboardPage() {
             {pendingTasks.length > 0 ? (
               <div className="space-y-2">
                 {pendingTasks.map(t => {
-                  const cat = categories.find(c => c.name === t.category || c.id === t.category)
+                  const catName = (t.category || 'Personal').toLowerCase()
+                  const cat = categories.find(c => c.name.toLowerCase() === catName || c.id === t.category)
                   const cls = getCategoryClasses(cat?.color ?? 'sky')
                   return (
                     <div key={t.id} className="flex items-center gap-3 bg-white/55 rounded-2xl p-3 border border-white/70 skeu-card">

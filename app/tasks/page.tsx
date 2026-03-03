@@ -2,17 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
-import { CheckCircle, Circle, Trash2, Calendar, Plus, Filter, RefreshCw } from "lucide-react"
+import { CheckCircle, Circle, Trash2, Calendar, Plus, Filter, RefreshCw, Sparkles, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { AppLayout } from "@/components/app-layout"
 import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib/store/overwhelmedStore"
-
-type LifeDomain = 'work' | 'study' | 'personal' | 'creative' | 'administrative'
+import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 
 interface Task {
   id: string
   name: string
-  life_domain: LifeDomain
+  category: string
   demand_type: DemandType
   difficulty: number
   deadline: string | null
@@ -20,14 +19,6 @@ interface Task {
   done: boolean
   createdAt: number
   recurring?: 'none' | 'daily' | 'weekly'
-}
-
-const DOMAIN_COLORS: Record<LifeDomain, string> = {
-  work: 'bg-blue-100 text-blue-700 border-l-blue-400',
-  study: 'bg-indigo-100 text-indigo-700 border-l-indigo-400',
-  personal: 'bg-teal-100 text-teal-700 border-l-teal-400',
-  creative: 'bg-pink-100 text-pink-700 border-l-pink-400',
-  administrative: 'bg-amber-100 text-amber-700 border-l-amber-400',
 }
 
 const DEMAND_COLORS: Record<DemandType, string> = {
@@ -51,9 +42,11 @@ function difficultyDots(d: number): string {
 export default function TasksPage() {
   const shouldReduceMotion = useReducedMotion()
   const { state: overwhelmedState, computeAndTransition } = useOverwhelmedStore()
+  const { categories } = useCategoryStore()
   const [tasks, setTasks] = useState<Task[]>([])
   const [filter, setFilter] = useState<'all' | 'active' | 'done'>('active')
   const [now, setNow] = useState<number>(0)
+  const [breakingDownId, setBreakingDownId] = useState<string | null>(null)
 
   useEffect(() => {
     const time = Date.now()
@@ -62,8 +55,9 @@ export default function TasksPage() {
       try {
         const stored = localStorage.getItem('loadlight-tasks')
         if (stored) {
-          const data = JSON.parse(stored) as Task[]
-          setTasks(data)
+          const data = JSON.parse(stored) as any[]
+          const mapped = data.map(t => ({ ...t, category: t.category || t.life_domain || 'Personal' }))
+          setTasks(mapped as Task[])
         }
       } catch { /* ignore */ }
     })
@@ -74,18 +68,58 @@ export default function TasksPage() {
     const undone = updated.filter(t => !t.done)
     const sevenDaysAgo = (now || Date.now()) - 604800000
     const demandTypeCounts: Record<DemandType, number> = { cognitive: 0, emotional: 0, creative: 0, routine: 0, physical: 0 }
-    updated.forEach(t => { demandTypeCounts[t.demand_type]++ })
+    undone.forEach(t => { demandTypeCounts[t.demand_type]++ })
     const data: TaskSignalData = {
       undoneCount: undone.length,
       doneCount: updated.filter(t => t.done).length,
       addedLast7Days: updated.filter(t => t.createdAt > sevenDaysAgo).length,
       completedLast7Days: updated.filter(t => t.done && t.createdAt > sevenDaysAgo).length,
-      tasksWithDeadlines: updated.filter(t => t.deadline).length,
-      tasksDueWithin48h: updated.filter(t => isDueWithin48h(t.deadline, now || Date.now())).length,
+      tasksWithDeadlines: undone.filter(t => t.deadline).length,
+      tasksDueWithin48h: undone.filter(t => isDueWithin48h(t.deadline, now || Date.now())).length,
       demandTypeCounts,
     }
     computeAndTransition(data)
   }, [computeAndTransition, now])
+
+  async function breakdownTask(id: string) {
+    const task = tasks.find(t => t.id === id)
+    if (!task) return
+    
+    setBreakingDownId(id)
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text: task.name, 
+          mode: 'breakdown',
+          categories: categories.map(c => c.name) 
+        }),
+      })
+      if (!res.ok) throw new Error('API error')
+      const data = await res.json()
+      
+      if (data.tasks?.length) {
+        const subTasks: Task[] = data.tasks.map((t: any) => ({
+          ...t,
+          id: Math.random().toString(36).slice(2),
+          done: false,
+          createdAt: Date.now(),
+          deadline: task.deadline // inherit deadline
+        }))
+        
+        // Replace old task with subtasks
+        const updated = tasks.flatMap(t => t.id === id ? subTasks : [t])
+        setTasks(updated)
+        syncAndCompute(updated)
+      }
+    } catch (err) {
+      console.error("Failed to breakdown task", err)
+      alert("Failed to break down task. Make sure you are connected to the internet.")
+    } finally {
+      setBreakingDownId(null)
+    }
+  }
 
   function toggle(id: string) {
     const task = tasks.find(t => t.id === id)
@@ -172,30 +206,37 @@ export default function TasksPage() {
         {/* Task list */}
         <div className="glass-panel p-4 space-y-2">
           <AnimatePresence>
-            {visible.map(task => (
-              <motion.div
-                key={task.id}
-                layout
-                initial={{ opacity: 0, x: -16 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 16 }}
-                transition={mc}
-                className={`flex items-start gap-3 rounded-2xl p-4 border-l-4 transition-all ${
-                  DOMAIN_COLORS[task.life_domain]
-                } ${task.done ? 'bg-white/30 opacity-60' : 'bg-white/60'}`}
-              >
-                <button onClick={() => toggle(task.id)} className="shrink-0 mt-0.5">
-                  {task.done
-                    ? <CheckCircle className="w-5 h-5 text-emerald-500" />
-                    : <Circle className="w-5 h-5 text-slate-300 hover:text-slate-400" />}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p className={`font-semibold text-sm ${task.done ? 'line-through text-slate-400' : 'text-slate-800'}`}>
-                    {task.name}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DEMAND_COLORS[task.demand_type]}`}>{task.demand_type}</span>
-                    <span className="text-xs text-slate-400 font-mono">{difficultyDots(task.difficulty)}</span>
+            {visible.map(task => {
+              const catName = (task.category || 'Personal').toLowerCase()
+              const cat = categories.find(c => c.name.toLowerCase() === catName || c.id === task.category)
+              const cls = getCategoryClasses(cat?.color ?? 'sky')
+              return (
+                <motion.div
+                  key={task.id}
+                  layout
+                  initial={{ opacity: 0, x: -16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 16 }}
+                  transition={mc}
+                  className={`flex items-start gap-3 rounded-2xl p-4 border-l-4 transition-all ${
+                    cls.bg.replace('bg-', 'border-l-')
+                  } ${task.done ? 'bg-white/30 opacity-60' : 'bg-white/60'}`}
+                >
+                  <button onClick={() => toggle(task.id)} className="shrink-0 mt-0.5">
+                    {task.done
+                      ? <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      : <Circle className="w-5 h-5 text-slate-300 hover:text-slate-400" />}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-semibold text-sm ${task.done ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                      {task.name}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${cls.bg} ${cls.text} badge-skeu shrink-0`}>
+                        {cat?.emoji ?? '📌'} {task.category}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DEMAND_COLORS[task.demand_type]}`}>{task.demand_type}</span>
+                      <span className="text-xs text-slate-400 font-mono">{difficultyDots(task.difficulty)}</span>
                     {task.recurring && task.recurring !== 'none' && (
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-600 flex items-center gap-1">
                         <RefreshCw className="w-3 h-3" /> {task.recurring}
@@ -213,11 +254,24 @@ export default function TasksPage() {
                     )}
                   </div>
                 </div>
-                <button onClick={() => remove(task.id)} className="text-slate-200 hover:text-red-400 transition-colors mt-0.5">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </motion.div>
-            ))}
+                <div className="flex flex-col items-center gap-1.5 ml-1">
+                    {!task.done && (
+                      <button 
+                        onClick={() => breakdownTask(task.id)} 
+                        disabled={breakingDownId === task.id}
+                        className="text-sky-400 hover:text-sky-600 transition-colors mt-0.5 disabled:opacity-50"
+                        title="AI Break Down"
+                      >
+                        {breakingDownId === task.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      </button>
+                    )}
+                    <button onClick={() => remove(task.id)} className="text-slate-300 hover:text-red-400 transition-colors mt-0.5">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    </div>
+                    </motion.div>
+                    )
+                    })}
           </AnimatePresence>
 
           {visible.length === 0 && (

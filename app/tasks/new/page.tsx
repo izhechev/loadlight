@@ -5,27 +5,19 @@ import { useRouter } from "next/navigation"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { Brain, Loader2, CheckCircle, Trash2, Plus, Calendar, ArrowLeft, Zap, AlertTriangle, RefreshCw } from "lucide-react"
 import { AppLayout } from "@/components/app-layout"
-import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
+import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 
-type LifeDomain = 'work' | 'study' | 'personal' | 'creative' | 'administrative'
-type DemandType = 'cognitive' | 'emotional' | 'creative' | 'routine'
+type DemandType = 'cognitive' | 'emotional' | 'creative' | 'routine' | 'physical'
 
 interface ExtractedTask {
   name: string
-  life_domain: LifeDomain
+  category: string
   demand_type: DemandType
   difficulty: number
   deadline: string | null
   estimated_minutes: number | null
   recurring?: 'none' | 'daily' | 'weekly'
-}
-
-const DOMAIN_COLORS: Record<LifeDomain, string> = {
-  work: 'bg-blue-100 text-blue-700',
-  study: 'bg-indigo-100 text-indigo-700',
-  personal: 'bg-teal-100 text-teal-700',
-  creative: 'bg-pink-100 text-pink-700',
-  administrative: 'bg-amber-100 text-amber-700',
+  times_per_day?: number
 }
 
 const DEMAND_COLORS: Record<DemandType, string> = {
@@ -72,12 +64,16 @@ export default function AddTaskPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: input, mode: 'extract' }),
+        body: JSON.stringify({ 
+          text: input, 
+          mode: 'extract',
+          categories: categories.map(c => c.name) 
+        }),
       })
       if (!res.ok) throw new Error('API error')
       const data = await res.json() as { tasks?: ExtractedTask[] }
       if (data.tasks?.length) {
-        setPreview(data.tasks.map(t => ({ ...t, recurring: 'none' })))
+        setPreview(data.tasks.map(t => ({ ...t, recurring: t.recurring || 'none' })))
       } else {
         throw new Error('No tasks extracted')
       }
@@ -90,7 +86,8 @@ export default function AddTaskPage() {
         difficulty: 2,
         deadline: null,
         estimated_minutes: 30,
-        recurring: 'none'
+        recurring: 'none',
+        times_per_day: 1
       }])
       setError('AI unavailable — added as manual task. You can edit the details below.')
     } finally {
@@ -101,8 +98,31 @@ export default function AddTaskPage() {
   function confirm() {
     if (!preview) return
     const existing = getStoredTasks()
-    const withId = preview.map(t => ({ ...t, id: Math.random().toString(36).slice(2), done: false, createdAt: Date.now() }))
-    localStorage.setItem('loadlight-tasks', JSON.stringify([...existing, ...withId]))
+    
+    const finalTasks: any[] = []
+    preview.forEach(t => {
+      const times = t.times_per_day || 1
+      if (times > 1) {
+        for (let i = 1; i <= times; i++) {
+          finalTasks.push({
+            ...t,
+            name: `${t.name} (${i}/${times})`,
+            id: Math.random().toString(36).slice(2),
+            done: false,
+            createdAt: Date.now()
+          })
+        }
+      } else {
+        finalTasks.push({
+          ...t,
+          id: Math.random().toString(36).slice(2),
+          done: false,
+          createdAt: Date.now()
+        })
+      }
+    })
+
+    localStorage.setItem('loadlight-tasks', JSON.stringify([...existing, ...finalTasks]))
     setSaved(true)
     setTimeout(() => router.push('/tasks'), 800)
   }
@@ -178,14 +198,18 @@ export default function AddTaskPage() {
                 AI Extracted {preview.length} Task{preview.length !== 1 ? 's' : ''} — Review &amp; Confirm (FR-2)
               </p>
               <div className="space-y-3">
-                {preview.map((task, i) => (
-                  <div key={i} className="bg-white/70 rounded-2xl border border-white/60 overflow-hidden">
+                {preview.map((task, i) => {
+                  const catName = (task.category || 'Personal').toLowerCase()
+                  const cat = categories.find(c => c.name.toLowerCase() === catName || c.id === task.category)
+                  const cls = getCategoryClasses(cat?.color ?? 'sky')
+                  return (
+                  <div key={i} className={`bg-white/70 rounded-2xl border border-white/60 overflow-hidden ${cls.bg.replace('bg-', 'border-l-4 border-l-')}`}>
                     {/* Task row */}
                     <div className="flex items-center gap-3 p-4">
                       <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
                       <span className="flex-1 font-semibold text-slate-800 text-sm">{task.name}</span>
                       <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DOMAIN_COLORS[task.life_domain]}`}>{task.life_domain}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${cls.bg} ${cls.text} badge-skeu shrink-0`}>{cat?.emoji ?? '📌'} {task.category}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DEMAND_COLORS[task.demand_type]}`}>{task.demand_type}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${difficultyColor(task.difficulty)}`}>{difficultyLabel(task.difficulty)}</span>
                         {task.estimated_minutes && <span className="text-xs text-slate-400">{task.estimated_minutes}m</span>}
@@ -216,8 +240,8 @@ export default function AddTaskPage() {
                               key={mode}
                               onClick={() => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, recurring: mode } : t) ?? null)}
                               className={`text-[10px] px-2 py-0.5 rounded-md font-bold transition-all ${
-                                (task.recurring || 'none') === mode 
-                                  ? 'bg-sky-400 text-white shadow-sm' 
+                                (task.recurring || 'none') === mode
+                                  ? 'bg-sky-400 text-white shadow-sm'
                                   : 'text-slate-400 hover:text-slate-600'
                               }`}
                             >
@@ -226,9 +250,24 @@ export default function AddTaskPage() {
                           ))}
                         </div>
                       </div>
+
+                      {task.recurring === 'daily' && (
+                        <div className="flex items-center gap-2 ml-2">
+                          <span className="text-xs text-slate-500">Times/day:</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="10"
+                            value={task.times_per_day || 1}
+                            onChange={e => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, times_per_day: parseInt(e.target.value) || 1 } : t) ?? null)}
+                            className="w-12 text-xs bg-white/60 border border-white/40 rounded-lg px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-300"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
               <div className="flex gap-3 mt-5">
                 {saved ? (

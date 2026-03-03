@@ -4,7 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
-import { LayoutDashboard, CheckSquare, Plus, Settings, Heart } from "lucide-react"
+import { LayoutDashboard, CheckSquare, Plus, Settings, Heart, Tags } from "lucide-react"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 import { CrisisRedirect } from "@/components/crisis-redirect"
 import { useState, useEffect } from "react"
@@ -13,6 +13,7 @@ const NAV = [
   { href: "/dashboard", label: "Overview",  icon: LayoutDashboard },
   { href: "/tasks",     label: "Tasks",     icon: CheckSquare },
   { href: "/tasks/new", label: "Add Task",  icon: Plus },
+  { href: "/categories",label: "Categories",icon: Tags },
   { href: "/settings",  label: "Settings",  icon: Settings },
 ]
 
@@ -26,6 +27,51 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { state, triggerOverwhelmedButton, exitRestMode, selfReportCount } = useOverwhelmedStore()
   const [showCrisis, setShowCrisis] = useState(false)
+
+  // Request notification permission and poll for due tasks
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission()
+      }
+
+      const checkReminders = () => {
+        if (Notification.permission !== 'granted') return
+        try {
+          const stored = localStorage.getItem('loadlight-tasks')
+          if (!stored) return
+          const tasks = JSON.parse(stored) as any[]
+          const now = Date.now()
+          const notifiedTasks = JSON.parse(localStorage.getItem('loadlight-notified') || '[]') as string[]
+
+          tasks.filter(t => !t.done && t.deadline).forEach(t => {
+            if (notifiedTasks.includes(t.id)) return
+            
+            const dueTime = new Date(t.deadline).getTime()
+            const timeUntilDue = dueTime - now
+            
+            // Notify if due within the next 2 hours, or already overdue
+            if (timeUntilDue <= 2 * 60 * 60 * 1000) {
+              new Notification('Task Reminder: ' + t.name, {
+                body: `This task is due ${timeUntilDue < 0 ? 'now/overdue' : 'soon'}.`,
+                icon: '/logo.png'
+              })
+              notifiedTasks.push(t.id)
+            }
+          })
+          
+          localStorage.setItem('loadlight-notified', JSON.stringify(notifiedTasks))
+        } catch (err) {
+          console.error(err)
+        }
+      }
+
+      // Check immediately, then every 5 minutes
+      checkReminders()
+      const interval = setInterval(checkReminders, 5 * 60 * 1000)
+      return () => clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
     if (state === "overwhelmed") {
@@ -69,12 +115,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </span>
           )}
           <button
-            onClick={() => { triggerOverwhelmedButton(); setShowCrisis(true) }}
-            className="overwhelmed-btn text-white font-bold px-3 sm:px-4 py-2 rounded-xl text-sm flex items-center gap-1.5"
+            onClick={() => { 
+              triggerOverwhelmedButton()
+              setShowCrisis(true)
+            }}
+            className="bg-gradient-to-r from-rose-400 to-pink-500 text-white font-bold px-3 sm:px-4 py-2 rounded-xl text-sm flex items-center gap-1.5 hover:brightness-110 active:brightness-90 transition-all shadow-md hover:shadow-lg border border-rose-300"
           >
             <Heart className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">I&apos;m overwhelmed</span>
-            <span className="sm:hidden">Help</span>
+            <span className="hidden sm:inline">{state === 'overwhelmed' ? 'View Rest Mode' : "I'm overwhelmed"}</span>
+            <span className="sm:hidden">{state === 'overwhelmed' ? 'Rest' : 'Help'}</span>
             {selfReportCount > 0 && (
               <span className="text-xs opacity-80 bg-white/20 px-1.5 py-0.5 rounded-full">{selfReportCount}</span>
             )}
