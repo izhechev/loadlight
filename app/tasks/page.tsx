@@ -175,7 +175,7 @@ export default function TasksPage() {
             <h1 className="text-2xl font-black text-slate-800">Tasks</h1>
             <p className="text-sm text-slate-500 font-bold">{tasks.filter(t => !t.done).length} active · {tasks.filter(t => t.done).length} done</p>
           </div>
-          <Link href="/tasks/new" className="glow-button font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2">
+          <Link href="/tasks/new" className="glow-button font-bold px-4 py-2.5 text-sm flex items-center gap-2">
             <Plus className="w-4 h-4" /> Add Tasks
           </Link>
         </div>

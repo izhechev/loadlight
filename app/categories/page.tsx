@@ -50,7 +50,7 @@ export default function CategoriesPage() {
           </div>
           <button 
             onClick={() => setIsAdding(!isAdding)}
-            className="glow-button font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2"
+            className="glow-button font-bold px-4 py-2 text-sm flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Add Category
           </button>
@@ -105,7 +105,7 @@ export default function CategoriesPage() {
                 <button 
                   onClick={handleAdd}
                   disabled={!newName.trim()}
-                  className="glow-button font-bold px-6 py-2 rounded-xl text-sm disabled:opacity-50"
+                  className="glow-button font-bold px-6 py-2 text-sm disabled:opacity-50"
                 >
                   Save
                 </button>

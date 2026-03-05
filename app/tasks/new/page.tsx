@@ -177,7 +177,7 @@ export default function AddTaskPage() {
               <button
                 onClick={handleExtract}
                 disabled={isExtracting || !input.trim()}
-                className="glow-button font-black px-5 py-2 rounded-xl text-sm flex items-center gap-2 disabled:opacity-50"
+                className="glow-button font-black px-5 py-2 text-sm flex items-center gap-2 disabled:opacity-50"
               >
                 {isExtracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
                 {isExtracting ? 'Extracting...' : 'Extract Tasks'}
@@ -279,7 +279,7 @@ export default function AddTaskPage() {
                   </div>
                 ) : (
                   <>
-                    <button onClick={confirm} className="glow-button font-black px-6 py-2.5 rounded-xl text-sm flex items-center gap-2">
+                    <button onClick={confirm} className="glow-button font-black px-6 py-2.5 text-sm flex items-center gap-2">
                       <Plus className="w-4 h-4" /> Save {preview.length} Task{preview.length !== 1 ? 's' : ''}
                     </button>
                     <button onClick={() => { setPreview(null); setInput('') }} className="bg-white/50 border border-sky-100/60 text-slate-500 font-bold px-4 py-2.5 rounded-xl text-sm hover:bg-white/80 hover:text-slate-700 transition-all">

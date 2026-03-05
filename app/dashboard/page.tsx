@@ -319,7 +319,7 @@ export default function DashboardPage() {
             <button
               onClick={fetchSummary}
               disabled={isAnalysing}
-              className="glow-button font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-50"
+              className="glow-button font-bold px-4 py-2 text-xs flex items-center gap-1.5 disabled:opacity-50"
             >
               {isAnalysing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
               {isAnalysing ? 'Thinking...' : 'Generate'}
