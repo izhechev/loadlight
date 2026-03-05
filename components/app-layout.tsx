@@ -90,10 +90,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`aero-bg min-h-screen ${stateClass}`}>
       <div className="orb-layer">
-        <div className="shockwave w-64 h-64 top-[20%] left-[10%]" style={{ animationDelay: '0s' }}></div>
-        <div className="shockwave w-96 h-96 top-[50%] left-[60%]" style={{ animationDelay: '1s' }}></div>
-        <div className="shockwave w-48 h-48 top-[70%] left-[20%]" style={{ animationDelay: '2s' }}></div>
+        <div className="shockwave w-[500px] h-[500px] top-[15%] left-[5%]" style={{ animationDelay: '0s', animationDuration: '12s' }}></div>
+        <div className="shockwave w-[700px] h-[700px] top-[45%] left-[55%]" style={{ animationDelay: '2s', animationDuration: '16s' }}></div>
+        <div className="shockwave w-[400px] h-[400px] top-[65%] left-[15%]" style={{ animationDelay: '4s', animationDuration: '10s' }}></div>
+        <div className="shockwave w-[600px] h-[600px] top-[10%] left-[70%]" style={{ animationDelay: '6s', animationDuration: '14s' }}></div>
       </div>
+      <div className="wave-layer"></div>
+      <div className="wave-layer-2"></div>
       
       <AnimatePresence>
         {showCrisis && (
@@ -135,7 +138,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex max-w-6xl mx-auto w-full px-3 py-4 gap-4 pb-24 md:pb-6">
 
         {/* ── Desktop sidebar (md+) ── */}
-        <nav className="hidden md:flex glass-panel p-3 flex-col gap-1 w-52 shrink-0 h-fit sticky top-20 self-start border border-white/5 shadow-2xl">
+        <nav className="hidden md:flex glass-panel p-3 flex-col gap-1 w-52 shrink-0 self-stretch sticky top-20 border border-sky-100/60 shadow-lg">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
             return (
@@ -144,8 +147,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 href={href}
                 className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-150 ${
                   active
-                    ? "bg-white/10 text-white shadow-inner-sm border border-white/10"
-                    : "text-slate-300 hover:bg-white/5 hover:text-white"
+                    ? "bg-sky-100/80 text-sky-800 shadow-inner border border-sky-200/60"
+                    : "text-slate-600 hover:bg-sky-50/60 hover:text-slate-800"
                 }`}
               >
                 <Icon className="w-4 h-4 shrink-0" />
@@ -171,8 +174,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               href={href}
               className={`flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all text-xs font-semibold ${
                 active
-                  ? "text-white bg-white/20 shadow-inner"
-                  : "text-slate-400"
+                  ? "text-sky-800 bg-sky-100/80 shadow-inner"
+                  : "text-slate-500"
               }`}
             >
               <Icon className="w-5 h-5" />

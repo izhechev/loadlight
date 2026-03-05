@@ -22,11 +22,11 @@ interface Task {
 }
 
 const DEMAND_COLORS: Record<DemandType, string> = {
-  cognitive: 'bg-blue-500/20 text-blue-100',
-  emotional: 'bg-rose-500/20 text-rose-100',
-  creative: 'bg-purple-500/20 text-purple-100',
-  routine: 'bg-slate-500/20 text-slate-100',
-  physical: 'bg-emerald-500/20 text-emerald-100',
+  cognitive: 'bg-sky-100/90 text-sky-700',
+  emotional: 'bg-pink-100/90 text-pink-700',
+  creative: 'bg-purple-100/90 text-purple-700',
+  routine: 'bg-blue-100/90 text-blue-700',
+  physical: 'bg-teal-100/90 text-teal-700',
 }
 
 function isDueWithin48h(deadline: string | null, currentTime: number): boolean {
@@ -168,14 +168,14 @@ export default function TasksPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-2xl space-y-4">
+      <div className="max-w-2xl mx-auto space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="page-header flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black text-white">Tasks</h1>
-            <p className="text-sm text-slate-300 font-bold">{tasks.filter(t => !t.done).length} active · {tasks.filter(t => t.done).length} done</p>
+            <h1 className="text-2xl font-black text-slate-800">Tasks</h1>
+            <p className="text-sm text-slate-500 font-bold">{tasks.filter(t => !t.done).length} active · {tasks.filter(t => t.done).length} done</p>
           </div>
-          <Link href="/tasks/new" className="glow-button text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2">
+          <Link href="/tasks/new" className="glow-button font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2">
             <Plus className="w-4 h-4" /> Add Tasks
           </Link>
         </div>
@@ -187,7 +187,7 @@ export default function TasksPage() {
               key={f}
               onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                filter === f ? 'bg-white/20 text-white shadow-inner border border-white/30' : 'bg-black/20 text-slate-400 border border-white/5 hover:bg-black/30'
+                filter === f ? 'bg-sky-100/90 text-sky-800 shadow-inner border border-sky-300/70' : 'bg-white/50 text-slate-500 border border-sky-100/70 hover:bg-white/70'
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -201,7 +201,7 @@ export default function TasksPage() {
         {/* Rest mode notice */}
         {overwhelmedState !== 'normal' && (
           <div className={`rounded-2xl px-4 py-3 text-sm font-bold flex items-center gap-2 border ${
-            overwhelmedState === 'elevated' ? 'bg-amber-900/40 border-amber-500/30 text-amber-200' : 'bg-pink-900/40 border-pink-500/30 text-rose-100'
+            overwhelmedState === 'elevated' ? 'bg-amber-50/90 border-amber-300/70 text-amber-700' : 'bg-rose-50/90 border-rose-300/70 text-rose-700'
           }`}>
             {overwhelmedState === 'elevated'
               ? '⚠ Elevated state — consider completing tasks before adding more.'
@@ -210,7 +210,7 @@ export default function TasksPage() {
         )}
 
         {/* Task list */}
-        <div className="glass-panel p-4 space-y-2 border border-white/5 shadow-2xl">
+        <div className="glass-panel p-4 space-y-2 shadow-lg">
           <AnimatePresence>
             {visible.map(task => {
               const catName = (task.category || 'Personal').toLowerCase()
@@ -226,7 +226,7 @@ export default function TasksPage() {
                   transition={mc}
                   className={`flex items-start gap-3 rounded-2xl p-4 border-l-4 transition-all ${
                     cls.bg.replace('bg-', 'border-l-')
-                  } ${task.done ? 'bg-black/40 opacity-50' : 'bg-black/20 hover:bg-black/30'} skeu-card border-none border-l-4 shadow-lg`}
+                  } ${task.done ? 'opacity-50' : 'hover:shadow-md'} skeu-card border-none border-l-4 shadow-sm`}
                 >
                   <button onClick={() => toggle(task.id)} className="shrink-0 mt-0.5">
                     {task.done
@@ -234,7 +234,7 @@ export default function TasksPage() {
                       : <Circle className="w-5 h-5 text-slate-400 hover:text-white" />}
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className={`font-bold text-sm ${task.done ? 'line-through text-slate-500' : 'text-white'}`}>
+                    <p className={`font-bold text-sm ${task.done ? 'line-through text-slate-400' : 'text-slate-800'}`}>
                       {task.name}
                     </p>
                     <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
@@ -251,7 +251,7 @@ export default function TasksPage() {
                     {task.estimated_minutes && <span className="text-[10px] text-slate-400 font-bold">{task.estimated_minutes}m</span>}
                     {task.deadline && (
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border ${
-                        isDueWithin48h(task.deadline, now) ? 'bg-red-900/40 text-red-200 border-red-500/20' : 'bg-white/5 text-slate-400 border-white/5'
+                        isDueWithin48h(task.deadline, now) ? 'bg-red-50/90 text-red-600 border-red-300/50' : 'bg-sky-50/60 text-slate-500 border-sky-100/60'
                       }`}>
                         <Calendar className="w-3 h-3" />
                         {new Date(task.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
@@ -265,7 +265,7 @@ export default function TasksPage() {
                       <button 
                         onClick={() => breakdownTask(task.id)} 
                         disabled={breakingDownId === task.id}
-                        className="text-sky-300 hover:text-white transition-colors mt-0.5 disabled:opacity-50"
+                        className="text-sky-500 hover:text-sky-800 transition-colors mt-0.5 disabled:opacity-50"
                         title="AI Break Down"
                       >
                         {breakingDownId === task.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -285,7 +285,7 @@ export default function TasksPage() {
               <CheckCircle className="w-10 h-10 mx-auto mb-2 opacity-20" />
               <p className="text-sm">{filter === 'done' ? 'No completed tasks yet.' : 'No tasks. Add some!'}</p>
               {filter !== 'done' && (
-                <Link href="/tasks/new" className="inline-flex items-center gap-1.5 mt-3 text-sky-300 text-sm font-bold hover:text-white transition-colors">
+                <Link href="/tasks/new" className="inline-flex items-center gap-1.5 mt-3 text-sky-600 text-sm font-bold hover:text-sky-900 transition-colors">
                   <Plus className="w-4 h-4" /> Add your first task
                 </Link>
               )}

@@ -32,24 +32,24 @@
 
 :root {
   --radius: 1.25rem;
-  --background: oklch(0.99 0.005 200);
-  --foreground: oklch(0.25 0.02 220);
+  --background: oklch(0.97 0.008 210);
+  --foreground: oklch(0.22 0.02 220);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.25 0.02 220);
+  --card-foreground: oklch(0.22 0.02 220);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.25 0.02 220);
-  --primary: oklch(0.65 0.2 215);
+  --popover-foreground: oklch(0.22 0.02 220);
+  --primary: oklch(0.60 0.18 215);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0.01 200);
-  --secondary-foreground: oklch(0.25 0.02 220);
-  --muted: oklch(0.97 0.01 200);
-  --muted-foreground: oklch(0.55 0.04 220);
-  --accent: oklch(0.97 0.01 200);
-  --accent-foreground: oklch(0.25 0.02 220);
+  --secondary: oklch(0.96 0.015 200);
+  --secondary-foreground: oklch(0.22 0.02 220);
+  --muted: oklch(0.96 0.015 200);
+  --muted-foreground: oklch(0.52 0.04 220);
+  --accent: oklch(0.96 0.015 200);
+  --accent-foreground: oklch(0.22 0.02 220);
   --destructive: oklch(0.58 0.25 25);
-  --border: oklch(0.9 0.02 210);
-  --input: oklch(0.9 0.02 210);
-  --ring: oklch(0.65 0.2 215);
+  --border: oklch(0.88 0.025 210);
+  --input: oklch(0.88 0.025 210);
+  --ring: oklch(0.60 0.18 215);
 }
 
 @layer base {
@@ -67,7 +67,7 @@
   }
 }
 
-/* ─── Frutiger Aero / Skeuomorphic Core ─── */
+/* ─── Frutiger Aero Background ─── */
 @keyframes bg-pan {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -77,7 +77,6 @@
 .aero-bg {
   min-height: 100vh;
   position: relative;
-  /* Replaced previous gradient with the new background image */
   background-image: url('/background.png');
   background-size: cover;
   background-attachment: fixed;
@@ -93,24 +92,23 @@
   background-image: url('/background.png');
   background-size: cover;
   background-position: center;
-  /* Added the requested blur */
-  filter: blur(8px) saturate(1.2);
-  opacity: 0.8;
+  filter: blur(4px) saturate(1.3) brightness(1.08);
+  opacity: 0.72;
   z-index: -2;
   pointer-events: none;
 }
 
-/* Iconic 2000s Sunburst/Lens Flare */
+/* Soft Frutiger Aero lens flare — warm white, top-left */
 .aero-bg::after {
   content: '';
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.1) 25%, transparent 60%);
+  background: radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.58) 0%, rgba(186, 230, 253, 0.18) 35%, transparent 65%);
   z-index: -1;
   pointer-events: none;
 }
 
-/* ─── Bubbles & Shockwaves (Floating) ─── */
+/* ─── Shockwaves ─── */
 .orb-layer {
   position: fixed;
   inset: 0;
@@ -120,183 +118,226 @@
 }
 
 @keyframes shockwave {
-  0% { transform: scale(0.8); opacity: 0; border-width: 2px; }
-  20% { opacity: 0.3; }
-  100% { transform: scale(2.2); opacity: 0; border-width: 0.5px; }
+  0% { transform: scale(0.6); opacity: 0; border-width: 3px; }
+  15% { opacity: 0.45; }
+  100% { transform: scale(2.8); opacity: 0; border-width: 0.5px; }
 }
 
 .shockwave {
   position: absolute;
   border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.15);
-  background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 80%);
-  animation: shockwave 8s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+  border: 2px solid rgba(125, 211, 252, 0.35);
+  background: radial-gradient(circle, rgba(186,230,253,0.08) 0%, transparent 75%);
+  animation: shockwave 12s cubic-bezier(0.23, 1, 0.32, 1) infinite;
   pointer-events: none;
 }
 
-/* Removing the static orbs that looked like tires */
+/* ─── CSS Waves ─── */
+@keyframes wave-flow {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.wave-layer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 200%;
+  height: 90px;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.28;
+  background-repeat: repeat-x;
+  background-position: bottom;
+  background-size: 720px 90px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 90'%3E%3Cpath fill='%237dd3fc' d='M0,45 C180,90 360,0 540,45 C720,90 900,0 1080,45 C1260,90 1350,20 1440,45 L1440,90 L0,90 Z'/%3E%3C/svg%3E");
+  animation: wave-flow 10s linear infinite;
+}
+
+.wave-layer-2 {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 200%;
+  height: 65px;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.20;
+  background-repeat: repeat-x;
+  background-position: bottom;
+  background-size: 960px 65px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1920 65'%3E%3Cpath fill='%2338bdf8' d='M0,32 C240,65 480,0 720,32 C960,65 1200,0 1440,32 C1680,65 1800,15 1920,32 L1920,65 L0,65 Z'/%3E%3C/svg%3E");
+  animation: wave-flow 15s linear infinite reverse;
+}
+
 .orb { display: none; }
 
-/* ─── Glass Panels & Cards (Darker, Glossy Windows Aero style) ─── */
+/* ─── Glass Panels — Light Frosted Glass ─── */
 .glass-panel {
-  /* Dark teal translucent background like the reference window */
-  background: rgba(10, 45, 35, 0.75);
+  background: rgba(255, 255, 255, 0.62);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.78);
   border-radius: 12px;
-  box-shadow: 
-    0 15px 30px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 4px 20px rgba(56, 189, 248, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
   position: relative;
-  color: white;
+  color: oklch(0.22 0.02 220);
 }
 
 .glass-panel-strong {
-  background: rgba(8, 35, 28, 0.85);
+  background: rgba(255, 255, 255, 0.80);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.88);
   border-radius: 12px;
-  box-shadow: 
-    0 20px 40px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.6);
+  box-shadow:
+    0 8px 32px rgba(56, 189, 248, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
   position: relative;
-  color: white;
+  color: oklch(0.22 0.02 220);
 }
 
-/* Remove white lines/tire look from borders and separators */
-.border-white\/5  { border-color: rgba(255, 255, 255, 0.03) !important; }
-.border-white\/10 { border-color: rgba(255, 255, 255, 0.06) !important; }
-.border-white\/20 { border-color: rgba(255, 255, 255, 0.1) !important; }
-.border-t         { border-top-color: rgba(255, 255, 255, 0.08) !important; }
-.border-b         { border-bottom-color: rgba(255, 255, 255, 0.08) !important; }
-
-/* High-contrast, sharp gloss reflection on the top half (classic Aero style) */
 .glass-panel::after, .glass-panel-strong::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 50%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.05) 95%, rgba(255, 255, 255, 0) 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px 12px 0 0;
-  pointer-events: none;
-  z-index: 10;
+  display: none;
 }
 
-/* Overriding text colors inside dark panels */
+/* Text inside light panels */
 .glass-panel p, .glass-panel h1, .glass-panel h2, .glass-panel h3, .glass-panel span,
 .glass-panel-strong p, .glass-panel-strong h1, .glass-panel-strong h2, .glass-panel-strong h3, .glass-panel-strong span {
-  color: #f8fafc;
-}
-.glass-panel .text-slate-500, .glass-panel .text-slate-600, .glass-panel-strong .text-slate-500 {
-  color: #cbd5e1 !important;
-}
-.glass-panel .text-slate-800, .glass-panel .text-slate-700, .glass-panel-strong .text-slate-800 {
-  color: #ffffff !important;
+  color: oklch(0.22 0.02 220);
 }
 
+/* ─── Skeu Cards — Light Aqua Glass ─── */
 .skeu-card {
-  background: linear-gradient(180deg, rgba(25, 80, 65, 0.8) 0%, rgba(15, 60, 50, 0.9) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.70) 0%, rgba(224, 242, 254, 0.58) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-top: 1px solid rgba(255, 255, 255, 0.96);
   border-radius: 12px;
-  box-shadow: 
-    0 8px 16px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 4px 16px rgba(56, 189, 248, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
   position: relative;
   transition: all 0.2s ease;
   overflow: hidden;
-  color: white;
+  color: oklch(0.22 0.02 220);
 }
 
-.skeu-card::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 45%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%);
-  pointer-events: none;
-}
-
-.skeu-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 30px 60px rgba(0, 50, 150, 0.15), inset 0 2px 0 rgba(255, 255, 255, 1);
-}
-
+/* Inset well — light version */
 .skeu-inset {
-  background: rgba(0, 50, 150, 0.04);
-  border: 1.5px solid rgba(255, 255, 255, 0.5);
-  border-radius: 1.25rem;
-  box-shadow: 
-    inset 0 6px 15px rgba(0, 50, 150, 0.15),
-    inset 0 -2px 4px rgba(255, 255, 255, 0.4),
-    0 1px 0 rgba(255, 255, 255, 1);
+  background: rgba(240, 249, 255, 0.65);
+  border: 1px solid rgba(186, 230, 253, 0.50);
+  box-shadow: inset 0 2px 6px rgba(56, 189, 248, 0.06);
 }
 
-/* ─── Buttons (Ultimate Gloss) ─── */
+/* ─── Buttons — Authentic Frutiger Aero Gloss Pill ─── */
 .glow-button {
-  background: linear-gradient(180deg, #1d6153 0%, #0e3f34 100%);
-  color: white;
-  font-weight: 700;
-  padding: 0.5rem 1.25rem;
-  border-radius: 8px; /* Match the pill/tab shape in the image */
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 
-    0 4px 8px rgba(0, 0, 0, 0.4),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.8);
   position: relative;
   overflow: hidden;
-  transition: all 0.2s ease;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Signature pill shape */
+  border-radius: 9999px;
+  padding: 0.5rem 1.35rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+
+  /* Layered aqua gradient: sky top → saturated mid → deep navy bottom */
+  background: linear-gradient(
+    180deg,
+    #7dd3fc 0%,
+    #0ea5e9 42%,
+    #0369a1 100%
+  );
+
+  /* White text + engraved shadow — authentic Aero */
+  color: white;
+  text-shadow:
+    0 1px 2px rgba(0, 30, 100, 0.55),
+    0 -1px 1px rgba(0, 10, 60, 0.2);
+
+  /* 3D border: bright top edge, dark bottom edge */
+  border-top: 1.5px solid rgba(255, 255, 255, 0.72);
+  border-bottom: 1.5px solid rgba(0, 30, 100, 0.45);
+  border-left: 1px solid rgba(255, 255, 255, 0.40);
+  border-right: 1px solid rgba(255, 255, 255, 0.40);
+
+  /* Drop shadow + inner bottom depth */
+  box-shadow:
+    0 4px 12px rgba(3, 105, 161, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.20),
+    inset 0 -3px 6px rgba(0, 20, 100, 0.30),
+    inset 0 1px 2px rgba(255, 255, 255, 0.25);
 }
 
+/* Gloss highlight — top 50% bright white fade */
 .glow-button::after {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 50%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 90%, rgba(255, 255, 255, 0) 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  top: 0; left: 2px; right: 2px;
+  height: 52%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.78) 0%,
+    rgba(255, 255, 255, 0.28) 65%,
+    rgba(255, 255, 255, 0.00) 100%
+  );
+  border-radius: 9999px 9999px 0 0;
   pointer-events: none;
 }
 
 .glow-button:hover {
+  filter: brightness(1.08);
   transform: translateY(-1px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
-  background: linear-gradient(180deg, #247565 0%, #124d40 100%);
+  box-shadow:
+    0 7px 18px rgba(3, 105, 161, 0.55),
+    0 2px 5px rgba(0, 0, 0, 0.22),
+    inset 0 -3px 6px rgba(0, 20, 100, 0.30),
+    inset 0 1px 2px rgba(255, 255, 255, 0.25);
 }
 
 .glow-button:active {
   transform: translateY(1px);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+  filter: brightness(0.95);
+  box-shadow:
+    0 1px 4px rgba(3, 105, 161, 0.35),
+    inset 0 3px 7px rgba(0, 20, 100, 0.40);
 }
 
-/* ─── Inputs ─── */
+/* ─── Inputs — Light Frosted ─── */
 .input-skeu {
-  background: rgba(10, 45, 35, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-top: 1px solid rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.60);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-top: 1px solid rgba(186, 230, 253, 0.50);
   border-radius: 8px;
-  box-shadow: 
-    inset 0 4px 8px rgba(0, 0, 0, 0.4),
-    0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 2px 4px rgba(56, 189, 248, 0.05);
   transition: all 0.2s ease;
-  color: white;
+  color: oklch(0.22 0.02 220);
 }
 
 .input-skeu:focus {
-  background: rgba(15, 60, 50, 0.8);
-  box-shadow: 
-    inset 0 2px 4px rgba(0, 0, 0, 0.5),
-    0 0 0 2px rgba(100, 255, 200, 0.3);
-  border-color: #64ffc8;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    inset 0 1px 3px rgba(56, 189, 248, 0.08),
+    0 0 0 2px rgba(125, 211, 252, 0.42);
+  border-color: #7dd3fc;
 }
 
-.input-skeu::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+/* ─── Page Header Glass Pill ─── */
+.page-header {
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 16px;
+  padding: 0.875rem 1.125rem;
+  box-shadow:
+    0 2px 16px rgba(56, 189, 248, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
 /* ─── Typography ─── */
@@ -304,57 +345,14 @@
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  background-image: linear-gradient(180deg, #ffffff 0%, #a7f3d0 100%);
+  background-image: linear-gradient(180deg, #0369a1 0%, #0ea5e9 100%);
   font-weight: 900;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
 }
 
 .gradient-text-green {
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  background-image: linear-gradient(180deg, #64ffc8 0%, #10b981 100%);
+  background-image: linear-gradient(180deg, #0f766e 0%, #0d9488 100%);
   font-weight: 900;
 }
-
-h1, h2, h3 {
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-  letter-spacing: -0.02em;
-}
-
-/* ─── Animations ─── */
-@keyframes logo-float {
-  0%, 100% { transform: translateY(0) rotate(-1deg); }
-  50% { transform: translateY(-20px) rotate(1deg); }
-}
-.logo-float { animation: logo-float 6s ease-in-out infinite; }
-
-@keyframes float-slow {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-15px); }
-}
-.float-slow { animation: float-slow 10s ease-in-out infinite; }
-
-@keyframes float-med {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-.float-med { animation: float-med 6s ease-in-out infinite; }
-
-.logo-glow {
-  filter: 
-    drop-shadow(0 0 30px rgba(56, 189, 248, 0.8))
-    drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2));
-}
-
-.logo-glow-sm {
-  filter: 
-    drop-shadow(0 0 15px rgba(56, 189, 248, 0.6))
-    drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
-}
-
-/* ─── Task Accents ─── */
-.task-card-work     { border-left: 8px solid #3b82f6; }
-.task-card-exercise { border-left: 8px solid #10b981; }
-.task-card-chores   { border-left: 8px solid #f59e0b; }
-.task-card-leisure  { border-left: 8px solid #a855f7; }
