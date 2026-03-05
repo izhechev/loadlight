@@ -42,15 +42,15 @@ export default function CategoriesPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-xl space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="max-w-xl mx-auto space-y-6">
+        <div className="page-header flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black text-slate-800">Categories</h1>
             <p className="text-sm text-slate-500 font-bold">Manage tags for your tasks. The AI will use these.</p>
           </div>
           <button 
             onClick={() => setIsAdding(!isAdding)}
-            className="glow-button text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2"
+            className="glow-button font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Add Category
           </button>
@@ -105,7 +105,7 @@ export default function CategoriesPage() {
                 <button 
                   onClick={handleAdd}
                   disabled={!newName.trim()}
-                  className="glow-button text-white font-bold px-6 py-2 rounded-xl text-sm disabled:opacity-50"
+                  className="glow-button font-bold px-6 py-2 rounded-xl text-sm disabled:opacity-50"
                 >
                   Save
                 </button>

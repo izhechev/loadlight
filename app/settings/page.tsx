@@ -68,23 +68,23 @@ export default function SettingsPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-black text-white">Settings</h1>
-          <p className="text-sm text-slate-300 font-bold">Configure your balance goals and monitor workload status</p>
+      <div className="max-w-xl mx-auto space-y-6">
+        <div className="page-header">
+          <h1 className="text-2xl font-black text-slate-800">Settings</h1>
+          <p className="text-sm text-slate-500 font-bold">Configure your balance goals and monitor workload status</p>
         </div>
 
         {/* Balance mode selector */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="skeu-card p-6 bg-black/20 border-white/5">
-          <h2 className="font-black text-white mb-1">Balance Mode</h2>
-          <p className="text-xs text-slate-400 mb-5 font-bold">Sets your target work/leisure ratio. AI advice adapts per mode.</p>
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="skeu-card p-6">
+          <h2 className="font-black text-slate-700 mb-1">Balance Mode</h2>
+          <p className="text-xs text-slate-500 mb-5 font-bold">Sets your target work/leisure ratio. AI advice adapts per mode.</p>
 
           {balanceMode === 'chill' && chillLockUntil && now > 0 && now < chillLockUntil && (
-            <div className="mb-4 bg-amber-900/30 border border-amber-500/20 rounded-2xl px-4 py-3 flex items-center gap-3">
-              <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="mb-4 bg-amber-50/90 border border-amber-300/60 rounded-2xl px-4 py-3 flex items-center gap-3">
+              <Lock className="w-4 h-4 text-amber-600 shrink-0" />
               <div>
-                <p className="text-sm font-semibold text-amber-200">Chill Guy lock active</p>
-                <p className="text-xs text-amber-400/80 font-bold">{lockDaysLeft} days remaining · Prevents impulsive switching</p>
+                <p className="text-sm font-semibold text-amber-700">Chill Guy lock active</p>
+                <p className="text-xs text-amber-600/80 font-bold">{lockDaysLeft} days remaining · Prevents impulsive switching</p>
               </div>
             </div>
           )}
@@ -99,27 +99,27 @@ export default function SettingsPage() {
                   onClick={() => selectMode(mode.id)}
                   disabled={locked}
                   className={`w-full flex items-center gap-4 rounded-2xl p-4 text-left transition-all border-2 ${
-                    active    ? 'border-sky-400 bg-white/10 shadow-inner' :
-                    locked    ? 'border-white/5 bg-black/40 opacity-40 cursor-not-allowed' :
-                                'border-white/10 bg-black/20 hover:bg-white/5'
+                    active    ? 'border-sky-400 bg-sky-50/80 shadow-inner' :
+                    locked    ? 'border-sky-100/40 bg-sky-50/30 opacity-40 cursor-not-allowed' :
+                                'border-sky-100/60 bg-white/40 hover:bg-white/70'
                   }`}
                 >
                   <span className="text-3xl">{mode.emoji}</span>
                   <div className="flex-1">
-                    <p className={`font-black ${active ? 'text-white' : 'text-slate-200'}`}>{mode.label}</p>
-                    <p className="text-xs text-slate-400 mt-0.5 font-bold">{mode.ratio} work/leisure · {mode.desc}</p>
+                    <p className={`font-black ${active ? 'text-sky-800' : 'text-slate-700'}`}>{mode.label}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 font-bold">{mode.ratio} work/leisure · {mode.desc}</p>
                     {locked && (
-                      <p className="text-xs text-amber-400 mt-1 flex items-center gap-1 font-bold">
+                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1 font-bold">
                         <Lock className="w-3 h-3" /> Locked until {new Date(chillLockUntil!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
                     )}
                   </div>
-                  {active && <ChevronRight className="w-4 h-4 text-sky-400 shrink-0" />}
+                  {active && <ChevronRight className="w-4 h-4 text-sky-600 shrink-0" />}
                 </button>
               )
             })}
           </div>
-          {saved && <p className="text-xs text-emerald-400 mt-3 font-bold">✓ Settings saved</p>}
+          {saved && <p className="text-xs text-emerald-600 mt-3 font-bold">✓ Settings saved</p>}
         </motion.div>
 
         {/* Status Toggle */}
@@ -134,11 +134,11 @@ export default function SettingsPage() {
 
         {/* Workload Analysis panel */}
         {showAnalysis && (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="skeu-card p-6 bg-black/20 border-white/5">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="skeu-card p-6">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-sky-400" />
-                <h2 className="font-black text-white">Workload Analysis</h2>
+                <BarChart3 className="w-5 h-5 text-sky-600" />
+                <h2 className="font-black text-slate-700">Workload Analysis</h2>
               </div>
               <button onClick={reset} className="text-xs text-slate-500 hover:text-red-400 flex items-center gap-1 transition-colors font-bold">
                 <RefreshCw className="w-3.5 h-3.5" /> Reset Data
@@ -146,9 +146,9 @@ export default function SettingsPage() {
             </div>
 
             <div className={`rounded-2xl px-5 py-4 mb-6 flex items-center justify-between border ${
-              state === 'normal'      ? 'bg-emerald-900/40 text-emerald-100 border-emerald-500/20' :
-              state === 'elevated'    ? 'bg-amber-900/40 text-amber-100 border-amber-500/20' :
-                                        'bg-red-900/40 text-red-100 border-red-500/20'
+              state === 'normal'      ? 'bg-emerald-50/90 text-emerald-700 border-emerald-300/60' :
+              state === 'elevated'    ? 'bg-amber-50/90 text-amber-700 border-amber-300/60' :
+                                        'bg-red-50/90 text-red-700 border-red-300/60'
             }`}>
               <div>
                 <p className="text-xs font-black uppercase tracking-wider opacity-70 mb-0.5">Current Status</p>
@@ -169,15 +169,15 @@ export default function SettingsPage() {
                 ['Urgency', signals.temporalPressure, 'Proportion of tasks due in the next 48 hours.'],
                 ['Self-Reported', signals.explicitSelfReport, 'Whether you have explicitly marked yourself as overwhelmed.'],
               ] as [string, number, string][]).map(([label, val, desc]) => (
-                <div key={label} className="bg-black/30 rounded-2xl p-4 border border-white/5 shadow-inner-sm">
+                <div key={label} className="skeu-inset rounded-2xl p-4">
                   <div className="flex justify-between items-end mb-2">
                     <div>
-                      <p className="font-black text-white text-sm">{label}</p>
-                      <p className="text-[10px] text-slate-400 font-bold leading-tight mt-0.5">{desc}</p>
+                      <p className="font-black text-slate-700 text-sm">{label}</p>
+                      <p className="text-[10px] text-slate-500 font-bold leading-tight mt-0.5">{desc}</p>
                     </div>
-                    <p className="text-xs font-black text-slate-300">{Math.round(val * 100)}%</p>
+                    <p className="text-xs font-black text-slate-600">{Math.round(val * 100)}%</p>
                   </div>
-                  <div className="w-full bg-black/40 rounded-full h-2.5 overflow-hidden border border-white/5">
+                  <div className="w-full bg-sky-50/70 rounded-full h-2.5 overflow-hidden border border-sky-100/60">
                     <div 
                       className={`h-full rounded-full transition-all duration-1000 ${val > 0.7 ? 'bg-gradient-to-r from-red-400 to-pink-500' : val > 0.45 ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`} 
                       style={{ width: `${val * 100}%` }} 
@@ -187,9 +187,9 @@ export default function SettingsPage() {
               ))}
             </div>
 
-            <div className="mt-6 bg-sky-900/30 rounded-2xl p-4 border border-sky-500/20 flex items-start gap-3">
-              <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-              <p className="text-[11px] text-sky-100 font-bold leading-relaxed">
+            <div className="mt-6 bg-sky-50/90 rounded-2xl p-4 border border-sky-300/60 flex items-start gap-3">
+              <Info className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-sky-700 font-bold leading-relaxed">
                 LoadLight monitors these signals to detect potential burnout. If your status reaches &quot;Overwhelmed&quot;, we&apos;ll suggest taking a break and prioritizing rest.
               </p>
             </div>
