@@ -120,27 +120,6 @@ function sanitise(input: string): string {
     .slice(0, 2000) // hard cap
 }
 
-const TaskSchema = z.object({
-  tasks: z.array(
-    z.object({
-      name: z.string(),
-      category: z.string(),
-      demand_type: z.enum(['cognitive', 'emotional', 'creative', 'routine', 'physical']),
-      difficulty: z.number().int().min(1).max(5),
-      deadline: z.string().nullable(),
-      estimated_minutes: z.number().nullable(),
-      recurring: z.enum(['none', 'daily', 'weekly']),
-      times_per_day: z.number().int().min(1).optional(),
-    })
-  ),
-})
-
-const AnalysisSchema = z.object({
-  verdict: z.enum(['overloaded', 'balanced', 'light']),
-  trend: z.string(),
-  advice: z.string(),
-  suggestion: z.string(),
-})
 
 export async function POST(req: Request) {
   const body = await req.json() as {
