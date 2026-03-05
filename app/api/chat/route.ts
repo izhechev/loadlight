@@ -1,13 +1,10 @@
-import { generateObject } from 'ai'
-import { z } from 'zod'
-
 export const runtime = 'edge'
 
 // Direct Gemini API call using simple fetch
 async function generateWithGemini(options: any) {
   const apiKey = process.env.GOOGLE_API_KEY
-  // Fall back to a rock-solid, stable model
-  const model = "gemini-2.0-flash" 
+  // gemma-3-4b-it: free-tier available, handles JSON well
+  const model = "gemma-3-4b-it"
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
   try {
@@ -21,7 +18,7 @@ async function generateWithGemini(options: any) {
           }]
         }],
         generationConfig: {
-          response_mime_type: "application/json"
+          temperature: 0.2
         }
       })
     })
