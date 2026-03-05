@@ -60,19 +60,19 @@ function computeSignals(data: TaskSignalData, selfReportCount: number): Signals 
   // Use the highest metric so we catch overwhelming loads of *any* type (many small tasks vs few huge ones)
   const taskAccumulation = clamp(Math.max(diffScore, timeScore, countScore))
 
-  // 2. Demand concentration: dominant type % of total tasks
+  // 2. Demand concentration: dominant type % of total tasks (min 6 tasks to avoid false positives)
   const totalTasks = Object.values(data.demandTypeCounts).reduce((a, b) => a + b, 0)
   let demandConcentration = 0
-  if (totalTasks > 0) {
+  if (totalTasks >= 6) {
     const maxCount = Math.max(...Object.values(data.demandTypeCounts))
     const dominantPct = maxCount / totalTasks
     // < 30% = 0.0, > 60% = 1.0, linear between
     demandConcentration = clamp((dominantPct - 0.3) / 0.3)
   }
 
-  // 3. Completion velocity: 1 - (completed/added). 0 if adding nothing.
+  // 3. Completion velocity: 1 - (completed/added). Requires 6+ tasks added to matter.
   let completionVelocity = 0
-  if (data.addedLast7Days > 0) {
+  if (data.addedLast7Days >= 6) {
     completionVelocity = clamp(1 - data.completedLast7Days / data.addedLast7Days)
   }
 
