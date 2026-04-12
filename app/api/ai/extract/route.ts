@@ -1,8 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { logAiCall } from '@/lib/data/tasks'
 
-export const runtime = 'edge'
-
 const SYSTEM_PROMPT = `You are a task extraction assistant for LoadLight, a task and wellbeing manager.
 
 Extract tasks from the user's free-form input. For each task produce these fields:
@@ -31,7 +29,8 @@ const SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_LOW_AND_ABOVE' },
   { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_LOW_AND_ABOVE' },
   { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_LOW_AND_ABOVE' },
-  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_LOW_AND_ABOVE' },
+  // MEDIUM threshold for dangerous content — LOW incorrectly flags medication names
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
 ]
 
 function offlineFallback(input: string) {
@@ -53,7 +52,8 @@ function offlineFallback(input: string) {
       recurring: 'none',
       recurringHours: null,
     }))
-  return NextResponse.json({ tasks })
+  // offline flag lets the client show a visible warning
+  return NextResponse.json({ tasks, offline: true })
 }
 
 export async function POST(request: NextRequest) {

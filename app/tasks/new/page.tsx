@@ -129,10 +129,13 @@ export default function AddTaskPage() {
         }),
       })
       if (!res.ok) throw new Error('API error')
-      const data = await res.json() as { tasks?: ExtractedTask[]; clarification?: Clarification | null; blocked?: boolean; category?: string }
+      const data = await res.json() as { tasks?: ExtractedTask[]; clarification?: Clarification | null; blocked?: boolean; category?: string; offline?: boolean; _debug?: unknown }
       if (data.blocked) {
         if (data.category === 'self_harm') { setShowCrisisModal(true) } else { setShowBlockedModal(true) }
         return
+      }
+      if (data.offline) {
+        setError('AI unavailable — fields pre-filled from your input. Edit before saving.')
       }
       if (data.tasks?.length) {
         setPreview(data.tasks.map(t => ({ ...t, recurring: t.recurring || 'none', recurring_hours: t.recurring_hours ?? null })))
