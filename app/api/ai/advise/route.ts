@@ -1,82 +1,71 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { generateText } from 'ai'
-import { createOpenAI } from '@ai-sdk/openai'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { logAiCall } from '@/lib/data/tasks'
 
 export const runtime = 'edge'
 
-const SYSTEM_PROMPT = `You are a calm, supportive wellbeing advisor integrated into LoadLight, a task manager focused on mental load.
+const SYSTEM_PROMPT = `You are a workload analysis tool inside a task management app called LoadLight.
 
-Your role is to give brief, compassionate advice (2-3 sentences max) to help users manage their workload without feeling overwhelmed.
-Be warm, practical, and specific. Never catastrophize or lecture. Focus on what can be done right now.`
+Rules you must follow:
+1. TONE: Use "consider", "you might", "one option is". Never "you should", "you must", or "you need to". No clinical terms.
+2. SCOPE: Comment on workload patterns only: task volume, deadline distribution, demand balance, completion trends. Never comment on emotions, feelings, mood, or psychological state.
+3. AUTHORITY: You are a calculator showing patterns, not a counsellor giving advice. Say "Cognitive tasks are concentrated on Monday" not "You are overloading yourself".
+4. ESCALATION: Never offer coping strategies, breathing exercises, relaxation techniques, or emotional support. If the user seems distressed, say nothing about it. The app handles escalation separately.
+5. TRANSPARENCY: You are an AI analysing task data. Do not pretend to be human or to understand the user's situation beyond what the task data shows.
+
+Provide a 1-2 sentence observation about the user's current workload based on the data. Adjust tone:
+- If state is "normal": informational, neutral
+- If state is "elevated": gentler, suggest reduction without pressure
+- If state is "overwhelmed": minimal, one short sentence only.`
 
 export async function POST(request: NextRequest) {
   const { state, signals, taskCount, urgentCount } = await request.json()
 
-  // Never advise when user is overwhelmed — rest mode takes over the UI
+  // Never advise when user is overwhelmed
   if (state === 'overwhelmed') {
-    return NextResponse.json({ advice: null })
+    return NextResponse.json({ advice: null, aiDisclosure: true })
   }
+
+  const apiKey = process.env.GOOGLE_API_KEY
+  if (!apiKey) return NextResponse.json({ advice: null, aiDisclosure: true })
 
   const userPrompt = `Current state: ${state}
 Tasks left: ${taskCount}
 Urgent (due within 48h): ${urgentCount}
-Signals: task accumulation ${Math.round(signals?.taskAccumulation * 100)}%, temporal pressure ${Math.round(signals?.temporalPressure * 100)}%
+Task accumulation signal: ${Math.round((signals?.taskAccumulation ?? 0) * 100)}%
+Temporal pressure signal: ${Math.round((signals?.temporalPressure ?? 0) * 100)}%
 
-Give brief, specific advice for this person right now.`
+Provide a 1-2 sentence workload observation.`
 
   const start = Date.now()
+  const model = 'gemini-3-flash-preview'
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
-  if (process.env.OPENAI_API_KEY) {
-    try {
-      const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY })
-      const { text, usage } = await generateText({
-        model: openai('gpt-4o-mini'),
-        system: SYSTEM_PROMPT,
-        prompt: userPrompt,
-        maxOutputTokens: 100,
-      })
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 120 },
+      }),
+    })
 
-      logAiCall({
-        userId: '',
-        callType: 'advisory',
-        model: 'gpt-4o-mini',
-        tokensIn: usage?.inputTokens ?? 0,
-        tokensOut: usage?.outputTokens ?? 0,
-        latencyMs: Date.now() - start,
-      }).catch(() => {})
+    const data = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
 
-      return NextResponse.json({ advice: text })
-    } catch (err) {
-      console.error('OpenAI advise failed, falling back:', err)
-    }
+    logAiCall({
+      userId: '',
+      callType: 'advisory',
+      model,
+      tokensIn: 0,
+      tokensOut: 0,
+      latencyMs: Date.now() - start,
+    }).catch(() => {})
+
+    if (text) return NextResponse.json({ advice: text, aiDisclosure: true })
+  } catch (err) {
+    console.error('Advise route error:', err)
   }
 
-  if (process.env.GOOGLE_API_KEY) {
-    try {
-      const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_API_KEY })
-      const { text, usage } = await generateText({
-        model: google('gemini-2.0-flash-exp'),
-        system: SYSTEM_PROMPT,
-        prompt: userPrompt,
-        maxOutputTokens: 100,
-      })
-
-      logAiCall({
-        userId: '',
-        callType: 'advisory',
-        model: 'gemini-2.0-flash-exp',
-        tokensIn: usage?.inputTokens ?? 0,
-        tokensOut: usage?.outputTokens ?? 0,
-        latencyMs: Date.now() - start,
-      }).catch(() => {})
-
-      return NextResponse.json({ advice: text })
-    } catch (err) {
-      console.error('Google advise failed:', err)
-    }
-  }
-
-  return NextResponse.json({ advice: null })
+  return NextResponse.json({ advice: null, aiDisclosure: true })
 }

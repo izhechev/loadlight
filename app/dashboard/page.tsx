@@ -215,6 +215,7 @@ export default function DashboardPage() {
   const [chillLockUntil, setChillLockUntil] = useState<number | null>(null)
   const [weeklyAnalysis, setWeeklyAnalysis] = useState<AnalysisResult | null>(null)
   const [isAnalysing, setIsAnalysing] = useState(false)
+  const [advisory, setAdvisory] = useState<string | null>(null)
   const [sparkHistory, setSparkHistory] = useState<SparkEntry[]>([])
   const autoFetched = useRef(false)
 
@@ -300,16 +301,38 @@ export default function DashboardPage() {
 
   async function fetchSummary() {
     setIsAnalysing(true)
+    // Fetch both: weekly summary (existing) + real-time advisory (spec)
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'weekly', tasks, balanceMode }),
-      })
-      const data = await res.json() as AnalysisResult
-      setWeeklyAnalysis(data)
+      const [summaryRes, adviseRes] = await Promise.allSettled([
+        fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'weekly', tasks, balanceMode }),
+        }),
+        fetch('/api/ai/advise', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            state,
+            signals: { taskAccumulation: 0, temporalPressure: 0 },
+            taskCount: undoneTasks.length,
+            urgentCount: dueSoon.length,
+          }),
+        }),
+      ])
+
+      if (summaryRes.status === 'fulfilled' && summaryRes.value.ok) {
+        setWeeklyAnalysis(await summaryRes.value.json() as AnalysisResult)
+      } else {
+        setWeeklyAnalysis({ verdict: 'light', trend: 'Unable to generate advice.', advice: '', suggestion: '' })
+      }
+
+      if (adviseRes.status === 'fulfilled' && adviseRes.value.ok) {
+        const d = await adviseRes.value.json() as { advice: string | null }
+        if (d.advice) setAdvisory(d.advice)
+      }
     } catch {
-      setWeeklyAnalysis({ verdict: 'light', trend: 'Could not load summary.', advice: 'Try again when connected.', suggestion: 'Check your internet connection.' })
+      setWeeklyAnalysis({ verdict: 'light', trend: 'Unable to generate advice.', advice: '', suggestion: '' })
     } finally {
       setIsAnalysing(false)
     }
@@ -499,7 +522,7 @@ export default function DashboardPage() {
           </motion.div>
         </div>
 
-        {/* ── AI Advisory (auto-loaded, refresh button stays) ── */}
+        {/* ── AI Advisory panel (spec: auto-generates, "AI workload analysis" indicator) ── */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -509,8 +532,9 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Brain className="w-5 h-5 text-purple-600" />
-              <h2 className="font-black text-slate-700">AI Advisory</h2>
-              <span className="text-xs text-slate-400 font-bold">Auto-loads on open</span>
+              <h2 className="font-black text-slate-700">Workload Analysis</h2>
+              {/* Spec: always-visible "AI workload analysis" indicator */}
+              <span className="text-[10px] text-slate-400 font-bold bg-slate-100/80 px-2 py-0.5 rounded-full border border-slate-200/60">AI workload analysis</span>
             </div>
             <button
               onClick={fetchSummary}
@@ -527,26 +551,42 @@ export default function DashboardPage() {
               <Loader2 className="w-8 h-8 mx-auto mb-2 text-purple-500/50 animate-spin" />
               <p className="text-sm text-slate-400 font-bold">Analysing your workload…</p>
             </div>
-          ) : weeklyAnalysis ? (
-            <div className="space-y-3">
-              <div className={`rounded-2xl px-4 py-3 font-black text-sm border ${
-                weeklyAnalysis.verdict === 'overloaded' ? 'bg-red-50/90 text-red-700 border-red-300/60' :
-                weeklyAnalysis.verdict === 'balanced'   ? 'bg-emerald-50/90 text-emerald-700 border-emerald-300/60' :
-                                                          'bg-sky-50/90 text-sky-700 border-sky-300/60'
-              }`}>
-                {weeklyAnalysis.verdict === 'overloaded' ? '⚠️ Overloaded' : weeklyAnalysis.verdict === 'balanced' ? '✅ Balanced' : '🌿 Light week'}
-              </div>
-              <p className="text-sm text-slate-600 leading-relaxed font-medium">{weeklyAnalysis.trend}</p>
-              <div className="skeu-inset rounded-2xl p-4">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-1.5">Suggestion</p>
-                <p className="text-sm text-slate-600 leading-relaxed font-medium">{weeklyAnalysis.suggestion}</p>
-              </div>
-              <p className="text-[10px] text-slate-500 font-bold italic">🤖 AI-generated · workload data only · not medical advice</p>
-            </div>
           ) : (
-            <div className="skeu-inset rounded-2xl p-6 text-center">
-              <Brain className="w-8 h-8 mx-auto mb-2 text-purple-500/50" />
-              <p className="text-sm text-slate-400 font-bold">Add tasks to get personalised insights</p>
+            <div className="space-y-3">
+              {/* Real-time advisory (spec: 1-2 sentence observation) */}
+              {advisory && (
+                <div className="skeu-inset rounded-2xl p-4 border-l-4 border-l-purple-300">
+                  <p className="text-sm text-slate-700 leading-relaxed font-medium">{advisory}</p>
+                </div>
+              )}
+
+              {weeklyAnalysis && (
+                <>
+                  <div className={`rounded-2xl px-4 py-3 font-black text-sm border ${
+                    weeklyAnalysis.verdict === 'overloaded' ? 'bg-red-50/90 text-red-700 border-red-300/60' :
+                    weeklyAnalysis.verdict === 'balanced'   ? 'bg-emerald-50/90 text-emerald-700 border-emerald-300/60' :
+                                                              'bg-sky-50/90 text-sky-700 border-sky-300/60'
+                  }`}>
+                    {weeklyAnalysis.verdict === 'overloaded' ? '⚠ Overloaded' : weeklyAnalysis.verdict === 'balanced' ? '✓ Balanced' : 'Light week'}
+                  </div>
+                  {weeklyAnalysis.trend && <p className="text-sm text-slate-600 leading-relaxed font-medium">{weeklyAnalysis.trend}</p>}
+                  {weeklyAnalysis.suggestion && (
+                    <div className="skeu-inset rounded-2xl p-4">
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-1.5">Observation</p>
+                      <p className="text-sm text-slate-600 leading-relaxed font-medium">{weeklyAnalysis.suggestion}</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {!advisory && !weeklyAnalysis && (
+                <div className="skeu-inset rounded-2xl p-6 text-center">
+                  <Brain className="w-8 h-8 mx-auto mb-2 text-purple-500/50" />
+                  <p className="text-sm text-slate-400 font-bold">Add tasks to get workload insights</p>
+                </div>
+              )}
+
+              <p className="text-[10px] text-slate-400 font-bold">AI workload analysis · task data only · not medical advice</p>
             </div>
           )}
         </motion.div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Coffee, BookOpen, Music, Footprints, Phone, MessageSquare, LogOut, Loader2, CheckCircle, AlertCircle, HelpCircle } from "lucide-react"
+import { X, Coffee, BookOpen, Music, Footprints, Phone, MessageSquare, LogOut, Loader2, CheckCircle, AlertCircle, HelpCircle, Globe } from "lucide-react"
 
 interface RestModeOverlayProps {
   onDismiss: () => void
@@ -47,8 +47,90 @@ const RECOVERY_CARDS = [
   },
 ]
 
+// ── Static crisis lines by timezone/locale — no API calls ──
+interface CrisisLine { label: string; number: string; href: string; note?: string }
+interface CrisisInfo { country: string; lines: CrisisLine[] }
+
+const CRISIS_BY_TZ: Record<string, CrisisInfo> = {
+  'Europe/Sofia':     { country: 'Bulgaria',     lines: [{ label: 'Надежда (Hope Line)', number: '0800 1 84 84', href: 'tel:080018484', note: 'free, 24/7' }, { label: 'EU helpline', number: '116 123', href: 'tel:116123' }] },
+  'Europe/Amsterdam': { country: 'Netherlands',   lines: [{ label: '113 Zelfmoordpreventie', number: '0800 0113', href: 'tel:08000113', note: 'free, 24/7' }] },
+  'Europe/Berlin':    { country: 'Germany',       lines: [{ label: 'Telefonseelsorge', number: '0800 111 0 111', href: 'tel:08001110111', note: 'free, 24/7' }] },
+  'Europe/Paris':     { country: 'France',        lines: [{ label: 'Numéro National Prévention Suicide', number: '3114', href: 'tel:3114', note: 'free, 24/7' }] },
+  'Europe/Warsaw':    { country: 'Poland',        lines: [{ label: 'Telefon Zaufania dla Dorosłych', number: '116 123', href: 'tel:116123' }] },
+  'Europe/Bucharest': { country: 'Romania',       lines: [{ label: 'Telefonul Speranței', number: '0800 801 200', href: 'tel:0800801200', note: 'free' }] },
+  'Europe/Athens':    { country: 'Greece',        lines: [{ label: 'Klimaka', number: '1018', href: 'tel:1018' }] },
+  'Europe/Prague':    { country: 'Czechia',       lines: [{ label: 'Linka bezpečí', number: '116 111', href: 'tel:116111' }] },
+  'Europe/Vienna':    { country: 'Austria',       lines: [{ label: 'Telefonseelsorge', number: '142', href: 'tel:142', note: 'free, 24/7' }] },
+  'Europe/Brussels':  { country: 'Belgium',       lines: [{ label: 'Centrum ter Preventie', number: '0800 32 123', href: 'tel:080032123', note: 'free' }] },
+  'Europe/Madrid':    { country: 'Spain',         lines: [{ label: 'Teléfono de la Esperanza', number: '717 003 717', href: 'tel:717003717' }] },
+  'Europe/Rome':      { country: 'Italy',         lines: [{ label: 'Telefono Amico', number: '02 2327 2327', href: 'tel:0223272327' }] },
+  'Europe/Lisbon':    { country: 'Portugal',      lines: [{ label: 'SOS Voz Amiga', number: '213 544 545', href: 'tel:213544545' }] },
+  'Europe/Stockholm': { country: 'Sweden',        lines: [{ label: 'Mind Självmordslinjen', number: '90101', href: 'tel:90101', note: 'free, 24/7' }] },
+  'Europe/Helsinki':  { country: 'Finland',       lines: [{ label: 'Kriisipuhelin', number: '09 2525 0111', href: 'tel:0925250111' }] },
+  'Europe/Oslo':      { country: 'Norway',        lines: [{ label: 'Mental Helse', number: '116 123', href: 'tel:116123', note: 'free, 24/7' }] },
+  'Europe/Copenhagen':{ country: 'Denmark',       lines: [{ label: 'Livslinien', number: '70 201 201', href: 'tel:70201201' }] },
+  'Europe/London':    { country: 'UK',            lines: [{ label: 'Samaritans', number: '116 123', href: 'tel:116123', note: 'free, 24/7' }] },
+  'Europe/Dublin':    { country: 'Ireland',       lines: [{ label: 'Samaritans', number: '116 123', href: 'tel:116123', note: 'free, 24/7' }] },
+  'America/New_York': { country: 'USA',           lines: [{ label: 'Suicide & Crisis Lifeline', number: '988', href: 'tel:988', note: 'call or text' }, { label: 'Crisis Text Line', number: '741741', href: 'sms:741741?body=HOME', note: 'text HOME' }] },
+  'America/Chicago':  { country: 'USA',           lines: [{ label: 'Suicide & Crisis Lifeline', number: '988', href: 'tel:988', note: 'call or text' }, { label: 'Crisis Text Line', number: '741741', href: 'sms:741741?body=HOME', note: 'text HOME' }] },
+  'America/Los_Angeles': { country: 'USA',        lines: [{ label: 'Suicide & Crisis Lifeline', number: '988', href: 'tel:988', note: 'call or text' }, { label: 'Crisis Text Line', number: '741741', href: 'sms:741741?body=HOME', note: 'text HOME' }] },
+  'America/Toronto':  { country: 'Canada',        lines: [{ label: 'Crisis Services Canada', number: '1-833-456-4566', href: 'tel:18334564566', note: '24/7' }] },
+  'Australia/Sydney': { country: 'Australia',     lines: [{ label: 'Lifeline', number: '13 11 14', href: 'tel:131114', note: '24/7' }] },
+}
+
+const INTERNATIONAL_FALLBACK: CrisisLine[] = [
+  { label: 'EU standard helpline', number: '116 123', href: 'tel:116123', note: 'many EU countries' },
+  { label: 'Befrienders Worldwide', number: 'befrienders.org', href: 'https://www.befrienders.org', note: 'find local lines' },
+]
+
+// Pure client-side — no API calls
+function getCrisisInfo(): CrisisInfo {
+  if (typeof window === 'undefined') return { country: '', lines: INTERNATIONAL_FALLBACK }
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  if (CRISIS_BY_TZ[tz]) return CRISIS_BY_TZ[tz]
+  // Partial match (e.g. "America/Denver" → USA)
+  const partial = Object.keys(CRISIS_BY_TZ).find(k => tz.startsWith(k.split('/')[0]))
+  if (partial) return CRISIS_BY_TZ[partial]
+  return { country: '', lines: INTERNATIONAL_FALLBACK }
+}
+
 function getStoredTasks() {
   try { return JSON.parse(localStorage.getItem('loadlight-tasks') ?? '[]') } catch { return [] }
+}
+
+// ── CrisisRedirect — pure static JSX, zero API calls ──
+function CrisisRedirect() {
+  const { country, lines } = getCrisisInfo()
+  return (
+    <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-5">
+      <p className="text-xs font-bold text-rose-700 mb-1 uppercase tracking-wide">
+        This app tracks tasks, not mental health. If you need support:
+      </p>
+      {country && (
+        <p className="text-[10px] text-rose-500 font-bold mb-2 flex items-center gap-1">
+          <Globe className="w-3 h-3" /> Showing lines for {country}
+        </p>
+      )}
+      <div className="flex flex-col gap-2">
+        {lines.map(line => (
+          <a
+            key={line.number}
+            href={line.href}
+            className="flex items-center gap-2 text-sm font-semibold text-rose-700 hover:text-rose-900 transition-colors"
+          >
+            {line.href.startsWith('sms') ? (
+              <MessageSquare className="w-4 h-4 shrink-0" />
+            ) : line.href.startsWith('http') ? (
+              <Globe className="w-4 h-4 shrink-0" />
+            ) : (
+              <Phone className="w-4 h-4 shrink-0" />
+            )}
+            <span>{line.number} — {line.label}{line.note ? ` (${line.note})` : ''}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayProps) {
@@ -187,26 +269,8 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
           ))}
         </div>
 
-        {/* Crisis lines */}
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-5">
-          <p className="text-xs font-bold text-rose-700 mb-2 uppercase tracking-wide">Need to talk to someone?</p>
-          <div className="flex flex-col gap-2">
-            <a
-              href="tel:988"
-              className="flex items-center gap-2 text-sm font-semibold text-rose-700 hover:text-rose-900 transition-colors"
-            >
-              <Phone className="w-4 h-4 shrink-0" />
-              988 — Suicide &amp; Crisis Lifeline (call or text)
-            </a>
-            <a
-              href="sms:741741?body=HOME"
-              className="flex items-center gap-2 text-sm font-semibold text-rose-700 hover:text-rose-900 transition-colors"
-            >
-              <MessageSquare className="w-4 h-4 shrink-0" />
-              741741 — Crisis Text Line (text HOME)
-            </a>
-          </div>
-        </div>
+        {/* Crisis lines — static, no API calls, location-based */}
+        <CrisisRedirect />
 
         {/* Actions */}
         <AnimatePresence mode="wait">
