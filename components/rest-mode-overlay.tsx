@@ -87,10 +87,19 @@ const INTERNATIONAL_FALLBACK: CrisisLine[] = [
 function getCrisisInfo(): CrisisInfo {
   if (typeof window === 'undefined') return { country: '', lines: INTERNATIONAL_FALLBACK }
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  // Exact match first
   if (CRISIS_BY_TZ[tz]) return CRISIS_BY_TZ[tz]
-  // Partial match (e.g. "America/Denver" → USA)
-  const partial = Object.keys(CRISIS_BY_TZ).find(k => tz.startsWith(k.split('/')[0]))
-  if (partial) return CRISIS_BY_TZ[partial]
+  // Suffix match: e.g. "America/Denver" → find any "America/..." key with same country
+  // (only useful for multi-timezone countries like USA; do NOT fall back continent-wide)
+  const [continent, city] = tz.split('/')
+  if (city) {
+    const same = Object.entries(CRISIS_BY_TZ).find(([k]) => k.startsWith(continent + '/') && CRISIS_BY_TZ[k])
+    // Only use if we have a city-level match in the same continent — but only for regions
+    // where all entries share a country (America/* → USA/Canada varies, so skip)
+    if (continent === 'Australia' || continent === 'Pacific') {
+      if (same) return same[1]
+    }
+  }
   return { country: '', lines: INTERNATIONAL_FALLBACK }
 }
 
@@ -98,21 +107,57 @@ function getStoredTasks() {
   try { return JSON.parse(localStorage.getItem('loadlight-tasks') ?? '[]') } catch { return [] }
 }
 
-// ── CrisisRedirect — pure static JSX, zero API calls ──
+// Sorted list of all available countries for the manual selector
+const COUNTRY_OPTIONS: { label: string; info: CrisisInfo }[] = Object.values(
+  Object.entries(CRISIS_BY_TZ).reduce<Record<string, { label: string; info: CrisisInfo }>>((acc, [, info]) => {
+    if (!acc[info.country]) acc[info.country] = { label: info.country, info }
+    return acc
+  }, {})
+).sort((a, b) => a.label.localeCompare(b.label))
+
+// ── CrisisRedirect — zero API calls ──
 export function CrisisRedirect() {
-  const { country, lines } = getCrisisInfo()
+  const detected = getCrisisInfo()
+  const [override, setOverride] = useState<CrisisInfo | null>(null)
+  const [showSelector, setShowSelector] = useState(false)
+  const { country, lines } = override ?? detected
+
   return (
     <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-5">
       <p className="text-xs font-bold text-rose-700 mb-1 uppercase tracking-wide">
         This app tracks tasks, not mental health. If you need support:
       </p>
-      {country && (
-        <p className="text-[10px] text-rose-500 font-bold mb-2 flex items-center gap-1">
-          <Globe className="w-3 h-3" /> Showing lines for {country}
-        </p>
+      <div className="flex items-center gap-2 mb-2">
+        {country && (
+          <p className="text-[10px] text-rose-500 font-bold flex items-center gap-1">
+            <Globe className="w-3 h-3" /> Showing lines for {country}
+          </p>
+        )}
+        <button
+          onClick={() => setShowSelector(s => !s)}
+          className="text-[10px] text-rose-400 underline font-bold hover:text-rose-600 transition-colors ml-auto"
+        >
+          {showSelector ? 'Cancel' : 'Wrong country?'}
+        </button>
+      </div>
+      {showSelector && (
+        <select
+          className="w-full text-xs rounded-lg border border-rose-200 bg-white text-slate-700 px-2 py-1.5 mb-3 focus:outline-none"
+          defaultValue=""
+          onChange={e => {
+            const found = COUNTRY_OPTIONS.find(o => o.label === e.target.value)
+            if (found) { setOverride(found.info); setShowSelector(false) }
+          }}
+        >
+          <option value="" disabled>Select your country…</option>
+          {COUNTRY_OPTIONS.map(o => (
+            <option key={o.label} value={o.label}>{o.label}</option>
+          ))}
+          <option value="__intl">International / other</option>
+        </select>
       )}
       <div className="flex flex-col gap-2">
-        {lines.map(line => (
+        {(override?.country === '' ? INTERNATIONAL_FALLBACK : lines).map(line => (
           <a
             key={line.number}
             href={line.href}
