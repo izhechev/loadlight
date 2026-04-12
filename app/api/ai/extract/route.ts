@@ -73,6 +73,7 @@ ${text}`
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
   const start = Date.now()
 
+  let rawApiResponse: unknown = null
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -84,7 +85,9 @@ ${text}`
       }),
     })
 
-    const data = await res.json() as {
+    rawApiResponse = await res.json()
+    const data = rawApiResponse as {
+      error?: { message: string; code: number }
       candidates?: {
         finishReason?: string
         safetyRatings?: { category: string; probability: string }[]
@@ -92,22 +95,30 @@ ${text}`
       }[]
     }
 
+    // Propagate API-level errors for diagnosis
+    if (data.error) {
+      console.error('Gemini API error:', data.error)
+      return NextResponse.json({ tasks: [], _debug: data.error })
+    }
+
     const candidate = data.candidates?.[0]
 
-    // Safety filter triggered — never extract, return blocked flag + category
+    // Safety filter triggered
     if (candidate?.finishReason === 'SAFETY') {
       const ratings = candidate.safetyRatings ?? []
       const hit = (cat: string) => ratings.some(r => r.category === cat && r.probability !== 'NEGLIGIBLE')
       const category =
         hit('HARM_CATEGORY_DANGEROUS_CONTENT') ? 'self_harm' :
         hit('HARM_CATEGORY_SEXUALLY_EXPLICIT') ? 'sexual' :
-        hit('HARM_CATEGORY_HATE_SPEECH')        ? 'hate' :
-        hit('HARM_CATEGORY_HARASSMENT')         ? 'other' : 'other'
+        hit('HARM_CATEGORY_HATE_SPEECH')        ? 'hate' : 'other'
       return NextResponse.json({ blocked: true, category })
     }
 
     const raw = candidate?.content?.parts?.[0]?.text?.trim()
-    if (!raw) return offlineFallback(text)
+    if (!raw) {
+      console.error('Gemini extraction: empty response', JSON.stringify(data).slice(0, 500))
+      return offlineFallback(text)
+    }
 
     // Strip markdown code fences if present
     const clean = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
@@ -124,7 +135,7 @@ ${text}`
 
     return NextResponse.json(parsed)
   } catch (err) {
-    console.error('Gemini extraction failed:', err)
+    console.error('Gemini extraction failed:', err, 'raw:', JSON.stringify(rawApiResponse).slice(0, 300))
     return offlineFallback(text)
   }
 }
