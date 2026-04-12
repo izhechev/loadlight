@@ -99,7 +99,7 @@ function getStoredTasks() {
 }
 
 // ── CrisisRedirect — pure static JSX, zero API calls ──
-function CrisisRedirect() {
+export function CrisisRedirect() {
   const { country, lines } = getCrisisInfo()
   return (
     <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-5">

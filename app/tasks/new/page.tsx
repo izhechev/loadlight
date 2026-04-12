@@ -8,6 +8,25 @@ import { AppLayout } from "@/components/app-layout"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 import { addTasks, IS_DEMO } from "@/lib/data/tasks"
+import { CrisisRedirect } from "@/components/rest-mode-overlay"
+
+// Crisis phrase detection — checked before any AI call
+const CRISIS_PATTERNS = [
+  /\bkill\s*(my)?self\b/i,
+  /\bsuicid(e|al)\b/i,
+  /\bend\s+(my|it\s+all|this|my\s+life)\b/i,
+  /\bwant\s+to\s+(die|end it)\b/i,
+  /\b(don'?t|do\s+not)\s+want\s+to\s+live\b/i,
+  /\bnot\s+worth\s+living\b/i,
+  /\bhurt\s+my\s*self\b/i,
+  /\bself[\s-]harm\b/i,
+  /\btake\s+my\s+(own\s+)?life\b/i,
+  /\bno\s+(reason|point)\s+to\s+(live|go\s+on)\b/i,
+]
+
+function containsCrisisPhrase(text: string): boolean {
+  return CRISIS_PATTERNS.some(p => p.test(text))
+}
 
 type DemandType = 'cognitive' | 'emotional' | 'creative' | 'routine' | 'physical'
 
@@ -64,6 +83,7 @@ export default function AddTaskPage() {
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [showOverwhelmedConfirm, setShowOverwhelmedConfirm] = useState(false)
+  const [showCrisisModal, setShowCrisisModal] = useState(false)
 
   // Restore tasks from localStorage
   function getStoredTasks(): ExtractedTask[] {
@@ -80,6 +100,11 @@ export default function AddTaskPage() {
 
   async function handleExtractIntent() {
     if (!input.trim()) return
+    // Safety: crisis phrases are never processed as tasks
+    if (containsCrisisPhrase(input)) {
+      setShowCrisisModal(true)
+      return
+    }
     if (overwhelmedState === 'overwhelmed') {
       setShowOverwhelmedConfirm(true)
       return
@@ -190,6 +215,36 @@ export default function AddTaskPage() {
             <p className="text-sm text-slate-500 font-bold">Type naturally — AI extracts and classifies each task</p>
           </div>
         </div>
+
+        {/* Crisis support modal — shown instead of task extraction when crisis phrases detected */}
+        <AnimatePresence>
+          {showCrisisModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.92, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.92, y: 20 }}
+                transition={mc}
+                className="glass-panel w-full max-w-md rounded-3xl p-6 shadow-2xl border border-rose-200/60"
+              >
+                <h2 className="text-lg font-black text-slate-800 mb-1">This app manages tasks, not crises</h2>
+                <p className="text-sm text-slate-500 mb-4">If you're going through something difficult, there are people who can help right now.</p>
+                <CrisisRedirect />
+                <button
+                  onClick={() => { setShowCrisisModal(false); setInput('') }}
+                  className="w-full glow-button font-black py-2.5 text-sm mt-2"
+                >
+                  Close
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Overwhelmed confirmation dialog */}
         <AnimatePresence>
