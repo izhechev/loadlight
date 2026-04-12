@@ -412,16 +412,24 @@ export default function TasksPage() {
   const firstDayOfWeek = new Date(calYear, calMonthNum, 1).getDay()
   const startOffset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1 // Mon-first
   // Helper: extract "YYYY-MM-DD" from either "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm"
-  function dateKey(dt: string): string { return dt.split('T')[0] }
+  // Normalize: Supabase may return "YYYY-MM-DD HH:mm:ss+00" (space) or ISO "T" separator
+  function normalizeDt(dt: string): string { return dt.replace(' ', 'T') }
+  function dateKey(dt: string): string { return normalizeDt(dt).split('T')[0] }
   // Helper: safe local-time date parse (avoids UTC-midnight timezone shift)
-  function parseLocal(dt: string): Date { return new Date(dt.includes('T') ? dt : dt + 'T00:00') }
-  // Helper: format time portion if present
+  function parseLocal(dt: string): Date {
+    const n = normalizeDt(dt)
+    return new Date(n.includes('T') ? n : n + 'T00:00')
+  }
+  // Helper: format time portion if present — shows actual time from DB string
   function formatTime(dt: string): string | null {
-    if (!dt.includes('T')) return null
-    const [, time] = dt.split('T')
-    if (!time) return null
-    const [h, m] = time.split(':')
+    const n = normalizeDt(dt)
+    if (!n.includes('T')) return null
+    const timePart = n.split('T')[1]
+    if (!timePart) return null
+    const [h, m] = timePart.split(':')
+    if (!h || !m) return null
     const hour = parseInt(h)
+    if (isNaN(hour)) return null
     const suffix = hour >= 12 ? 'pm' : 'am'
     const hour12 = hour % 12 || 12
     return `${hour12}:${m}${suffix}`
