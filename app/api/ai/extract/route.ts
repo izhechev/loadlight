@@ -135,7 +135,9 @@ ${text}`
 
     return NextResponse.json(parsed)
   } catch (err) {
-    console.error('Gemini extraction failed:', err, 'raw:', JSON.stringify(rawApiResponse).slice(0, 300))
-    return offlineFallback(text)
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('Gemini extraction failed:', msg, 'raw:', JSON.stringify(rawApiResponse).slice(0, 300))
+    // Return error details in dev so we can diagnose
+    return NextResponse.json({ tasks: [], offline: true, _err: msg, _raw: JSON.stringify(rawApiResponse).slice(0, 500) })
   }
 }
