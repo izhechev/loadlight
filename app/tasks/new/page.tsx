@@ -91,6 +91,7 @@ export default function AddTaskPage() {
   const [saved, setSaved] = useState(false)
   const [showOverwhelmedConfirm, setShowOverwhelmedConfirm] = useState(false)
   const [showCrisisModal, setShowCrisisModal] = useState(false)
+  const [showBlockedModal, setShowBlockedModal] = useState(false)
 
   // Restore tasks from localStorage
   function getStoredTasks(): ExtractedTask[] {
@@ -107,15 +108,29 @@ export default function AddTaskPage() {
 
   async function handleExtractIntent() {
     if (!input.trim()) return
-    // Safety: crisis phrases are never processed as tasks
-    if (containsCrisisPhrase(input)) {
-      setShowCrisisModal(true)
-      return
-    }
-    if (overwhelmedState === 'overwhelmed') {
-      setShowOverwhelmedConfirm(true)
-      return
-    }
+
+    // 1. Instant local check for obvious crisis phrases
+    if (containsCrisisPhrase(input)) { setShowCrisisModal(true); return }
+
+    // 2. Server-side moderation — catches everything else (CSAM, violence, hate, etc.)
+    setIsExtracting(true)
+    try {
+      const modRes = await fetch('/api/moderate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: input }),
+      })
+      const mod = await modRes.json() as { flagged: boolean; category: string | null }
+      if (mod.flagged) {
+        setIsExtracting(false)
+        if (mod.category === 'self_harm') { setShowCrisisModal(true) } else { setShowBlockedModal(true) }
+        return
+      }
+    } catch { /* moderation unavailable — proceed */ }
+    setIsExtracting(false)
+
+    // 3. Overwhelmed check + extraction
+    if (overwhelmedState === 'overwhelmed') { setShowOverwhelmedConfirm(true); return }
     await doExtract()
   }
 
@@ -247,6 +262,35 @@ export default function AddTaskPage() {
                   className="w-full glow-button font-black py-2.5 text-sm mt-2"
                 >
                   Close
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Harmful content blocked modal */}
+        <AnimatePresence>
+          {showBlockedModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.92, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.92, y: 20 }}
+                transition={mc}
+                className="glass-panel w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-200/60"
+              >
+                <h2 className="text-lg font-black text-slate-800 mb-2">That can't be added as a task</h2>
+                <p className="text-sm text-slate-500 mb-5">This app is for managing your work and daily tasks.</p>
+                <button
+                  onClick={() => { setShowBlockedModal(false); setInput('') }}
+                  className="w-full glow-button font-black py-2.5 text-sm"
+                >
+                  OK
                 </button>
               </motion.div>
             </motion.div>
