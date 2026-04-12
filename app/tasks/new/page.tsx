@@ -11,6 +11,10 @@ import { addTasks, IS_DEMO } from "@/lib/data/tasks"
 import { CrisisRedirect } from "@/components/rest-mode-overlay"
 
 // Crisis phrase detection — checked before any AI call
+// Single words that are unambiguous crisis signals when entered alone
+const CRISIS_STANDALONE = new Set(['kill', 'suicide', 'suicidal', 'die', 'dying'])
+
+// Multi-word crisis phrase patterns
 const CRISIS_PATTERNS = [
   /\bkill\s*(my)?self\b/i,
   /\bsuicid(e|al)\b/i,
@@ -25,6 +29,9 @@ const CRISIS_PATTERNS = [
 ]
 
 function containsCrisisPhrase(text: string): boolean {
+  const trimmed = text.trim().toLowerCase()
+  // Standalone crisis word (e.g. "Kill", "suicide" with nothing else)
+  if (CRISIS_STANDALONE.has(trimmed)) return true
   return CRISIS_PATTERNS.some(p => p.test(text))
 }
 
