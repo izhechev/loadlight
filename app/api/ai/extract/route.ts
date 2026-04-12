@@ -5,51 +5,27 @@ export const runtime = 'edge'
 
 const SYSTEM_PROMPT = `You are a task extraction assistant for LoadLight, a task and wellbeing manager.
 
-Extract tasks from the user's free-form input. For each task:
-- name: concise noun phrase, 1-3 words. Strip filler action verbs and normalize colloquial phrasing:
-    "hit the gym" → "Gym", "do the laundry" → "Laundry", "buy groceries" → "Groceries",
-    "call mom" → "Call mom", "finish the report" → "Finish report", "take out trash" → "Take out trash"
-- category: match to existing categories (Work, Study, Personal, Exercise, Creative, Admin) or infer
-- lifeDomain: one of work/study/personal/health/finance/social/creativity/home
+Extract tasks from the user's free-form input. For each task produce these fields:
+- name: concise noun phrase, 1-4 words. Normalize colloquial phrasing and drop filler verbs:
+    "hit the gym daily" → name "Gym", recurring "daily"
+    "do the laundry" → "Laundry"
+    "buy groceries" → "Groceries"
+    "call mom" → "Call mom"
+    "finish the report" → "Finish report"
+    "take lamictal 10:30 and 22:30 daily" → TWO tasks: "Take Lamictal 10:30" (deadline today at 10:30) and "Take Lamictal 22:30" (deadline today at 22:30), both recurring "daily"
+- category: match to (Work, Study, Personal, Exercise, Creative, Admin) or infer
+- lifeDomain: work | study | personal | health | finance | social | creativity | home
 - demandType: cognitive | emotional | creative | routine | physical
 - difficulty: 1 (trivial) to 5 (very hard)
 - priority: 1 (critical) to 4 (low)
-- deadline: ISO datetime string if mentioned, else null
-- startDate: ISO datetime string if mentioned, else null
+- deadline: "YYYY-MM-DDTHH:mm" if a time is mentioned, else null
+- startDate: "YYYY-MM-DDTHH:mm" if mentioned, else null
 - estimatedMinutes: integer if mentioned, else null
-- notes: any extra context from the input
-- recurring: "none" | "daily" | "weekly"
-- recurringHours: integer if user says "every X hours", else null. When set, also set recurring to "daily".
+- notes: any extra context
+- recurring: "none" | "daily" | "weekly". Set to "daily" when user says "daily" or gives a fixed daily time.
+- recurringHours: integer if user says "every X hours", else null
 
-Return ONLY valid JSON with a "tasks" array.`
-
-const RESPONSE_SCHEMA = {
-  type: 'object',
-  properties: {
-    tasks: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          name:             { type: 'string' },
-          category:         { type: 'string' },
-          lifeDomain:       { type: 'string' },
-          demandType:       { type: 'string' },
-          difficulty:       { type: 'integer' },
-          priority:         { type: 'integer' },
-          deadline:         { type: 'string', nullable: true },
-          startDate:        { type: 'string', nullable: true },
-          estimatedMinutes: { type: 'integer', nullable: true },
-          notes:            { type: 'string' },
-          recurring:        { type: 'string' },
-          recurringHours:   { type: 'integer', nullable: true },
-        },
-        required: ['name', 'category', 'lifeDomain', 'demandType', 'difficulty', 'priority', 'notes', 'recurring'],
-      },
-    },
-  },
-  required: ['tasks'],
-}
+Return ONLY valid JSON — no markdown, no explanation. Format: {"tasks": [...]}`
 
 const SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_LOW_AND_ABOVE' },
@@ -93,7 +69,7 @@ Available categories: ${(categories ?? ['Work', 'Study', 'Personal', 'Exercise',
 User input:
 ${text}`
 
-  const model = 'gemini-2.0-flash-exp'
+  const model = 'gemini-3-flash-preview'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
   const start = Date.now()
 
@@ -103,12 +79,7 @@ ${text}`
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 1024,
-          responseMimeType: 'application/json',
-          responseSchema: RESPONSE_SCHEMA,
-        },
+        generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
         safetySettings: SAFETY_SETTINGS,
       }),
     })
@@ -138,7 +109,9 @@ ${text}`
     const raw = candidate?.content?.parts?.[0]?.text?.trim()
     if (!raw) return offlineFallback(text)
 
-    const parsed = JSON.parse(raw) as { tasks: unknown[] }
+    // Strip markdown code fences if present
+    const clean = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+    const parsed = JSON.parse(clean) as { tasks: unknown[] }
 
     logAiCall({
       userId: '',
