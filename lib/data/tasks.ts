@@ -132,6 +132,17 @@ export async function getTasks(): Promise<Task[]> {
   return (data ?? []).map(dbRowToTask)
 }
 
+/** Ensure the profiles row exists for the given user — required before any task insert (FK). */
+async function ensureProfile(supabase: ReturnType<typeof createClient>, userId: string): Promise<void> {
+  await supabase
+    .from('profiles')
+    .upsert(
+      { id: userId, balance_mode: 'average', onboarding_complete: false },
+      { onConflict: 'id', ignoreDuplicates: true },
+    )
+  // Ignore errors — profile may already exist, FK will succeed either way
+}
+
 export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<Task> {
   if (IS_DEMO) {
     const newTask: Task = {
@@ -146,6 +157,8 @@ export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<Tas
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+
+  await ensureProfile(supabase, user.id)
 
   const { data, error } = await supabase
     .from('tasks')
@@ -171,6 +184,8 @@ export async function addTasks(tasks: Omit<Task, 'id' | 'createdAt'>[]): Promise
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+
+  await ensureProfile(supabase, user.id)
 
   const rows = tasks.map(t => taskToDbRow({ ...t, userId: user.id }))
   const { data, error } = await supabase.from('tasks').insert(rows).select()
