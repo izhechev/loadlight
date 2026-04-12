@@ -108,28 +108,8 @@ export default function AddTaskPage() {
 
   async function handleExtractIntent() {
     if (!input.trim()) return
-
-    // 1. Instant local check for obvious crisis phrases
+    // Instant local check for obvious crisis phrases (no network)
     if (containsCrisisPhrase(input)) { setShowCrisisModal(true); return }
-
-    // 2. Server-side moderation — catches everything else (CSAM, violence, hate, etc.)
-    setIsExtracting(true)
-    try {
-      const modRes = await fetch('/api/moderate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: input }),
-      })
-      const mod = await modRes.json() as { flagged: boolean; category: string | null }
-      if (mod.flagged) {
-        setIsExtracting(false)
-        if (mod.category === 'self_harm') { setShowCrisisModal(true) } else { setShowBlockedModal(true) }
-        return
-      }
-    } catch { /* moderation unavailable — proceed */ }
-    setIsExtracting(false)
-
-    // 3. Overwhelmed check + extraction
     if (overwhelmedState === 'overwhelmed') { setShowOverwhelmedConfirm(true); return }
     await doExtract()
   }
@@ -149,7 +129,11 @@ export default function AddTaskPage() {
         }),
       })
       if (!res.ok) throw new Error('API error')
-      const data = await res.json() as { tasks?: ExtractedTask[]; clarification?: Clarification | null }
+      const data = await res.json() as { tasks?: ExtractedTask[]; clarification?: Clarification | null; blocked?: boolean; category?: string }
+      if (data.blocked) {
+        if (data.category === 'self_harm') { setShowCrisisModal(true) } else { setShowBlockedModal(true) }
+        return
+      }
       if (data.tasks?.length) {
         setPreview(data.tasks.map(t => ({ ...t, recurring: t.recurring || 'none', recurring_hours: t.recurring_hours ?? null })))
         if (data.clarification?.question) setClarification(data.clarification)

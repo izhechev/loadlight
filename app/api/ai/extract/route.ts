@@ -1,118 +1,69 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { generateObject } from 'ai'
-import { createOpenAI } from '@ai-sdk/openai'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { z } from 'zod'
 import { logAiCall } from '@/lib/data/tasks'
 
 export const runtime = 'edge'
 
-const ExtractedTaskSchema = z.object({
-  tasks: z.array(z.object({
-    name:             z.string(),
-    category:         z.string().default('Personal'),
-    lifeDomain:       z.string().default('personal'),
-    demandType:       z.enum(['cognitive', 'emotional', 'creative', 'routine', 'physical']).default('routine'),
-    difficulty:       z.number().int().min(1).max(5).default(2),
-    priority:         z.number().int().min(1).max(4).default(3),
-    deadline:         z.string().nullable().optional(),
-    startDate:        z.string().nullable().optional(),
-    estimatedMinutes: z.number().int().nullable().optional(),
-    notes:            z.string().default(''),
-    recurring:        z.enum(['none', 'daily', 'weekly']).default('none'),
-    recurringHours:   z.number().int().nullable().optional(),
-  })),
-})
-
 const SYSTEM_PROMPT = `You are a task extraction assistant for LoadLight, a task and wellbeing manager.
 
 Extract tasks from the user's free-form input. For each task:
-- name: short, action-oriented title
+- name: concise noun phrase, 1-3 words. Strip filler action verbs and normalize colloquial phrasing:
+    "hit the gym" → "Gym", "do the laundry" → "Laundry", "buy groceries" → "Groceries",
+    "call mom" → "Call mom", "finish the report" → "Finish report", "take out trash" → "Take out trash"
 - category: match to existing categories (Work, Study, Personal, Exercise, Creative, Admin) or infer
 - lifeDomain: one of work/study/personal/health/finance/social/creativity/home
 - demandType: cognitive | emotional | creative | routine | physical
 - difficulty: 1 (trivial) to 5 (very hard)
 - priority: 1 (critical) to 4 (low)
-- deadline: ISO date string if mentioned, else null
-- startDate: ISO date string if mentioned, else null
+- deadline: ISO datetime string if mentioned, else null
+- startDate: ISO datetime string if mentioned, else null
 - estimatedMinutes: integer if mentioned, else null
 - notes: any extra context from the input
 - recurring: "none" | "daily" | "weekly"
 - recurringHours: integer if user says "every X hours", else null. When set, also set recurring to "daily".
 
-Return a JSON object with a "tasks" array.`
+Return ONLY valid JSON with a "tasks" array.`
 
-export async function POST(request: NextRequest) {
-  const { text, categories } = await request.json()
-  if (!text?.trim()) {
-    return NextResponse.json({ tasks: [] })
-  }
+const RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    tasks: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name:             { type: 'string' },
+          category:         { type: 'string' },
+          lifeDomain:       { type: 'string' },
+          demandType:       { type: 'string' },
+          difficulty:       { type: 'integer' },
+          priority:         { type: 'integer' },
+          deadline:         { type: 'string', nullable: true },
+          startDate:        { type: 'string', nullable: true },
+          estimatedMinutes: { type: 'integer', nullable: true },
+          notes:            { type: 'string' },
+          recurring:        { type: 'string' },
+          recurringHours:   { type: 'integer', nullable: true },
+        },
+        required: ['name', 'category', 'lifeDomain', 'demandType', 'difficulty', 'priority', 'notes', 'recurring'],
+      },
+    },
+  },
+  required: ['tasks'],
+}
 
-  const userPrompt = `Today's date: ${new Date().toISOString().split('T')[0]}
-Available categories: ${(categories ?? ['Work', 'Study', 'Personal', 'Exercise', 'Creative', 'Admin']).join(', ')}
+const SAFETY_SETTINGS = [
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_LOW_AND_ABOVE' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_LOW_AND_ABOVE' },
+  { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_LOW_AND_ABOVE' },
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_LOW_AND_ABOVE' },
+]
 
-User input:
-${text}`
-
-  const start = Date.now()
-
-  // Try OpenAI first, fall back to Google
-  if (process.env.OPENAI_API_KEY) {
-    try {
-      const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY })
-      const { object, usage } = await generateObject({
-        model: openai('gpt-4o-mini'),
-        system: SYSTEM_PROMPT,
-        prompt: userPrompt,
-        schema: ExtractedTaskSchema,
-      })
-
-      logAiCall({
-        userId: '',
-        callType: 'extraction',
-        model: 'gpt-4o-mini',
-        tokensIn: usage?.inputTokens ?? 0,
-        tokensOut: usage?.outputTokens ?? 0,
-        latencyMs: Date.now() - start,
-      }).catch(() => {})
-
-      return NextResponse.json(object)
-    } catch (err) {
-      console.error('OpenAI extraction failed, falling back to Google:', err)
-    }
-  }
-
-  if (process.env.GOOGLE_API_KEY) {
-    try {
-      const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_API_KEY })
-      const { object, usage } = await generateObject({
-        model: google('gemini-2.0-flash-exp'),
-        system: SYSTEM_PROMPT,
-        prompt: userPrompt,
-        schema: ExtractedTaskSchema,
-      })
-
-      logAiCall({
-        userId: '',
-        callType: 'extraction',
-        model: 'gemini-2.0-flash-exp',
-        tokensIn: usage?.inputTokens ?? 0,
-        tokensOut: usage?.outputTokens ?? 0,
-        latencyMs: Date.now() - start,
-      }).catch(() => {})
-
-      return NextResponse.json(object)
-    } catch (err) {
-      console.error('Google extraction failed:', err)
-    }
-  }
-
-  // Offline fallback — parse lines naively
-  const tasks = text
+function offlineFallback(input: string) {
+  const tasks = input
     .split('\n')
-    .map((line: string) => line.trim())
-    .filter((line: string) => line.length > 0)
-    .map((line: string) => ({
+    .map(l => l.trim())
+    .filter(Boolean)
+    .map(line => ({
       name: line,
       category: 'Personal',
       lifeDomain: 'personal',
@@ -126,6 +77,81 @@ ${text}`
       recurring: 'none',
       recurringHours: null,
     }))
-
   return NextResponse.json({ tasks })
+}
+
+export async function POST(request: NextRequest) {
+  const { text, categories } = await request.json() as { text: string; categories?: string[] }
+  if (!text?.trim()) return NextResponse.json({ tasks: [] })
+
+  const apiKey = process.env.GOOGLE_API_KEY
+  if (!apiKey) return offlineFallback(text)
+
+  const userPrompt = `Today's date: ${new Date().toISOString().split('T')[0]}
+Available categories: ${(categories ?? ['Work', 'Study', 'Personal', 'Exercise', 'Creative', 'Admin']).join(', ')}
+
+User input:
+${text}`
+
+  const model = 'gemini-2.0-flash-exp'
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+  const start = Date.now()
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 1024,
+          responseMimeType: 'application/json',
+          responseSchema: RESPONSE_SCHEMA,
+        },
+        safetySettings: SAFETY_SETTINGS,
+      }),
+    })
+
+    const data = await res.json() as {
+      candidates?: {
+        finishReason?: string
+        safetyRatings?: { category: string; probability: string }[]
+        content?: { parts?: { text?: string }[] }
+      }[]
+    }
+
+    const candidate = data.candidates?.[0]
+
+    // Safety filter triggered — never extract, return blocked flag + category
+    if (candidate?.finishReason === 'SAFETY') {
+      const ratings = candidate.safetyRatings ?? []
+      const hit = (cat: string) => ratings.some(r => r.category === cat && r.probability !== 'NEGLIGIBLE')
+      const category =
+        hit('HARM_CATEGORY_DANGEROUS_CONTENT') ? 'self_harm' :
+        hit('HARM_CATEGORY_SEXUALLY_EXPLICIT') ? 'sexual' :
+        hit('HARM_CATEGORY_HATE_SPEECH')        ? 'hate' :
+        hit('HARM_CATEGORY_HARASSMENT')         ? 'other' : 'other'
+      return NextResponse.json({ blocked: true, category })
+    }
+
+    const raw = candidate?.content?.parts?.[0]?.text?.trim()
+    if (!raw) return offlineFallback(text)
+
+    const parsed = JSON.parse(raw) as { tasks: unknown[] }
+
+    logAiCall({
+      userId: '',
+      callType: 'extraction',
+      model,
+      tokensIn: 0,
+      tokensOut: 0,
+      latencyMs: Date.now() - start,
+    }).catch(() => {})
+
+    return NextResponse.json(parsed)
+  } catch (err) {
+    console.error('Gemini extraction failed:', err)
+    return offlineFallback(text)
+  }
 }
