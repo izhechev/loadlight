@@ -1,0 +1,56 @@
+<h2>Proposed design — confirm before we build</h2>
+<p class="subtitle">The full plan in one view. All decisions locked below — tell me if anything is wrong.</p>
+
+<div class="section">
+  <h3>Page structure</h3>
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;font-family:monospace;font-size:13px;color:#334155;">
+    app/prototypes/tufte-comparison/page.tsx<br>
+    prototypes/evidence/tufte-comparison.png<br>
+    prototypes/evidence/tufte-comparison-notes.md<br>
+    prototypes/evidence/build-output.txt
+  </div>
+  <p style="margin-top:8px;font-size:13px;color:#64748b;">Standalone page — no AppLayout wrapper. Uses the <code>aero-bg</code> background class so both versions sit on the Frutiger Aero canvas. No sidebar, no top nav (it's a prototype, not a real page).</p>
+</div>
+
+<div class="section">
+  <h3>Layout</h3>
+  <div style="display:flex;gap:10px;margin-top:8px;">
+    <div style="flex:1;background:#dbeafe;border:2px solid #93c5fd;border-radius:8px;padding:12px;">
+      <div style="font-weight:800;font-size:13px;color:#1e40af;margin-bottom:4px;">Version A — Current</div>
+      <div style="font-size:12px;color:#1d4ed8;">Glassmorphism skeu-cards<br>No sparklines<br>Decorative bubbles (shockwaves)<br>No overwhelm score<br>Balance: 3 mode buttons</div>
+    </div>
+    <div style="flex:1;background:#dcfce7;border:2px solid #86efac;border-radius:8px;padding:12px;">
+      <div style="font-weight:800;font-size:13px;color:#14532d;margin-bottom:4px;">Version B — Tufte</div>
+      <div style="font-size:12px;color:#166534;">Solid bg-white cards<br>SVG sparklines (colour = trend)<br>No bubbles behind cards<br>Overwhelm score 0.32<br>Balance: draggable slider</div>
+    </div>
+  </div>
+  <p style="margin-top:8px;font-size:13px;color:#64748b;"><strong>Side-by-side on ≥768px, stacked on &lt;768px.</strong> Both columns scroll together.</p>
+</div>
+
+<div class="section">
+  <h3>Sparklines (Version B only)</h3>
+  <p style="font-size:13px;color:#475569;">Raw inline SVG polylines — no recharts (not installed). 4-point data rendered as a small 80×24px chart beneath the number. Colour logic:</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:6px 12px;font-size:12px;color:#166534;font-weight:700;">↑ Improving → green stroke</div>
+    <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:6px;padding:6px 12px;font-size:12px;color:#9a3412;font-weight:700;">↓ Worsening → orange stroke</div>
+    <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:6px 12px;font-size:12px;color:#475569;font-weight:700;">→ Stable → grey stroke</div>
+  </div>
+  <p style="margin-top:8px;font-size:13px;color:#64748b;">Mock data as specified: [28,31,34,36] total, [25,28,30,33] completed, [2.1,1.8,1.3,1.5] hours, [3,1,2,0] due soon.</p>
+</div>
+
+<div class="section">
+  <h3>Screenshot approach</h3>
+  <p style="font-size:13px;color:#475569;"><code>npx playwright screenshot --full-page http://localhost:3000/prototypes/tufte-comparison ./prototypes/evidence/tufte-comparison.png</code><br><br>Starts <code>next dev</code> in background first, waits for port 3000, then captures.</p>
+</div>
+
+<div class="section">
+  <h3>What is NOT in scope</h3>
+  <ul style="font-size:13px;color:#64748b;margin:8px 0 0 0;padding-left:18px;line-height:1.8;">
+    <li>No Supabase, no real data — hardcoded mock only</li>
+    <li>No modification to existing pages or components</li>
+    <li>No full dashboard — only stat cards + balance panel</li>
+    <li>No recharts install</li>
+  </ul>
+</div>
+
+<p style="margin-top:16px;font-size:14px;color:#0369a1;font-weight:700;">Does this match what you want? Reply here — any changes before I write the spec?</p>

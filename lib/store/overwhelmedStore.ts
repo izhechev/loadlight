@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { saveStateSnapshot, logOverwhelmEvent } from '@/lib/data/tasks'
 
 export type OverwhelmedState = 'normal' | 'elevated' | 'overwhelmed'
 export type DemandType = 'cognitive' | 'emotional' | 'creative' | 'routine' | 'physical'
@@ -45,44 +46,50 @@ const WEIGHTS = {
   explicitSelfReport: 0.15,
 }
 
-const THRESHOLDS = { elevated: 0.45, overwhelmed: 0.70 }
+// Calibrated for high-volume task managers: 30 tasks/day is normal.
+// "overwhelmed" should only trigger from real signals (urgent deadlines, explicit button)
+// — not just from having a large backlog.
+const THRESHOLDS = { elevated: 0.62, overwhelmed: 0.85 }
 
 function clamp(val: number, min = 0, max = 1): number {
   return Math.min(Math.max(val, min), max)
 }
 
 function computeSignals(data: TaskSignalData, selfReportCount: number): Signals {
-  // 1. Task accumulation: Smart calculation based on volume, difficulty, and time
-  const diffScore = data.totalUndoneDifficulty / 30; // 30+ difficulty points is heavy (e.g. 10 hard tasks)
-  const timeScore = data.totalUndoneMinutes / 480; // 480 mins (8 hours) of active work is heavy
-  const countScore = data.undoneCount / 15; // 15+ active tasks is heavy
-  
-  // Use the highest metric so we catch overwhelming loads of *any* type (many small tasks vs few huge ones)
+  // 1. Task accumulation
+  // 200 undone = saturated (30/day × ~1 week backlog)
+  const countScore = data.undoneCount / 200
+  // 100 hours of undone work = saturated
+  const timeScore = data.totalUndoneMinutes / 6000
+  // 500 difficulty pts = saturated (200 tasks × avg 2.5)
+  const diffScore = data.totalUndoneDifficulty / 500
   const taskAccumulation = clamp(Math.max(diffScore, timeScore, countScore))
 
-  // 2. Demand concentration: dominant type % of total tasks (min 6 tasks to avoid false positives)
+  // 2. Demand concentration (needs 15+ tasks, kicks in only at 70%+ dominance)
   const totalTasks = Object.values(data.demandTypeCounts).reduce((a, b) => a + b, 0)
   let demandConcentration = 0
-  if (totalTasks >= 6) {
+  if (totalTasks >= 15) {
     const maxCount = Math.max(...Object.values(data.demandTypeCounts))
     const dominantPct = maxCount / totalTasks
-    // < 30% = 0.0, > 60% = 1.0, linear between
-    demandConcentration = clamp((dominantPct - 0.3) / 0.3)
+    // < 70% = 0, > 90% = 1.0 — only extreme concentration matters
+    demandConcentration = clamp((dominantPct - 0.7) / 0.2)
   }
 
-  // 3. Completion velocity: 1 - (completed/added). Requires 6+ tasks added to matter.
+  // 3. Completion velocity — broken for recurring-heavy users (recurring tasks are always
+  // "added" but rarely "done"). Requires 50+ added to kick in; capped at 0.6 max so it
+  // can never saturate the score on its own.
   let completionVelocity = 0
-  if (data.addedLast7Days >= 6) {
-    completionVelocity = clamp(1 - data.completedLast7Days / data.addedLast7Days)
+  if (data.addedLast7Days >= 50) {
+    completionVelocity = clamp(1 - data.completedLast7Days / data.addedLast7Days) * 0.6
   }
 
-  // 4. Temporal pressure: % of deadline tasks due within 48h
+  // 4. Temporal pressure: urgent deadlines are a real overload signal
   const temporalPressure = data.tasksWithDeadlines > 0
     ? clamp(data.tasksDueWithin48h / data.tasksWithDeadlines)
     : 0
 
-  // 5. Explicit self-report: presses this session / 8
-  const explicitSelfReport = clamp(selfReportCount / 8)
+  // 5. Explicit self-report: user knows best — each press counts
+  const explicitSelfReport = clamp(selfReportCount / 5)
 
   return { taskAccumulation, demandConcentration, completionVelocity, temporalPressure, explicitSelfReport }
 }
@@ -123,17 +130,18 @@ export const useOverwhelmedStore = create<OverwhelmedStore>()(
           signals.explicitSelfReport * WEIGHTS.explicitSelfReport
 
         const newHistory = [...scoreHistory, composite].slice(-3)
-        const targetState = deriveStateFromScore(composite)
+        // Auto-detection caps at 'elevated' — only the user can trigger 'overwhelmed' via the button
+        const rawTarget = deriveStateFromScore(composite)
+        const targetState: OverwhelmedState = rawTarget === 'overwhelmed' ? 'elevated' : rawTarget
 
-        // Increase only if last 2 scores both exceed threshold (3-day rolling window protection)
-        let nextState = state
-        if (STATE_RANK[targetState] > STATE_RANK[state]) {
+        // Increase only if last 2 scores both exceed threshold (rolling window protection)
+        let nextState: OverwhelmedState = state === 'overwhelmed' ? 'overwhelmed' : state // never auto-clear overwhelmed
+        if (STATE_RANK[targetState] > STATE_RANK[nextState]) {
           const recentScores = newHistory.slice(-2)
-          const threshold = targetState === 'overwhelmed' ? THRESHOLDS.overwhelmed : THRESHOLDS.elevated
-          const sustained = recentScores.length >= 2 && recentScores.every(s => s >= threshold)
+          const sustained = recentScores.length >= 2 && recentScores.every(s => s >= THRESHOLDS.elevated)
           if (sustained) nextState = targetState
-        } else {
-          // Always allow immediate decrease
+        } else if (state !== 'overwhelmed') {
+          // Allow immediate decrease but don't auto-clear overwhelmed
           nextState = targetState
         }
 
@@ -144,9 +152,25 @@ export const useOverwhelmedStore = create<OverwhelmedStore>()(
           lastComputed: Date.now(),
           state: nextState,
         })
+
+        // Fire-and-forget persistence
+        saveStateSnapshot({
+          compositeScore:      composite,
+          taskAccumulation:    signals.taskAccumulation,
+          demandConcentration: signals.demandConcentration,
+          completionVelocity:  signals.completionVelocity,
+          temporalPressure:    signals.temporalPressure,
+          selfReport:          signals.explicitSelfReport,
+          state:               nextState,
+        }).catch(() => {})
+
+        if (nextState !== state) {
+          logOverwhelmEvent('composite', state, nextState).catch(() => {})
+        }
       },
 
       triggerOverwhelmedButton() {
+        const { state } = get()
         set(s => ({
           selfReportCount: s.selfReportCount + 1,
           state: 'overwhelmed',
@@ -155,6 +179,9 @@ export const useOverwhelmedStore = create<OverwhelmedStore>()(
             explicitSelfReport: clamp((s.selfReportCount + 1) / 8),
           },
         }))
+        if (state !== 'overwhelmed') {
+          logOverwhelmEvent('button', state, 'overwhelmed').catch(() => {})
+        }
       },
 
       exitRestMode() {

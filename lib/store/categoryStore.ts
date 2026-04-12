@@ -42,6 +42,7 @@ interface CategoryStore {
   updateCategory: (id: string, updates: Partial<Omit<Category, 'id'>>) => void
   deleteCategory: (id: string) => void
   resetToDefaults: () => void
+  reorderCategories: (fromId: string, toId: string) => void
 }
 
 export const useCategoryStore = create<CategoryStore>()(
@@ -67,6 +68,18 @@ export const useCategoryStore = create<CategoryStore>()(
 
       resetToDefaults() {
         set({ categories: DEFAULT_CATEGORIES })
+      },
+
+      reorderCategories(fromId, toId) {
+        set(s => {
+          const cats = [...s.categories]
+          const fromIdx = cats.findIndex(c => c.id === fromId)
+          const toIdx = cats.findIndex(c => c.id === toId)
+          if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return s
+          const [moved] = cats.splice(fromIdx, 1)
+          cats.splice(toIdx, 0, moved)
+          return { categories: cats }
+        })
       },
     }),
     { 

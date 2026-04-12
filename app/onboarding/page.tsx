@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowRight, ArrowLeft } from "lucide-react"
+import { upsertProfile, IS_DEMO } from "@/lib/data/tasks"
 
-type BalanceMode = 'beast' | 'balanced' | 'chill'
+type BalanceMode = 'beast' | 'average' | 'chill'
 type WorkType = 'student' | 'professional' | 'freelancer' | 'other'
 
 const WORK_TYPES: { id: WorkType; emoji: string; label: string; desc: string }[] = [
@@ -18,7 +19,7 @@ const WORK_TYPES: { id: WorkType; emoji: string; label: string; desc: string }[]
 
 const BALANCE_MODES: { id: BalanceMode; emoji: string; label: string; ratio: string; desc: string; note?: string }[] = [
   { id: 'beast',    emoji: '⚡', label: 'Beast Worker',    ratio: '70% work / 30% leisure', desc: 'Maximize productivity' },
-  { id: 'balanced', emoji: '⚖️', label: 'Average Worker',  ratio: '50% work / 50% leisure', desc: 'Healthy balance' },
+  { id: 'average',  emoji: '⚖️', label: 'Average Worker',  ratio: '50% work / 50% leisure', desc: 'Healthy balance' },
   { id: 'chill',    emoji: '🌿', label: 'Chill Guy',       ratio: '30% work / 70% leisure', desc: 'Rest & leisure first', note: 'Includes 30-day lock to prevent impulsive switching' },
 ]
 
@@ -51,13 +52,21 @@ export default function OnboardingPage() {
     setStep(nextStep)
   }
 
-  function finish() {
+  async function finish() {
     localStorage.setItem('loadlight-user', JSON.stringify({
       name,
       workType,
       balanceMode,
       onboardingComplete: true,
     }))
+
+    if (!IS_DEMO && balanceMode) {
+      await upsertProfile({
+        balanceMode: balanceMode as 'beast' | 'average' | 'chill',
+        onboardingComplete: true,
+      }).catch(() => {})
+    }
+
     router.push('/dashboard')
   }
 
