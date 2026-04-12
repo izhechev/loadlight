@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(C:/Users/Maznqra/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh:*)",
+      "Bash(npx next:*)",
+      "Bash(tee prototypes/evidence/build-output.txt)",
+      "Bash(echo \"dev server starting in background, pid $!\")",
+      "Bash(npx --yes playwright@latest screenshot --browser chromium --full-page \"http://localhost:3001/prototypes/tufte-comparison\" \"prototypes/evidence/tufte-comparison.png\")",
+      "Bash(npx playwright:*)",
+      "Bash(git -C \"C:/Users/Maznqra/OneDrive - Office 365 Fontys/Code/Open learning/LoadLight/loadlight\" status --short)",
+      "Bash(wmic process:*)",
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3000\")",
+      "Bash(node -e \"const { execSync } = require\\('child_process'\\); try { console.log\\(execSync\\('npx next dev --port 3000', {timeout: 8000}\\).toString\\(\\)\\) } catch\\(e\\) { console.log\\('stdout:', e.stdout?.toString\\(\\)\\); console.log\\('stderr:', e.stderr?.toString\\(\\)\\) }\")",
+      "Bash(npx tsc:*)",
+      "Bash(cmd:*)",
+      "Bash(npm install:*)",
+      "WebSearch",
+      "Bash(where supabase:*)",
+      "Bash(scoop install:*)",
+      "Bash(npx supabase:*)"
+    ]
+  }
+}
