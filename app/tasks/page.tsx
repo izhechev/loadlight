@@ -340,7 +340,12 @@ export default function TasksPage() {
       const nextDate = task.deadline ? new Date(task.deadline) : new Date()
       if (task.recurring === 'daily') nextDate.setDate(nextDate.getDate() + 1)
       if (task.recurring === 'weekly') nextDate.setDate(nextDate.getDate() + 7)
-      const newTask = { ...task, id: Math.random().toString(36).slice(2), done: false, createdAt: Date.now(), deadline: nextDate.toISOString().split('T')[0] }
+      // Preserve the original time portion so "Take lamictal at 22:30" stays at 22:30 each day
+      const timepart = task.deadline?.includes('T') ? task.deadline.split('T')[1] : null
+      const nextDeadline = timepart
+        ? `${nextDate.toISOString().split('T')[0]}T${timepart}`
+        : nextDate.toISOString().split('T')[0]
+      const newTask = { ...task, id: Math.random().toString(36).slice(2), done: false, createdAt: Date.now(), deadline: nextDeadline }
       updated = [...updated, newTask]
       addTasks([{ ...newTask, status: 'active', notes: newTask.notes ?? '', recurring: newTask.recurring ?? 'none', lifeDomain: 'personal', demandType: (newTask as any).demand_type ?? 'routine' }]).catch(() => {})
     }
@@ -387,7 +392,7 @@ export default function TasksPage() {
       if (a.done !== b.done) return a.done ? 1 : -1
       const pa = a.priority ?? 3, pb = b.priority ?? 3
       if (pa !== pb) return pa - pb
-      if (a.deadline && b.deadline) return parseLocal(a.deadline).getTime() - parseLocal(b.deadline).getTime()
+      if (a.deadline && b.deadline) return parseLocal(effectiveDeadline(a)!).getTime() - parseLocal(effectiveDeadline(b)!).getTime()
       if (a.deadline) return -1
       if (b.deadline) return 1
       return 0
@@ -420,24 +425,71 @@ export default function TasksPage() {
     const n = normalizeDt(dt)
     return new Date(n.includes('T') ? n : n + 'T00:00')
   }
-  // Helper: format time portion if present — shows actual time from DB string
-  function formatTime(dt: string): string | null {
-    const n = normalizeDt(dt)
-    if (!n.includes('T')) return null
-    const timePart = n.split('T')[1]
-    if (!timePart) return null
-    const [h, m] = timePart.split(':')
-    if (!h || !m) return null
-    const hour = parseInt(h)
-    if (isNaN(hour)) return null
-    const suffix = hour >= 12 ? 'pm' : 'am'
-    const hour12 = hour % 12 || 12
-    return `${hour12}:${m}${suffix}`
+  // Helper: format date using UTC — our times are stored as naive UTC so the
+  // UTC date is always the "intended" date (avoids local-tz rollover near midnight)
+  const UTC_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  function formatDate(dt: string): string {
+    try {
+      const d = new Date(normalizeDt(dt))
+      if (isNaN(d.getTime())) return ''
+      return `${d.getUTCDate()} ${UTC_MONTHS[d.getUTCMonth()]}`
+    } catch { return '' }
+  }
+  // Helper: for recurring daily tasks, advance the deadline to the next future occurrence
+  function effectiveDeadline(task: Task): string | null {
+    const dl = task.deadline
+    if (!dl || task.recurring !== 'daily') return dl
+    const normalized = normalizeDt(dl)
+    const base = new Date(normalized)
+    if (isNaN(base.getTime())) return dl
+    const currentNow = now || Date.now()
+
+    // Determine the time-of-day to use:
+    // 1. From the stored deadline (if it has a non-midnight time)
+    // 2. From the task name (e.g. "Take Lamictal 10:30") as fallback for legacy midnight entries
+    let timeStr = normalized.includes('T') ? normalized.split('T')[1] : '00:00'
+    const isMidnight = timeStr.startsWith('00:00')
+    if (isMidnight) {
+      const nameMatch = task.name.match(/\b(\d{1,2}):(\d{2})\b/)
+      if (nameMatch) timeStr = `${nameMatch[1].padStart(2, '0')}:${nameMatch[2]}`
+    }
+
+    // Reconstruct a base date that combines original date + correct time
+    const dateOnlyStr = normalized.split('T')[0]
+    const baseWithTime = new Date(`${dateOnlyStr}T${timeStr.split('+')[0].split('Z')[0]}Z`)
+    const effectiveBase = isNaN(baseWithTime.getTime()) ? base : baseWithTime
+
+    if (effectiveBase.getTime() > currentNow) return `${dateOnlyStr}T${timeStr}`
+
+    // Advance by full days until it's in the future
+    const msPerDay = 86400000
+    const elapsed = currentNow - effectiveBase.getTime()
+    const daysAhead = Math.ceil(elapsed / msPerDay)
+    const next = new Date(effectiveBase.getTime() + daysAhead * msPerDay)
+    const yyyy = next.getUTCFullYear()
+    const mm = String(next.getUTCMonth() + 1).padStart(2, '0')
+    const dd = String(next.getUTCDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}T${timeStr}`
+  }
+
+  // Helper: format time portion — reads UTC hours (= AI's intended local time)
+  function formatTime(dt: string | null): string | null {
+    if (!dt) return null
+    try {
+      const date = new Date(normalizeDt(dt))
+      if (isNaN(date.getTime())) return null
+      const h = date.getUTCHours()
+      const m = date.getUTCMinutes()
+      if (h === 0 && m === 0) return null // midnight = date-only, skip
+      const suffix = h >= 12 ? 'pm' : 'am'
+      const hour12 = h % 12 || 12
+      return `${hour12}:${String(m).padStart(2, '0')}${suffix}`
+    } catch { return null }
   }
 
   const tasksByDate = new Map<string, Task[]>()
   visible.filter(t => t.deadline).forEach(t => {
-    const key = dateKey(t.deadline!)
+    const key = dateKey(effectiveDeadline(t)!)
     const arr = tasksByDate.get(key) ?? []
     tasksByDate.set(key, [...arr, t])
   })
@@ -491,19 +543,22 @@ export default function TasksPage() {
                 {task.priority === 1 ? 'P1' : 'P2'}
               </span>
             )}
-            {task.deadline && (
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border ${
-                isDueWithin48h(task.deadline, now) ? 'bg-red-50/90 text-red-600 border-red-300/50' : 'bg-sky-50/60 text-slate-500 border-sky-100/60'
-              }`}>
-                <Calendar className="w-3 h-3" />
-                {parseLocal(task.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                {formatTime(task.deadline) && ` · ${formatTime(task.deadline)}`}
-                {isDueWithin48h(task.deadline, now) && ' · Due soon'}
-              </span>
-            )}
+            {task.deadline && (() => {
+              const dl = effectiveDeadline(task)!
+              return (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border ${
+                  isDueWithin48h(dl, now) ? 'bg-red-50/90 text-red-600 border-red-300/50' : 'bg-sky-50/60 text-slate-500 border-sky-100/60'
+                }`}>
+                  <Calendar className="w-3 h-3" />
+                  {formatDate(dl)}
+                  {formatTime(dl) && ` · ${formatTime(dl)}`}
+                  {isDueWithin48h(dl, now) && ' · Due soon'}
+                </span>
+              )
+            })()}
             {task.start_date && (
               <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border bg-emerald-50/60 text-emerald-600 border-emerald-200/60">
-                ▶ {formatTime(task.start_date) ?? parseLocal(task.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                ▶ {formatTime(task.start_date) ?? formatDate(task.start_date!)}
               </span>
             )}
           </div>
@@ -545,13 +600,16 @@ export default function TasksPage() {
         </div>
         <div className="flex flex-wrap gap-1 mt-1.5">
           <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${DEMAND_COLORS[task.demand_type]}`}>{task.demand_type}</span>
-          {task.deadline && (
-            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5 ${isDueWithin48h(task.deadline, now) ? 'bg-red-50 text-red-600' : 'bg-sky-50/80 text-slate-500'}`}>
-              <Calendar className="w-2.5 h-2.5" />
-              {parseLocal(task.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-              {formatTime(task.deadline) && ` ${formatTime(task.deadline)}`}
-            </span>
-          )}
+          {task.deadline && (() => {
+            const dl = effectiveDeadline(task)!
+            return (
+              <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5 ${isDueWithin48h(dl, now) ? 'bg-red-50 text-red-600' : 'bg-sky-50/80 text-slate-500'}`}>
+                <Calendar className="w-2.5 h-2.5" />
+                {formatDate(dl)}
+                {formatTime(dl) && ` ${formatTime(dl)}`}
+              </span>
+            )
+          })()}
           {task.estimated_minutes && <span className="text-[9px] text-slate-400 font-bold">{task.estimated_minutes}m</span>}
         </div>
       </div>

@@ -1,8 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { logAiCall } from '@/lib/data/tasks'
 
-export const runtime = 'edge'
-
 const SYSTEM_PROMPT = `You are a workload analysis tool inside a task management app called LoadLight.
 
 Rules you must follow:
@@ -37,7 +35,7 @@ Temporal pressure signal: ${Math.round((signals?.temporalPressure ?? 0) * 100)}%
 Provide a 1-2 sentence workload observation.`
 
   const start = Date.now()
-  const model = 'gemini-3-flash-preview'
+  const model = 'gemini-2.5-flash'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
   try {
@@ -46,12 +44,13 @@ Provide a 1-2 sentence workload observation.`
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 120 },
+        generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
       }),
     })
 
-    const data = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+    const data = await res.json() as { candidates?: { content?: { parts?: { thought?: boolean; text?: string }[] } }[] }
+    const parts = data.candidates?.[0]?.content?.parts ?? []
+    const text = (parts.find(p => !p.thought) ?? parts[0])?.text?.trim()
 
     logAiCall({
       userId: '',

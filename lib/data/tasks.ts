@@ -363,6 +363,18 @@ function dbRowToTask(row: any): Task {
   }
 }
 
+// Ensure datetime strings are stored as explicit UTC so Supabase/Postgres
+// doesn't reinterpret them through the database session timezone (which may
+// not be UTC). We store "naive" local times as UTC — the convention used
+// by formatTime (getUTCHours) in the UI.
+function toUtcTs(dt: string | null | undefined): string | null | undefined {
+  if (dt == null) return dt
+  // Already has timezone info → leave as-is
+  if (dt.includes('+') || dt.endsWith('Z')) return dt
+  // Append Z to mark as UTC
+  return dt + 'Z'
+}
+
 function taskToDbRow(task: Partial<Task>): Record<string, unknown> {
   const row: Record<string, unknown> = {}
   if (task.userId           !== undefined) row.user_id           = task.userId
@@ -372,8 +384,8 @@ function taskToDbRow(task: Partial<Task>): Record<string, unknown> {
   if (task.demandType       !== undefined) row.demand_type       = task.demandType
   if (task.difficulty       !== undefined) row.difficulty        = task.difficulty
   if (task.priority         !== undefined) row.priority          = task.priority
-  if (task.deadline         !== undefined) row.deadline          = task.deadline
-  if (task.startDate        !== undefined) row.start_date        = task.startDate
+  if (task.deadline         !== undefined) row.deadline          = toUtcTs(task.deadline)
+  if (task.startDate        !== undefined) row.start_date        = toUtcTs(task.startDate)
   if (task.estimatedMinutes !== undefined) row.estimated_minutes = task.estimatedMinutes
   if (task.notes            !== undefined) row.notes             = task.notes
   if (task.status           !== undefined) row.status            = task.status

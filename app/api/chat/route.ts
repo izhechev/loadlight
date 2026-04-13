@@ -3,8 +3,7 @@ export const runtime = 'edge'
 // Direct Gemini API call using simple fetch
 async function generateWithGemini(options: any) {
   const apiKey = process.env.GOOGLE_API_KEY
-  // gemini-3-flash-preview: newest Gemini model available on the free API tier
-  const model = "gemini-3-flash-preview"
+  const model = "gemini-2.5-flash"
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
   try {
