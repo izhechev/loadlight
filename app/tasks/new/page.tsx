@@ -196,7 +196,14 @@ export default function AddTaskPage() {
       demandType: t.demand_type ?? 'routine',
       difficulty: t.difficulty ?? 2,
       priority: t.priority ?? 3,
-      deadline: t.deadline ?? null,
+      deadline: (() => {
+        const timeMatch = t.name.match(/\b(\d{1,2}):(\d{2})\b/)
+        if (timeMatch) {
+          const dateStr = t.deadline ? t.deadline.split('T')[0] : new Date().toISOString().split('T')[0]
+          return `${dateStr}T${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`
+        }
+        return t.deadline ?? null
+      })(),
       startDate: t.start_date ?? null,
       estimatedMinutes: t.estimated_minutes ?? null,
       notes: t.notes ?? '',

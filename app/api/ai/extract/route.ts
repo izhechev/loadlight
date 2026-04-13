@@ -10,18 +10,26 @@ Extract tasks from the user's free-form input. For each task produce these field
     "buy groceries" → "Groceries"
     "call mom" → "Call mom"
     "finish the report" → "Finish report"
-    "take lamictal 10:30 and 22:30 daily" → TWO tasks: "Take Lamictal 10:30" (deadline today at 10:30) and "Take Lamictal 22:30" (deadline today at 22:30), both recurring "daily"
+    "take lamictal 10:30 and 22:30 daily" → TWO tasks: "Take Lamictal" (deadline today at 10:30) and "Take Lamictal" (deadline today at 22:30), both recurring "daily"
 - category: match to (Work, Study, Personal, Exercise, Creative, Admin) or infer
 - lifeDomain: work | study | personal | health | finance | social | creativity | home
 - demandType: cognitive | emotional | creative | routine | physical
 - difficulty: 1 (trivial) to 5 (very hard)
 - priority: 1 (critical) to 4 (low)
-- deadline: "YYYY-MM-DDTHH:mm" if a time is mentioned, else null
+- deadline: MUST be "YYYY-MM-DDTHH:mm" (including the time) when ANY time is mentioned. NEVER return just "YYYY-MM-DD" if a time was given.
+    Examples: "at 10:30" → "2026-04-13T10:30", "22:30" → "2026-04-13T22:30", "3pm" → "2026-04-13T15:00"
+    If no time mentioned: null
 - startDate: "YYYY-MM-DDTHH:mm" if mentioned, else null
 - estimatedMinutes: integer if mentioned, else null
 - notes: any extra context
-- recurring: "none" | "daily" | "weekly". Set to "daily" when user says "daily" or gives a fixed daily time.
+- recurring: "none" | "daily" | "weekly". Set to "daily" when user says "daily", "every day", "everyday", or gives a fixed daily time.
 - recurringHours: integer if user says "every X hours", else null
+
+CRITICAL RULE for recurring tasks with a fixed time:
+When a task recurs daily AND has a specific time (e.g. "everyday at 10:30", "daily 22:30"), you MUST:
+  1. Keep the task name clean — do NOT include the time in the name: "Take Lamictal" NOT "Take Lamictal 10:30"
+  2. Set deadline to today's date with that time: "2026-04-13T10:30"
+  3. Set recurring to "daily"
 
 Return ONLY valid JSON — no markdown, no explanation. Format: {"tasks": [...]}`
 
@@ -34,6 +42,39 @@ const SAFETY_SETTINGS = [
 ]
 
 function offlineFallback(input: string) {
+  const today = new Date().toISOString().split('T')[0]
+  const isDaily = /\b(daily|every\s*day|everyday)\b/i.test(input)
+  const times = [...input.matchAll(/\b(\d{1,2}):(\d{2})\b/g)].map(m => ({
+    h: m[1].padStart(2, '0'), min: m[2],
+  }))
+
+  // If recurring daily with explicit times: one task per time
+  if (isDaily && times.length > 0) {
+    // Strip time references and recurring words to get a clean task name
+    const baseName = input
+      .replace(/\b(daily|every\s*day|everyday)\b/gi, '')
+      .replace(/\b(at|and)\b/gi, '')
+      .replace(/\b\d{1,2}:\d{2}\b/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .replace(/^[,\s]+|[,\s]+$/g, '')
+    const tasks = times.map(t => ({
+      name: baseName || input.trim(),
+      category: 'Personal',
+      lifeDomain: 'personal',
+      demandType: 'routine',
+      difficulty: 2,
+      priority: 3,
+      deadline: `${today}T${t.h}:${t.min}`,
+      startDate: null,
+      estimatedMinutes: null,
+      notes: '',
+      recurring: 'daily',
+      recurringHours: null,
+    }))
+    return NextResponse.json({ tasks, offline: true })
+  }
+
   const tasks = input
     .split('\n')
     .map(l => l.trim())
@@ -69,36 +110,44 @@ Available categories: ${(categories ?? ['Work', 'Study', 'Personal', 'Exercise',
 User input:
 ${text}`
 
-  const model = 'gemini-3-flash-preview'
+  const model = 'gemini-2.5-flash'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
   const start = Date.now()
 
-  let rawApiResponse: unknown = null
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
-        safetySettings: SAFETY_SETTINGS,
-      }),
-    })
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+    safetySettings: SAFETY_SETTINGS,
+  })
 
-    rawApiResponse = await res.json()
-    const data = rawApiResponse as {
-      error?: { message: string; code: number }
-      candidates?: {
-        finishReason?: string
-        safetyRatings?: { category: string; probability: string }[]
-        content?: { parts?: { text?: string }[] }
-      }[]
+  // Retry up to 2 extra times on transient 503 / UNAVAILABLE errors
+  async function callGemini() {
+    for (let attempt = 0; attempt <= 2; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt))
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+      const data = await res.json() as {
+        error?: { message: string; code: number; status?: string }
+        candidates?: {
+          finishReason?: string
+          safetyRatings?: { category: string; probability: string }[]
+          content?: { parts?: { text?: string }[] }
+        }[]
+      }
+      const isTransient = data.error?.status === 'UNAVAILABLE' || data.error?.code === 503
+      if (data.error && !isTransient) return data  // hard error — don't retry
+      if (!data.error) return data                  // success
+      console.warn(`Gemini 503 attempt ${attempt + 1}`)
     }
+    return { error: { code: 503, message: 'Service temporarily unavailable after retries' } }
+  }
 
-    // Propagate API-level errors for diagnosis
+  try {
+    const data = await callGemini()
+
+    // Propagate API-level errors
     if (data.error) {
       console.error('Gemini API error:', data.error)
-      return NextResponse.json({ tasks: [], _debug: data.error })
+      return offlineFallback(text)
     }
 
     const candidate = data.candidates?.[0]
@@ -114,7 +163,10 @@ ${text}`
       return NextResponse.json({ blocked: true, category })
     }
 
-    const raw = candidate?.content?.parts?.[0]?.text?.trim()
+    // Thinking models emit a thought part first — find the actual response part
+    const parts: { thought?: boolean; text?: string }[] = candidate?.content?.parts ?? []
+    const responsePart = parts.find(p => !p.thought) ?? parts[0]
+    const raw = responsePart?.text?.trim()
     if (!raw) {
       console.error('Gemini extraction: empty response', JSON.stringify(data).slice(0, 500))
       return offlineFallback(text)
@@ -133,11 +185,44 @@ ${text}`
       latencyMs: Date.now() - start,
     }).catch(() => {})
 
-    return NextResponse.json(parsed)
+    const today = new Date().toISOString().split('T')[0]
+
+    // Collect ALL HH:mm times mentioned in the original user input (fallback pool)
+    const inputTimes = [...text.matchAll(/\b(\d{1,2}):(\d{2})\b/g)].map(m => ({
+      h: m[1].padStart(2, '0'),
+      min: m[2],
+    }))
+
+    // For recurring tasks, always use times from the user's raw input — the AI's
+    // deadline minutes are unreliable (e.g. returns "22:00" instead of "22:30").
+    // inputTimes is consumed in order: first recurring task gets first input time, etc.
+    const inputTimesForRecurring = [...inputTimes] // separate copy so non-recurring tasks aren't affected
+
+    const patched = (parsed.tasks as Record<string, unknown>[]).map(task => {
+      const name = (task.name as string) ?? ''
+      const recurring = task.recurring as string | undefined
+      const dl = task.deadline as string | null
+      const dateStr = dl ? dl.split('T')[0] : today
+
+      // For recurring tasks: always override time with the next input time (ground truth)
+      if (recurring && recurring !== 'none' && inputTimesForRecurring.length > 0) {
+        const time = inputTimesForRecurring.shift()!
+        task.deadline = `${dateStr}T${time.h}:${time.min}`
+        return task
+      }
+
+      // For non-recurring tasks: fall back to time in name, then AI deadline
+      const nameMatch = name.match(/\b(\d{1,2}):(\d{2})\b/)
+      if (nameMatch) {
+        task.deadline = `${dateStr}T${nameMatch[1].padStart(2, '0')}:${nameMatch[2]}`
+      }
+
+      return task
+    })
+    return NextResponse.json({ tasks: patched })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error('Gemini extraction failed:', msg, 'raw:', JSON.stringify(rawApiResponse).slice(0, 300))
-    // Return error details in dev so we can diagnose
-    return NextResponse.json({ tasks: [], offline: true, _err: msg, _raw: JSON.stringify(rawApiResponse).slice(0, 500) })
+    console.error('Gemini extraction failed:', msg)
+    return offlineFallback(text)
   }
 }

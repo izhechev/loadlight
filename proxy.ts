@@ -6,55 +6,57 @@ const AUTH_ONLY  = ['/login', '/signup']
 
 export async function proxy(request: NextRequest) {
   // Demo mode — Supabase not configured, pass everything through
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
     return NextResponse.next()
   }
 
-  const response = NextResponse.next({ request })
+  try {
+    const response = NextResponse.next({ request })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            )
+          },
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
+      }
+    )
+
+    // Refresh session — MUST be called before checking user
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const { pathname } = request.nextUrl
+
+    const isProtected = PROTECTED.some(p => pathname.startsWith(p))
+    const isAuthOnly  = AUTH_ONLY.some(p => pathname.startsWith(p))
+
+    if (isProtected && !user) {
+      return NextResponse.redirect(new URL('/login', request.url))
     }
-  )
 
-  // Refresh session — MUST be called before checking user
-  const { data: { user } } = await supabase.auth.getUser()
+    if (isAuthOnly && user) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
 
-  const { pathname } = request.nextUrl
-
-  const isProtected = PROTECTED.some(p => pathname.startsWith(p))
-  const isAuthOnly  = AUTH_ONLY.some(p => pathname.startsWith(p))
-
-  if (isProtected && !user) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/login'
-    return NextResponse.redirect(redirectUrl)
+    return response
+  } catch {
+    // If anything fails (misconfigured Supabase, network error), pass through
+    return NextResponse.next()
   }
-
-  if (isAuthOnly && user) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/dashboard'
-    return NextResponse.redirect(redirectUrl)
-  }
-
-  return response
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/).*)',
+    // Exclude static assets, API routes, and auth callback (needs to run before session exists)
+    '/((?!_next/static|_next/image|favicon.ico|api/|auth/).*)',
   ],
 }
