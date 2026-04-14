@@ -110,45 +110,55 @@ Available categories: ${(categories ?? ['Work', 'Study', 'Personal', 'Exercise',
 User input:
 ${text}`
 
-  const model = 'gemini-2.5-flash'
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+  const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
   const start = Date.now()
 
-  const body = JSON.stringify({
+  const requestBody = JSON.stringify({
     contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
     generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
     safetySettings: SAFETY_SETTINGS,
   })
 
-  // Retry up to 2 extra times on transient 503 / UNAVAILABLE errors
-  async function callGemini() {
-    for (let attempt = 0; attempt <= 2; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, 1500 * attempt))
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
-      const data = await res.json() as {
-        error?: { message: string; code: number; status?: string }
-        candidates?: {
-          finishReason?: string
-          safetyRatings?: { category: string; probability: string }[]
-          content?: { parts?: { text?: string }[] }
-        }[]
+  type GeminiResponse = {
+    error?: { message: string; code: number; status?: string }
+    candidates?: {
+      finishReason?: string
+      safetyRatings?: { category: string; probability: string }[]
+      content?: { parts?: { thought?: boolean; text?: string }[] }
+    }[]
+  }
+
+  // Try each model in order; retry once on 503 before moving to the next model
+  async function callWithFallback(): Promise<{ data: GeminiResponse; model: string } | null> {
+    for (const model of MODELS) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+      for (let attempt = 0; attempt <= 1; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 1500))
+        try {
+          const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody })
+          const data = await res.json() as GeminiResponse
+          const isTransient = data.error?.status === 'UNAVAILABLE' || data.error?.code === 503
+          if (!data.error) return { data, model }
+          if (!isTransient) break // hard error — skip remaining retries for this model
+          console.warn(`${model} 503 attempt ${attempt + 1}`)
+        } catch (e) {
+          console.warn(`${model} fetch error:`, e)
+        }
       }
-      const isTransient = data.error?.status === 'UNAVAILABLE' || data.error?.code === 503
-      if (data.error && !isTransient) return data  // hard error — don't retry
-      if (!data.error) return data                  // success
-      console.warn(`Gemini 503 attempt ${attempt + 1}`)
+      console.warn(`${model} failed, trying next model`)
     }
-    return { error: { code: 503, message: 'Service temporarily unavailable after retries' } }
+    return null
   }
 
   try {
-    const data = await callGemini()
+    const result = await callWithFallback()
 
-    // Propagate API-level errors
-    if (data.error) {
-      console.error('Gemini API error:', data.error)
+    if (!result) {
+      console.error('All Gemini models failed — using offline fallback')
       return offlineFallback(text)
     }
+
+    const { data, model } = result
 
     const candidate = data.candidates?.[0]
 
