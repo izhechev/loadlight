@@ -9,6 +9,7 @@ import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 import { addTasks, IS_DEMO } from "@/lib/data/tasks"
 import { CrisisRedirect } from "@/components/rest-mode-overlay"
+import { PastDeadlineModal } from "@/components/past-deadline-modal"
 
 // Crisis phrase detection — checked before any AI call
 // Single words that are unambiguous crisis signals when entered alone
@@ -102,6 +103,9 @@ export default function AddTaskPage() {
   const [showOverwhelmedConfirm, setShowOverwhelmedConfirm] = useState(false)
   const [showCrisisModal, setShowCrisisModal] = useState(false)
   const [showBlockedModal, setShowBlockedModal] = useState(false)
+  const [pastDeadlineQueue, setPastDeadlineQueue] = useState<ExtractedTask[]>([])
+  const [currentPastDeadlineTask, setCurrentPastDeadlineTask] = useState<ExtractedTask | null>(null)
+  const [resolvedTasks, setResolvedTasks] = useState<ExtractedTask[]>([])
 
   // Restore tasks from localStorage
   function getStoredTasks(): ExtractedTask[] {
@@ -179,11 +183,9 @@ export default function AddTaskPage() {
   // keep old name used by button
   const handleExtract = handleExtractIntent
 
-  async function confirm() {
-    if (!preview) return
-
+  async function performSave(tasksToSave: ExtractedTask[]) {
     const finalTasks: any[] = []
-    preview.forEach(t => {
+    tasksToSave.forEach(t => {
       const times = t.times_per_day || 1
       if (times > 1) {
         for (let i = 1; i <= times; i++) {
@@ -225,6 +227,52 @@ export default function AddTaskPage() {
 
     setSaved(true)
     setTimeout(() => router.push('/tasks'), 800)
+  }
+
+  async function confirm() {
+    if (!preview) return
+
+    const now = Date.now()
+    const pastTasks: ExtractedTask[] = []
+    const futureTasks: ExtractedTask[] = []
+
+    preview.forEach(t => {
+      if (t.deadline) {
+        const dl = new Date(t.deadline.replace(' ', 'T'))
+        if (!isNaN(dl.getTime()) && dl.getTime() < now) {
+          pastTasks.push(t)
+          return
+        }
+      }
+      futureTasks.push(t)
+    })
+
+    if (pastTasks.length > 0) {
+      setPastDeadlineQueue(pastTasks.slice(1))
+      setCurrentPastDeadlineTask(pastTasks[0])
+      setResolvedTasks(futureTasks)
+      return
+    }
+
+    await performSave(preview)
+  }
+
+  function advancePastDeadlineQueue(resolvedTask: ExtractedTask | null) {
+    const newResolved = resolvedTask
+      ? [...resolvedTasks, resolvedTask]
+      : resolvedTasks  // null = deleted, skip
+
+    if (pastDeadlineQueue.length > 0) {
+      setResolvedTasks(newResolved)
+      setCurrentPastDeadlineTask(pastDeadlineQueue[0])
+      setPastDeadlineQueue(pastDeadlineQueue.slice(1))
+    } else {
+      // All resolved — save everything
+      setCurrentPastDeadlineTask(null)
+      setPastDeadlineQueue([])
+      setResolvedTasks([])
+      performSave(newResolved)
+    }
   }
 
   const mc = shouldReduceMotion ? { duration: 0 } : { duration: 0.22 }
@@ -578,6 +626,26 @@ export default function AddTaskPage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {currentPastDeadlineTask && (
+          <PastDeadlineModal
+            task={{
+              name: currentPastDeadlineTask.name,
+              deadline: currentPastDeadlineTask.deadline!,
+              recurring: currentPastDeadlineTask.recurring,
+              category: currentPastDeadlineTask.category,
+            }}
+            onPostpone={(newDeadline) => {
+              advancePastDeadlineQueue({ ...currentPastDeadlineTask, deadline: newDeadline })
+            }}
+            onRemoveDeadline={() => {
+              advancePastDeadlineQueue({ ...currentPastDeadlineTask, deadline: null })
+            }}
+            onCancel={() => {
+              advancePastDeadlineQueue(currentPastDeadlineTask)
+            }}
+          />
+        )}
       </div>
     </AppLayout>
   )
