@@ -420,6 +420,15 @@ export default function TasksPage() {
   // Normalize: Supabase may return "YYYY-MM-DD HH:mm:ss+00" (space) or ISO "T" separator
   function normalizeDt(dt: string): string { return dt.replace(' ', 'T') }
   function dateKey(dt: string): string { return normalizeDt(dt).split('T')[0] }
+  // Convert a stored timestamp (may have tz info) to "YYYY-MM-DDTHH:mm" using UTC components
+  // so datetime-local inputs always show the user's intended time, not the browser's local conversion
+  function toInputDt(dt: string | null | undefined): string {
+    if (!dt) return ''
+    const d = new Date(normalizeDt(dt))
+    if (isNaN(d.getTime())) return dt.replace(' ', 'T').slice(0, 16)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
+  }
   // Helper: safe local-time date parse (avoids UTC-midnight timezone shift)
   function parseLocal(dt: string): Date {
     const n = normalizeDt(dt)
@@ -1011,12 +1020,12 @@ export default function TasksPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="vista-label">Deadline</label>
-                      <input type="datetime-local" value={editingTask.deadline ?? ''} onChange={e => setEditingTask({ ...editingTask, deadline: e.target.value || null })}
+                      <input type="datetime-local" value={toInputDt(editingTask.deadline)} onChange={e => setEditingTask({ ...editingTask, deadline: e.target.value ? e.target.value + 'Z' : null })}
                         className="input-skeu w-full rounded-lg px-3 py-2 text-xs text-slate-700 focus:outline-none" />
                     </div>
                     <div className="space-y-1">
                       <label className="vista-label">Start</label>
-                      <input type="datetime-local" value={editingTask.start_date ?? ''} onChange={e => setEditingTask({ ...editingTask, start_date: e.target.value || null })}
+                      <input type="datetime-local" value={toInputDt(editingTask.start_date)} onChange={e => setEditingTask({ ...editingTask, start_date: e.target.value ? e.target.value + 'Z' : null })}
                         className="input-skeu w-full rounded-lg px-3 py-2 text-xs text-slate-700 focus:outline-none" />
                     </div>
                   </div>

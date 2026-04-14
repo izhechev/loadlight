@@ -35,6 +35,16 @@ function containsCrisisPhrase(text: string): boolean {
   return CRISIS_PATTERNS.some(p => p.test(text))
 }
 
+// Convert stored timestamp (with or without tz) → "YYYY-MM-DDTHH:mm" using UTC components
+// so datetime-local inputs always show the intended time, not the browser's local tz conversion
+function toInputDt(dt: string | null | undefined): string {
+  if (!dt) return ''
+  const d = new Date(dt.replace(' ', 'T'))
+  if (isNaN(d.getTime())) return dt.replace(' ', 'T').slice(0, 16)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
+}
+
 type DemandType = 'cognitive' | 'emotional' | 'creative' | 'routine' | 'physical'
 
 interface ExtractedTask {
@@ -138,7 +148,8 @@ export default function AddTaskPage() {
         setError('AI unavailable — fields pre-filled from your input. Edit before saving.')
       }
       if (data.tasks?.length) {
-        setPreview(data.tasks.map(t => ({ ...t, recurring: t.recurring || 'none', recurring_hours: t.recurring_hours ?? null })))
+        const appendZ = (dt: string | null | undefined) => dt ? (dt.endsWith('Z') || dt.includes('+') ? dt : dt + 'Z') : null
+        setPreview(data.tasks.map(t => ({ ...t, recurring: t.recurring || 'none', recurring_hours: t.recurring_hours ?? null, deadline: appendZ(t.deadline), start_date: appendZ(t.start_date) })))
         if (data.clarification?.question) setClarification(data.clarification)
       } else {
         throw new Error('No tasks extracted')
@@ -433,8 +444,8 @@ export default function AddTaskPage() {
                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Due:</span>
                           <input
                             type="datetime-local"
-                            value={task.deadline ?? ''}
-                            onChange={e => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, deadline: e.target.value || null } : t) ?? null)}
+                            value={toInputDt(task.deadline)}
+                            onChange={e => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, deadline: e.target.value ? e.target.value + 'Z' : null } : t) ?? null)}
                             className="input-skeu text-[10px] rounded-lg px-2 py-1 text-slate-700 focus:outline-none"
                           />
                         </div>
@@ -443,8 +454,8 @@ export default function AddTaskPage() {
                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Start:</span>
                           <input
                             type="datetime-local"
-                            value={task.start_date ?? ''}
-                            onChange={e => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, start_date: e.target.value || null } : t) ?? null)}
+                            value={toInputDt(task.start_date)}
+                            onChange={e => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, start_date: e.target.value ? e.target.value + 'Z' : null } : t) ?? null)}
                             className="input-skeu text-[10px] rounded-lg px-2 py-1 text-slate-700 focus:outline-none"
                           />
                         </div>
