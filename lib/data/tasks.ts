@@ -63,7 +63,7 @@ export interface OverwhelmEventInsert {
 
 export interface AiLogInsert {
   userId: string
-  callType: 'extraction' | 'advisory'
+  callType: 'extraction' | 'advisory' | 'past-deadline'
   model: string
   tokensIn: number
   tokensOut: number

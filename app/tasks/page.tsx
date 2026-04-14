@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/app-layout"
 import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib/store/overwhelmedStore"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { getTasks, updateTask, deleteTask, addTasks, IS_DEMO } from "@/lib/data/tasks"
+import { PastDeadlineModal } from "@/components/past-deadline-modal"
 
 interface Task {
   id: string
@@ -73,6 +74,7 @@ export default function TasksPage() {
   const [chatInput, setChatInput]           = useState('')
   const [chatPhase, setChatPhase]           = useState<'idle' | 'chatting' | 'confirming' | 'done'>('idle')
   const [editingTask, setEditingTask]       = useState<Task | null>(null)
+  const [pastDeadlinePending, setPastDeadlinePending] = useState<Task | null>(null)
 
   type PendingSchedule = {
     scheduled: { id: string; name: string; start_date: string; deadline: string }[]
@@ -360,7 +362,7 @@ export default function TasksPage() {
     deleteTask(id).catch(() => {})
   }
 
-  function saveEdit(edited: Task) {
+  function performSave(edited: Task) {
     const updated = tasks.map(t => t.id === edited.id ? edited : t)
     setTasks(updated)
     syncAndCompute(updated)
@@ -378,6 +380,17 @@ export default function TasksPage() {
       recurringHours: edited.recurring_hours,
       snoozedUntil: edited.snoozedUntil,
     }).catch(() => {})
+  }
+
+  function saveEdit(edited: Task) {
+    if (edited.deadline) {
+      const dl = new Date(edited.deadline.replace(' ', 'T'))
+      if (!isNaN(dl.getTime()) && dl.getTime() < Date.now()) {
+        setPastDeadlinePending(edited)
+        return
+      }
+    }
+    performSave(edited)
   }
 
   const snoozedCount = tasks.filter(t => !t.done && t.snoozedUntil && t.snoozedUntil > (now || Date.now())).length
@@ -1111,6 +1124,32 @@ export default function TasksPage() {
           </>
         )}
       </AnimatePresence>
+
+      {pastDeadlinePending && (
+        <PastDeadlineModal
+          task={{
+            name: pastDeadlinePending.name,
+            deadline: pastDeadlinePending.deadline!,
+            recurring: pastDeadlinePending.recurring,
+            category: pastDeadlinePending.category,
+          }}
+          onPostpone={(newDeadline) => {
+            const updated = { ...pastDeadlinePending, deadline: newDeadline }
+            setPastDeadlinePending(null)
+            performSave(updated)
+          }}
+          onRemoveDeadline={() => {
+            const updated = { ...pastDeadlinePending, deadline: null }
+            setPastDeadlinePending(null)
+            performSave(updated)
+          }}
+          onDelete={() => {
+            setPastDeadlinePending(null)
+            remove(pastDeadlinePending.id)
+          }}
+          onCancel={() => setPastDeadlinePending(null)}
+        />
+      )}
     </AppLayout>
   )
 }
