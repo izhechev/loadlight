@@ -34,36 +34,34 @@ Temporal pressure signal: ${Math.round((signals?.temporalPressure ?? 0) * 100)}%
 
 Provide a 1-2 sentence workload observation.`
 
+  const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
   const start = Date.now()
-  const model = 'gemini-2.5-flash'
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+  const requestBody = JSON.stringify({
+    contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
+    generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
+  })
 
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
-      }),
-    })
+  for (const model of MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody })
+      const data = await res.json() as {
+        error?: { code: number; status?: string }
+        candidates?: { content?: { parts?: { thought?: boolean; text?: string }[] } }[]
+      }
+      if (data.error) {
+        console.warn(`Advise: ${model} error ${data.error.code} — ${data.error.status}`)
+        continue
+      }
+      const parts = data.candidates?.[0]?.content?.parts ?? []
+      const text = (parts.find(p => !p.thought) ?? parts[0])?.text?.trim()
+      if (!text) { console.warn(`Advise: ${model} returned empty response`); continue }
 
-    const data = await res.json() as { candidates?: { content?: { parts?: { thought?: boolean; text?: string }[] } }[] }
-    const parts = data.candidates?.[0]?.content?.parts ?? []
-    const text = (parts.find(p => !p.thought) ?? parts[0])?.text?.trim()
-
-    logAiCall({
-      userId: '',
-      callType: 'advisory',
-      model,
-      tokensIn: 0,
-      tokensOut: 0,
-      latencyMs: Date.now() - start,
-    }).catch(() => {})
-
-    if (text) return NextResponse.json({ advice: text, aiDisclosure: true })
-  } catch (err) {
-    console.error('Advise route error:', err)
+      logAiCall({ userId: '', callType: 'advisory', model, tokensIn: 0, tokensOut: 0, latencyMs: Date.now() - start }).catch(() => {})
+      return NextResponse.json({ advice: text, aiDisclosure: true })
+    } catch (err) {
+      console.warn(`Advise: ${model} fetch error:`, err)
+    }
   }
 
   return NextResponse.json({ advice: null, aiDisclosure: true })
