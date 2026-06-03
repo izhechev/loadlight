@@ -250,7 +250,16 @@ export default function DashboardPage() {
   const updateState = useCallback(() => {
     if (!tasks.length) return
     const sevenDaysAgo = Date.now() - 604800000
-    const undoneTasks = tasks.filter(t => !t.done)
+    const allUndone = tasks.filter(t => !t.done)
+    // Deduplicate recurring tasks so signals aren't inflated by future copies
+    const seenKeys = new Set<string>()
+    const undoneTasks = allUndone.filter(t => {
+      if (!t.recurring || t.recurring === 'none') return true
+      const key = `${t.name.trim().toLowerCase()}||${(t.category || '').toLowerCase()}`
+      if (seenKeys.has(key)) return false
+      seenKeys.add(key)
+      return true
+    })
     const demandTypeCounts: Record<DemandType, number> = { cognitive: 0, emotional: 0, creative: 0, routine: 0, physical: 0 }
     undoneTasks.forEach(t => { demandTypeCounts[t.demand_type]++ })
     const totalUndoneDifficulty = undoneTasks.reduce((acc, t) => acc + (t.difficulty || 2), 0)
@@ -295,7 +304,23 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks])
 
-  const undoneTasks = tasks.filter(t => !t.done)
+  const allUndone = tasks.filter(t => !t.done)
+  // Deduplicate recurring tasks for all display metrics
+  const undoneTasks = (() => {
+    const seen = new Set<string>()
+    return allUndone
+      .slice()
+      .sort((a, b) => {
+        if (a.deadline && b.deadline) return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+        if (a.deadline) return -1; if (b.deadline) return 1; return 0
+      })
+      .filter(t => {
+        if (!t.recurring || t.recurring === 'none') return true
+        const key = `${t.name.trim().toLowerCase()}||${(t.category || '').toLowerCase()}`
+        if (seen.has(key)) return false
+        seen.add(key); return true
+      })
+  })()
   const activeMin = undoneTasks.reduce((acc, t) => acc + (t.estimated_minutes ?? 30), 0)
   const workMin = undoneTasks.filter(t => WORK_CATEGORIES.some(w => t.category?.toLowerCase().includes(w.toLowerCase()))).reduce((acc, t) => acc + (t.estimated_minutes ?? 30), 0)
   const targetWork = balanceMode === 'beast' ? 70 : balanceMode === 'average' ? 50 : 30
