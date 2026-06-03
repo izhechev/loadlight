@@ -531,6 +531,9 @@ export default function TasksPage() {
         </button>
         <div className="flex-1 min-w-0">
           <p className={`font-bold text-sm ${task.done ? 'line-through text-slate-400' : 'text-slate-800'}`}>{task.name}</p>
+          {task.notes && (
+            <p className="text-xs mt-0.5 mb-1 leading-snug" style={{ color: '#5a7a9a' }}>{task.notes}</p>
+          )}
           <div className="flex flex-wrap gap-1.5 mt-1 items-center">
             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${DEMAND_COLORS[task.demand_type]} border border-white/5 shadow-sm`}>{task.demand_type}</span>
             <span className="text-xs text-slate-400 font-mono tracking-tighter">{difficultyDots(task.difficulty)}</span>
@@ -611,6 +614,9 @@ export default function TasksPage() {
             <Trash2 className="w-3 h-3" />
           </button>
         </div>
+        {task.notes && (
+          <p className="text-[10px] mt-1 leading-snug" style={{ color: '#5a7a9a' }}>{task.notes}</p>
+        )}
         <div className="flex flex-wrap gap-1 mt-1.5">
           <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${DEMAND_COLORS[task.demand_type]}`}>{task.demand_type}</span>
           {task.deadline && (() => {
