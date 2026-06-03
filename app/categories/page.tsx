@@ -1,12 +1,11 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
 import {
   Plus, Trash2, Tag, RefreshCw, Palette, ChevronDown, ChevronRight,
   CheckCircle, LayoutGrid, CalendarDays, Calendar, ChevronLeft,
   GripVertical, AlertTriangle, Settings2,
-} from "lucide-react"
+} from "@/lib/icons"
 import { AppLayout } from "@/components/app-layout"
 import { useCategoryStore, COLOR_OPTIONS, getCategoryClasses, type ColorKey } from "@/lib/store/categoryStore"
 import { getTasks } from "@/lib/data/tasks"
@@ -149,7 +148,7 @@ export default function CategoriesPage() {
           ]).map(({ id, icon: Icon, label }) => (
             <button key={id} onClick={() => setView(id)}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-                view === id ? 'nav-item-active' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
+                view === id ? 'nav-item-active' : 'vista-chip-inactive'
               }`}>
               <Icon className="w-3.5 h-3.5" /> {label}
             </button>
@@ -162,18 +161,17 @@ export default function CategoriesPage() {
 
             {/* Balance overshoot banner */}
             {overshootPct > 0 && totalActiveMin > 0 && (
-              <div className="bg-gradient-to-r from-orange-50/90 to-amber-50/90 border-2 border-orange-300/70 rounded-2xl px-4 py-3 flex items-start gap-3 shadow-md">
-                <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5 drop-shadow-sm" />
-                <div className="text-xs text-orange-700">
-                  <span className="font-black text-orange-800">Work overload detected.</span> Work-type categories use <strong>{workPct}%</strong> of your estimated time — {overshootPct}% above your <strong>{target}%</strong> {balanceMode} target. Categories highlighted in orange are the main contributors.
+              <div className="aero-warning rounded-2xl px-4 py-3 flex items-start gap-3 shadow-md">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 drop-shadow-sm" />
+                <div className="text-xs">
+                  <span className="font-black">Work overload detected.</span> Work-type categories use <strong>{workPct}%</strong> of your estimated time — {overshootPct}% above your <strong>{target}%</strong> {balanceMode} target. Categories highlighted in orange are the main contributors.
                 </div>
               </div>
             )}
 
             {/* Add form */}
-            <AnimatePresence>
               {isAdding && (
-                <motion.div key="add" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="skeu-card p-5">
+                <div className="skeu-card p-5 anim-fade-in-down">
                   <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                     <Tag className="w-4 h-4 text-sky-500" /> New Category
                   </h3>
@@ -201,9 +199,8 @@ export default function CategoriesPage() {
                       <button onClick={handleAdd} disabled={!newName.trim()} className="glow-button font-bold px-6 py-2 text-sm disabled:opacity-50">Save</button>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
 
             {/* Category cards */}
             <div className="space-y-2">
@@ -220,21 +217,15 @@ export default function CategoriesPage() {
                 const isEmpty = stats.active.length === 0
 
                 return (
-                  <motion.div
+                  <div
                     key={cat.id}
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: isDragging ? 0.4 : 1, x: 0 }}
-                    transition={{ delay: i * 0.03 }}
+                    className={`anim-fade-in-left rounded-2xl transition-all duration-150 ${overshootCat ? 'aero-warning' : 'glass-panel'} ${isOver && !isDragging ? 'ring-2 ring-sky-400/60' : ''}`}
+                    style={{ animationDelay: `${i * 0.03}s`, opacity: isDragging ? 0.4 : undefined }}
                     draggable
                     onDragStart={() => setDraggingId(cat.id)}
                     onDragEnd={() => { setDraggingId(null); setDragOverId(null) }}
                     onDragOver={e => { e.preventDefault(); setDragOverId(cat.id) }}
                     onDrop={() => { if (draggingId && draggingId !== cat.id) reorderCategories(draggingId, cat.id); setDraggingId(null); setDragOverId(null) }}
-                    className={`rounded-2xl border transition-all duration-150 ${
-                      overshootCat
-                        ? 'bg-orange-50/80 border-orange-200'
-                        : `bg-white/60 ${colorData.bg.replace('bg-', 'border-').replace('/90', '/40')}`
-                    } ${isOver && !isDragging ? 'ring-2 ring-sky-400 ring-offset-1' : ''}`}
                   >
                     {/* Card header — always visible */}
                     <div className="flex items-center gap-2 px-3 py-2.5">
@@ -292,14 +283,8 @@ export default function CategoriesPage() {
                     </div>
 
                     {/* Expanded task list */}
-                    <AnimatePresence>
                       {isExpanded && stats.active.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="overflow-hidden"
-                        >
+                        <div className="overflow-hidden anim-fade-in">
                           <div className="px-3 pb-3 pt-1 border-t border-white/50 space-y-1.5 mt-1">
                             {stats.active.map(t => (
                               <div key={t.id} className="flex items-center gap-2 text-xs text-slate-700 bg-white/50 px-3 py-2 rounded-xl">
@@ -313,10 +298,9 @@ export default function CategoriesPage() {
                               </div>
                             ))}
                           </div>
-                        </motion.div>
+                        </div>
                       )}
-                    </AnimatePresence>
-                  </motion.div>
+                  </div>
                 )
               })}
             </div>

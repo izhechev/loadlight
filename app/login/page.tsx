@@ -3,8 +3,6 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { motion, AnimatePresence } from "framer-motion"
-import { Loader2, Mail, Lock, Eye, EyeOff, MailCheck } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
@@ -35,7 +33,6 @@ export default function LoginPage() {
     }
 
     const supabase = createClient()
-
     if (tab === 'signup') {
       const { error: err } = await supabase.auth.signUp({
         email,
@@ -52,124 +49,141 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="aero-bg min-h-screen flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 24, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, type: 'spring', bounce: 0.25 }}
-        className="glass-panel p-8 max-w-sm w-full"
+    <div className="aero-bg min-h-screen" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div
+        className="glass-panel anim-scale-in"
+        style={{ padding: 32, maxWidth: 360, width: '100%' }}
       >
         {/* Logo */}
-        <div className="flex flex-col items-center mb-6">
-          <Image src="/logo.png" alt="LoadLight" width={80} height={80} className="logo-glow logo-float mb-4" />
-          <h1 className="text-2xl font-black gradient-text">LoadLight</h1>
-          <p className="text-sm text-slate-500 mt-1">Balance your load, lighten your mind</p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 24 }}>
+          <Image src="/logo.png" alt="LoadLight" width={72} height={72} className="logo-glow logo-float" style={{ marginBottom: 12 }} />
+          <h1 style={{ fontSize: 22, fontWeight: 900, color: '#1a3a6a', marginBottom: 4 }}>LoadLight</h1>
+          <p style={{ fontSize: 12, color: '#5a7a9a', fontWeight: 600 }}>Balance your load, lighten your mind</p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex bg-sky-50/70 rounded-2xl p-1 border border-sky-100/60 mb-6">
+        {/* Tabs — Vista-style selector */}
+        <div
+          style={{
+            display: 'flex',
+            backgroundColor: '#dce8f4',
+            backgroundImage: 'linear-gradient(to bottom, #eef4fa, #d0e4f0)',
+            borderRadius: 6,
+            padding: 3,
+            border: '1px solid #9ab8d0',
+            marginBottom: 20,
+          }}
+        >
           {(['signin', 'signup'] as const).map(t => (
             <button
               key={t}
               onClick={() => switchTab(t)}
-              className={`flex-1 py-2 rounded-xl text-sm font-black transition-all ${
-                tab === t
-                  ? 'bg-white shadow-sm text-sky-700'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
+              style={{
+                flex: 1,
+                padding: '6px 0',
+                borderRadius: 4,
+                fontSize: 12,
+                fontWeight: 800,
+                cursor: 'pointer',
+                border: tab === t ? '1px solid #6a9fc8' : '1px solid transparent',
+                backgroundColor: tab === t ? '#ffffff' : 'transparent',
+                backgroundImage: tab === t ? 'linear-gradient(to bottom, #ffffff, #e8f2fa)' : 'none',
+                color: tab === t ? '#1a3a6a' : '#5a7a9a',
+                boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.90)' : 'none',
+              }}
             >
-              {t === 'signin' ? 'Sign in' : 'Register'}
+              {t === 'signin' ? 'Sign In' : 'Register'}
             </button>
           ))}
         </div>
 
-        <AnimatePresence mode="wait">
-          {verifyPending ? (
-            <motion.div
-              key="verify"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="text-center py-4"
+        {verifyPending ? (
+          <div className="anim-fade-in" style={{ textAlign: 'center', padding: '16px 0' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>✉️</div>
+            <h2 style={{ fontWeight: 900, color: '#1a1a1a', marginBottom: 8, fontSize: 16 }}>Check your email</h2>
+            <p style={{ fontSize: 13, color: '#4a6a8a', lineHeight: 1.6 }}>
+              We sent a verification link to <strong style={{ color: '#1a1a1a' }}>{email}</strong>.
+              Click it to activate your account, then come back and sign in.
+            </p>
+            <button
+              onClick={() => switchTab('signin')}
+              className="glow-button"
+              style={{ marginTop: 20, padding: '8px 24px', fontSize: 13, fontWeight: 900 }}
             >
-              <MailCheck className="w-12 h-12 text-sky-500 mx-auto mb-3" />
-              <h2 className="font-black text-slate-800 mb-2">Check your email</h2>
-              <p className="text-sm text-slate-500 leading-relaxed">
-                We sent a verification link to <span className="font-bold text-slate-700">{email}</span>.
-                Click it to activate your account, then come back and sign in.
-              </p>
+              Back to Sign In
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#7a9ab8', fontSize: 14 }}>✉</span>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="Your email"
+                required
+                autoComplete="email"
+                className="input-skeu"
+                style={{ width: '100%', paddingLeft: 34, paddingRight: 12, paddingTop: 10, paddingBottom: 10, fontSize: 13, borderRadius: 4 }}
+              />
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#7a9ab8', fontSize: 14 }}>🔒</span>
+              <input
+                id="password"
+                name="password"
+                type={showPass ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder={tab === 'signup' ? 'Choose a password (min 6 chars)' : 'Password'}
+                required
+                minLength={tab === 'signup' ? 6 : undefined}
+                autoComplete={tab === 'signup' ? 'new-password' : 'current-password'}
+                className="input-skeu"
+                style={{ width: '100%', paddingLeft: 34, paddingRight: 40, paddingTop: 10, paddingBottom: 10, fontSize: 13, borderRadius: 4 }}
+              />
               <button
-                onClick={() => switchTab('signin')}
-                className="mt-5 glow-button font-black py-2.5 px-6 text-sm"
+                type="button"
+                onClick={() => setShowPass(!showPass)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#7a9ab8', fontSize: 13, fontWeight: 700 }}
               >
-                Back to sign in
+                {showPass ? 'Hide' : 'Show'}
               </button>
-            </motion.div>
-          ) : (
-            <motion.form
-              key="form"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onSubmit={handleSubmit}
-              className="space-y-4"
+            </div>
+
+            {error && (
+              <div className="aero-danger" style={{ padding: '8px 12px', borderRadius: 4, fontSize: 12 }}>
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="glow-button"
+              style={{ width: '100%', padding: '10px', fontSize: 14, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: loading ? 0.6 : 1, borderRadius: 4, marginTop: 4 }}
             >
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="Your email"
-                  required
-                  autoComplete="email"
-                  className="w-full pl-11 pr-4 py-3.5 bg-white/60 rounded-2xl text-sm text-slate-700 placeholder:text-slate-400 border border-white/70 focus:outline-none focus:ring-2 focus:ring-sky-300 input-skeu"
-                />
+              {loading && <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.40)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />}
+              {tab === 'signup' ? 'Create Account' : 'Sign In'}
+            </button>
+
+            {!process.env.NEXT_PUBLIC_SUPABASE_URL && (
+              <div style={{ textAlign: 'center', paddingTop: 4 }}>
+                <Link href="/dashboard" style={{ fontSize: 11, color: '#5a7a9a', textDecoration: 'underline', fontWeight: 600 }}>
+                  Continue as guest (demo mode) →
+                </Link>
               </div>
+            )}
+          </form>
+        )}
+      </div>
 
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  id="password"
-                  name="password"
-                  type={showPass ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder={tab === 'signup' ? 'Choose a password (min 6 chars)' : 'Password'}
-                  required
-                  minLength={tab === 'signup' ? 6 : undefined}
-                  autoComplete={tab === 'signup' ? 'new-password' : 'current-password'}
-                  className="w-full pl-11 pr-11 py-3.5 bg-white/60 rounded-2xl text-sm text-slate-700 placeholder:text-slate-400 border border-white/70 focus:outline-none focus:ring-2 focus:ring-sky-300 input-skeu"
-                />
-                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {error && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{error}</p>}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="glow-button w-full text-white font-black py-3.5 rounded-2xl text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {tab === 'signup' ? 'Create account' : 'Sign in'}
-              </button>
-
-              {!process.env.NEXT_PUBLIC_SUPABASE_URL && (
-                <div className="text-center pt-1">
-                  <Link href="/dashboard" className="text-xs text-slate-400 hover:text-slate-600">
-                    Continue as guest (demo mode) →
-                  </Link>
-                </div>
-              )}
-            </motion.form>
-          )}
-        </AnimatePresence>
-      </motion.div>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   )
 }

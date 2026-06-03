@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Clock, Lightbulb, Calendar, Loader2, ArrowLeft, Trash2 } from 'lucide-react'
+import { Lightbulb, Calendar, Loader2, ArrowLeft, Trash2 } from '@/lib/icons'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -162,27 +161,21 @@ export function PastDeadlineModal({
   const wasDueLabel = formatWasDue(task.deadline)
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      <div
+        className="anim-overlay-in"
+        style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.55)', padding: 16 }}
         onClick={onCancel}
       >
-        <motion.div
-          initial={{ scale: 0.92, y: 20 }}
-          animate={{ scale: 1, y: 0 }}
-          exit={{ scale: 0.92, y: 20 }}
-          transition={{ duration: 0.18 }}
-          className="glass-panel w-full max-w-md rounded-3xl p-6 shadow-2xl"
+        <div
+          className="vista-dialog anim-scale-in"
+          style={{ width: '100%', maxWidth: 460, padding: 24 }}
           onClick={e => e.stopPropagation()}
         >
           {/* ── Loading ── */}
           {phase === 'loading' && (
             <div className="flex flex-col items-center justify-center py-10 gap-3">
-              <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
-              <p className="text-sm text-slate-500 font-bold">Analysing task…</p>
+              <Loader2 style={{ width: 28, height: 28, color: '#5a7a9a' }} className="animate-spin" />
+              <p style={{ fontSize: 13, color: '#5a7a9a', fontWeight: 700 }}>Analysing task...</p>
             </div>
           )}
 
@@ -191,28 +184,27 @@ export function PastDeadlineModal({
             <div className="space-y-5">
               {/* Header */}
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-slate-700">
-                  <Clock className="w-5 h-5 shrink-0" />
-                  <h2 className="font-black text-base">This deadline has already passed</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1a2a4a' }}>
+                  <Calendar style={{ width: 18, height: 18, flexShrink: 0 }} />
+                  <h2 style={{ fontWeight: 900, fontSize: 15, color: '#1a2a4a' }}>This deadline has already passed</h2>
                 </div>
-                <p className="text-xs text-slate-400 font-bold pl-7">
+                <p style={{ fontSize: 11, color: '#5a7a9a', fontWeight: 700, paddingLeft: 26 }}>
                   Task: &quot;{task.name}&quot;
                 </p>
-                <p className="text-xs text-slate-400 font-bold pl-7">
+                <p style={{ fontSize: 11, color: '#5a7a9a', fontWeight: 700, paddingLeft: 26 }}>
                   Was due: {wasDueLabel}
                 </p>
               </div>
 
-              {/* AI observation */}
               {observation && (
-                <p className="text-sm text-slate-600 leading-relaxed">{observation}</p>
+                <p style={{ fontSize: 13, color: '#2a3a5a', lineHeight: 1.6 }}>{observation}</p>
               )}
 
               {/* Suggested time badge */}
               {suggestedLabel && (
-                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
-                  <Lightbulb className="w-4 h-4 text-amber-500 shrink-0" />
-                  <span className="text-sm font-black text-amber-700">
+                <div className="flex items-center gap-2 aero-warning rounded-xl px-4 py-2.5">
+                  <Lightbulb className="w-4 h-4 shrink-0" />
+                  <span className="text-sm font-black">
                     Suggested: {suggestedLabel}
                   </span>
                 </div>
@@ -236,7 +228,7 @@ export function PastDeadlineModal({
                     if (suggestedTime) setCustomTime(toInputDt(suggestedTime))
                     setPhase('custom-time')
                   }}
-                  className="w-full py-2.5 rounded-xl text-sm font-bold border border-slate-200 bg-white/50 text-slate-600 hover:bg-white/80 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-2.5 text-sm font-bold transition-all flex items-center justify-center gap-2 vista-btn-secondary"
                 >
                   <Calendar className="w-4 h-4" />
                   Pick a different time
@@ -246,16 +238,16 @@ export function PastDeadlineModal({
                 <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1">
                   <button
                     onClick={onRemoveDeadline}
-                    className="text-sm text-slate-400 hover:text-slate-600 font-bold transition-colors"
+                    style={{ fontSize: 13, color: '#5a7a9a', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
                   >
                     Remove deadline
                   </button>
                   {onDelete && (
                     <button
                       onClick={onDelete}
-                      className="text-sm text-slate-400 hover:text-red-500 font-bold transition-colors flex items-center gap-1"
+                      style={{ fontSize: 13, color: '#c83030', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'underline' }}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 style={{ width: 13, height: 13 }} />
                       Don&apos;t need it
                     </button>
                   )}
@@ -265,9 +257,9 @@ export function PastDeadlineModal({
                 <div className="flex justify-center pt-1">
                   <button
                     onClick={onCancel}
-                    className="text-sm text-slate-400 hover:text-slate-600 font-bold transition-colors flex items-center gap-1"
+                    style={{ fontSize: 13, color: '#5a7a9a', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'underline' }}
                   >
-                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <ArrowLeft style={{ width: 13, height: 13 }} />
                     Back / Cancel
                   </button>
                 </div>
@@ -280,21 +272,20 @@ export function PastDeadlineModal({
             <div className="space-y-5">
               {/* Header */}
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-slate-700">
-                  <Clock className="w-5 h-5 shrink-0" />
-                  <h2 className="font-black text-base">This deadline has already passed</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1a2a4a' }}>
+                  <Calendar style={{ width: 18, height: 18, flexShrink: 0 }} />
+                  <h2 style={{ fontWeight: 900, fontSize: 15, color: '#1a2a4a' }}>This deadline has already passed</h2>
                 </div>
-                <p className="text-xs text-slate-400 font-bold pl-7">
+                <p style={{ fontSize: 11, color: '#5a7a9a', fontWeight: 700, paddingLeft: 26 }}>
                   Task: &quot;{task.name}&quot;
                 </p>
-                <p className="text-xs text-slate-400 font-bold pl-7">
+                <p style={{ fontSize: 11, color: '#5a7a9a', fontWeight: 700, paddingLeft: 26 }}>
                   Was due: {wasDueLabel}
                 </p>
               </div>
 
-              {/* AI question */}
               {clarificationQ && (
-                <p className="text-sm text-slate-700 leading-relaxed">{clarificationQ}</p>
+                <p style={{ fontSize: 13, color: '#2a3a5a', lineHeight: 1.6 }}>{clarificationQ}</p>
               )}
 
               {/* Answer input */}
@@ -303,7 +294,7 @@ export function PastDeadlineModal({
                 onChange={e => setClarificationA(e.target.value)}
                 placeholder="Your answer…"
                 rows={3}
-                className="w-full rounded-xl border border-slate-200 bg-white/60 px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-300 resize-none"
+                className="input-skeu w-full rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none"
                 onKeyDown={e => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleGetAdvice()
                 }}
@@ -320,9 +311,9 @@ export function PastDeadlineModal({
                 <div className="flex justify-center">
                   <button
                     onClick={onCancel}
-                    className="text-sm text-slate-400 hover:text-slate-600 font-bold transition-colors flex items-center gap-1"
+                    style={{ fontSize: 13, color: '#5a7a9a', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'underline' }}
                   >
-                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <ArrowLeft style={{ width: 13, height: 13 }} />
                     Cancel
                   </button>
                 </div>
@@ -334,9 +325,9 @@ export function PastDeadlineModal({
           {phase === 'custom-time' && (
             <div className="space-y-5">
               {/* Header */}
-              <div className="flex items-center gap-2 text-slate-700">
-                <Calendar className="w-5 h-5 shrink-0" />
-                <h2 className="font-black text-base">Pick a new deadline</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Calendar style={{ width: 18, height: 18, flexShrink: 0, color: '#1a2a4a' }} />
+                <h2 style={{ fontWeight: 900, fontSize: 15, color: '#1a2a4a' }}>Pick a new deadline</h2>
               </div>
 
               {/* datetime-local input */}
@@ -344,7 +335,7 @@ export function PastDeadlineModal({
                 type="datetime-local"
                 value={customTime}
                 onChange={e => setCustomTime(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white/60 px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-300"
+                className="input-skeu w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none"
               />
 
               <div className="space-y-2.5">
@@ -360,17 +351,16 @@ export function PastDeadlineModal({
                 <div className="flex justify-center">
                   <button
                     onClick={() => setPhase('advice')}
-                    className="text-sm text-slate-400 hover:text-slate-600 font-bold transition-colors flex items-center gap-1"
+                    style={{ fontSize: 13, color: '#5a7a9a', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'underline' }}
                   >
-                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <ArrowLeft style={{ width: 13, height: 13 }} />
                     Back
                   </button>
                 </div>
               </div>
             </div>
           )}
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
   )
 }

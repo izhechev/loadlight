@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { X, Coffee, BookOpen, Music, Footprints, Phone, MessageSquare, LogOut, Loader2, CheckCircle, AlertCircle, HelpCircle, Globe } from "lucide-react"
+import { X, Coffee, BookOpen, Music, Footprints, Phone, MessageSquare, LogOut, Loader2, CheckCircle, AlertCircle, HelpCircle, Globe } from "@/lib/icons"
 
 interface RestModeOverlayProps {
   onDismiss: () => void
@@ -21,29 +20,29 @@ const RECOVERY_CARDS = [
     icon: Coffee,
     title: "5-min break",
     desc: "Step away from the screen. Breathe slowly.",
-    color: "from-amber-100 to-orange-50 border-amber-200",
-    iconColor: "text-amber-600",
+    color: "aero-card-amber",
+    iconColor: "#ffd98a",
   },
   {
     icon: BookOpen,
     title: "Read something light",
     desc: "A short article, a few pages — nothing heavy.",
-    color: "from-sky-100 to-blue-50 border-sky-200",
-    iconColor: "text-sky-600",
+    color: "aero-card-sky",
+    iconColor: "#7bc8ff",
   },
   {
     icon: Music,
     title: "Put on music",
     desc: "Calm or upbeat — whatever lifts your mood.",
-    color: "from-violet-100 to-purple-50 border-violet-200",
-    iconColor: "text-violet-600",
+    color: "aero-card-violet",
+    iconColor: "#d4a8ff",
   },
   {
     icon: Footprints,
     title: "Short walk",
     desc: "Even 5 minutes outside helps reset your brain.",
-    color: "from-green-100 to-emerald-50 border-green-200",
-    iconColor: "text-green-600",
+    color: "aero-card-green",
+    iconColor: "#80ffc8",
   },
 ]
 
@@ -123,26 +122,26 @@ export function CrisisRedirect() {
   const { country, lines } = override ?? detected
 
   return (
-    <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-5">
-      <p className="text-xs font-bold text-rose-700 mb-1 uppercase tracking-wide">
+    <div className="aero-danger rounded-2xl p-4 mb-5">
+      <p style={{ fontSize: 11, fontWeight: 700, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
         This app tracks tasks, not mental health. If you need support:
       </p>
       <div className="flex items-center gap-2 mb-2">
         {country && (
-          <p className="text-[10px] text-rose-500 font-bold flex items-center gap-1">
+          <p className="text-[10px] font-bold flex items-center gap-1 opacity-70">
             <Globe className="w-3 h-3" /> Showing lines for {country}
           </p>
         )}
         <button
           onClick={() => setShowSelector(s => !s)}
-          className="text-[10px] text-rose-400 underline font-bold hover:text-rose-600 transition-colors ml-auto"
+          className="text-[10px] underline font-bold transition-colors ml-auto opacity-60 hover:opacity-90"
         >
           {showSelector ? 'Cancel' : 'Wrong country?'}
         </button>
       </div>
       {showSelector && (
         <select
-          className="w-full text-xs rounded-lg border border-rose-200 bg-white text-slate-700 px-2 py-1.5 mb-3 focus:outline-none"
+          className="input-skeu w-full text-xs rounded-lg px-2 py-1.5 mb-3 focus:outline-none"
           defaultValue=""
           onChange={e => {
             const found = COUNTRY_OPTIONS.find(o => o.label === e.target.value)
@@ -161,7 +160,7 @@ export function CrisisRedirect() {
           <a
             key={line.number}
             href={line.href}
-            className="flex items-center gap-2 text-sm font-semibold text-rose-700 hover:text-rose-900 transition-colors"
+            className="flex items-center gap-2 text-sm font-semibold transition-colors hover:opacity-90"
           >
             {line.href.startsWith('sms') ? (
               <MessageSquare className="w-4 h-4 shrink-0" />
@@ -204,30 +203,21 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
   const hasResults = triage && (triage.canSkip.length > 0 || triage.urgent.length > 0)
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-    >
-      <motion.div
-        initial={{ scale: 0.92, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.92, y: 20 }}
-        className="glass-panel-strong w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-pink-200/60 max-h-[90vh] overflow-y-auto"
-      >
+    <div className="anim-overlay-in" style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.55)', padding: 16 }}>
+      <div className="vista-dialog anim-scale-in" style={{ width: '100%', maxWidth: 520, padding: 24, maxHeight: '90vh', overflowY: 'auto' }}>
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="text-xl font-black gradient-text">Rest Mode Active</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Take a moment. Your tasks will be here when you're ready.</p>
+            <h2 className="text-xl font-black" style={{ color: '#1a2a4a' }}>Rest Mode Active</h2>
+            <p className="text-sm mt-0.5" style={{ color: '#4a6a8a' }}>Take a moment. Your tasks will be here when you&apos;re ready.</p>
           </div>
           <button
             onClick={onDismiss}
-            className="text-slate-400 hover:text-slate-600 transition-colors p-1 shrink-0"
+            className="vista-close-btn"
             aria-label="Close"
+            style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontSize: 11, fontWeight: 900 }}
           >
-            <X className="w-5 h-5" />
+            ✕
           </button>
         </div>
 
@@ -241,15 +231,15 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
           ) : hasResults ? (
             <div className="space-y-3">
               {triage!.canSkip.length > 0 && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5">
-                  <p className="text-xs font-black text-emerald-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <div className="aero-success rounded-2xl p-3.5">
+                  <p className="text-xs font-black uppercase tracking-wide mb-2 flex items-center gap-1.5">
                     <CheckCircle className="w-3.5 h-3.5" /> These can wait today
                   </p>
                   <ul className="space-y-1.5">
                     {triage!.canSkip.map((item, i) => (
                       <li key={i} className="flex items-start justify-between gap-3">
-                        <span className="text-sm font-semibold text-emerald-800 leading-snug">{item.name}</span>
-                        <span className="text-xs text-emerald-600 whitespace-nowrap shrink-0">{item.reason}</span>
+                        <span className="text-sm font-semibold leading-snug">{item.name}</span>
+                        <span className="text-xs whitespace-nowrap shrink-0 opacity-70">{item.reason}</span>
                       </li>
                     ))}
                   </ul>
@@ -257,15 +247,15 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
               )}
 
               {triage!.urgent.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5">
-                  <p className="text-xs font-black text-amber-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <div className="aero-warning rounded-2xl p-3.5">
+                  <p className="text-xs font-black uppercase tracking-wide mb-2 flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5" /> Worth keeping on the radar
                   </p>
                   <ul className="space-y-1.5">
                     {triage!.urgent.map((item, i) => (
                       <li key={i} className="flex items-start justify-between gap-3">
-                        <span className="text-sm font-semibold text-amber-800 leading-snug">{item.name}</span>
-                        <span className="text-xs text-amber-600 whitespace-nowrap shrink-0">{item.reason}</span>
+                        <span className="text-sm font-semibold leading-snug">{item.name}</span>
+                        <span className="text-xs whitespace-nowrap shrink-0 opacity-70">{item.reason}</span>
                       </li>
                     ))}
                   </ul>
@@ -273,21 +263,21 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
               )}
 
               {triage!.question && questionAnswer === null && (
-                <div className="bg-sky-50 border border-sky-200 rounded-2xl p-3.5">
-                  <p className="text-xs font-black text-sky-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <div className="aero-info rounded-2xl p-3.5">
+                  <p className="text-xs font-black uppercase tracking-wide mb-2 flex items-center gap-1.5">
                     <HelpCircle className="w-3.5 h-3.5" /> Quick question
                   </p>
-                  <p className="text-sm text-sky-800 font-medium mb-3 leading-snug">{triage!.question}</p>
+                  <p className="text-sm font-medium mb-3 leading-snug">{triage!.question}</p>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setQuestionAnswer('yes')}
-                      className="flex-1 bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold py-1.5 rounded-xl text-sm transition-colors border border-sky-200"
+                      className="flex-1 vista-chip-active font-bold py-1.5 rounded-xl text-sm transition-colors"
                     >
                       Yes, today
                     </button>
                     <button
                       onClick={() => setQuestionAnswer('no')}
-                      className="flex-1 bg-white hover:bg-sky-50 text-sky-700 font-bold py-1.5 rounded-xl text-sm transition-colors border border-sky-200"
+                      className="flex-1 vista-btn-secondary font-bold py-1.5 text-sm transition-colors"
                     >
                       Can wait
                     </button>
@@ -305,11 +295,11 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
           {RECOVERY_CARDS.map(({ icon: Icon, title, desc, color, iconColor }) => (
             <div
               key={title}
-              className={`bg-gradient-to-br ${color} border rounded-2xl p-3.5`}
+              className={`${color} p-3.5`}
             >
-              <Icon className={`w-5 h-5 ${iconColor} mb-2`} />
-              <p className="font-bold text-sm text-slate-700">{title}</p>
-              <p className="text-xs text-slate-500 mt-0.5 leading-snug">{desc}</p>
+              <Icon className="w-5 h-5 mb-2" style={{ color: iconColor }} />
+              <p className="font-bold text-sm" style={{ color: '#1a1a1a' }}>{title}</p>
+              <p className="text-xs mt-0.5 leading-snug" style={{ color: '#4a6a8a' }}>{desc}</p>
             </div>
           ))}
         </div>
@@ -318,58 +308,49 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
         <CrisisRedirect />
 
         {/* Actions */}
-        <AnimatePresence mode="wait">
           {confirmExit ? (
-            <motion.div
-              key="confirm"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col gap-2"
-            >
-              <p className="text-sm text-slate-600 text-center font-medium mb-1">
+            <div className="flex flex-col gap-2 anim-fade-in-up">
+              <p className="text-sm text-center font-medium mb-1" style={{ color: '#3a5a7a' }}>
                 Exit rest mode?
               </p>
               <div className="flex gap-2">
                 <button
                   onClick={() => { onExitRestMode(); onDismiss() }}
-                  className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 rounded-xl text-sm transition-colors"
+                  className="flex-1 overwhelm-btn py-2 rounded-xl text-sm font-bold"
                 >
                   Yes, exit
                 </button>
                 <button
                   onClick={() => setConfirmExit(false)}
-                  className="flex-1 glass-panel text-slate-600 font-bold py-2 rounded-xl text-sm hover:bg-white/60 transition-colors border border-slate-200"
+                  className="flex-1 vista-btn-secondary py-2 text-sm"
                 >
                   Stay in rest mode
                 </button>
               </div>
-            </motion.div>
+            </div>
           ) : (
-            <motion.div
-              key="actions"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex gap-2"
-            >
+            <div className="flex gap-2 anim-fade-in">
               <button
                 onClick={() => setConfirmExit(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 rounded-xl text-sm transition-colors border border-slate-200"
+                className="flex-1 flex items-center justify-center gap-1.5 vista-btn-secondary py-2 text-sm font-bold"
               >
                 <LogOut className="w-4 h-4" />
                 Exit Rest Mode
               </button>
               <button
                 onClick={onDismiss}
-                className="flex-1 bg-gradient-to-r from-pink-400 to-rose-400 hover:brightness-110 text-white font-bold py-2 rounded-xl text-sm transition-all shadow-md"
+                className="flex-1 glow-button py-2 text-sm font-bold"
+                style={{
+                  background: 'linear-gradient(180deg, #f472b6 0%, #ec4899 38%, #db2777 55%, #9d174d 100%)',
+                  borderTopColor: 'rgba(255,200,230,0.75)',
+                  borderBottomColor: 'rgba(100,0,60,0.55)',
+                }}
               >
                 Stay in Rest Mode
               </button>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   )
 }
