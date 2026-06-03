@@ -572,11 +572,19 @@ export default function TasksPage() {
                 </span>
               )
             })()}
-            {task.start_date && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border bg-emerald-50/60 text-emerald-600 border-emerald-200/60">
-                ▶ {formatTime(task.start_date) ?? formatDate(task.start_date!)}
-              </span>
-            )}
+            {task.start_date && (() => {
+              const sameDay = task.deadline &&
+                new Date(task.start_date).toDateString() === new Date(task.deadline).toDateString()
+              // Only show start badge if it's a different day than the deadline,
+              // or if there is no deadline — avoids showing two dates on the same card
+              if (sameDay) return null
+              return (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border bg-emerald-50/60 text-emerald-600 border-emerald-200/60">
+                  ▶ {formatDate(task.start_date!)}
+                  {formatTime(task.start_date) && ` · ${formatTime(task.start_date)}`}
+                </span>
+              )
+            })()}
           </div>
         </div>
         <div className="flex flex-col items-center gap-1.5 ml-1">
