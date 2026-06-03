@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
-import { motion, useReducedMotion } from "framer-motion"
-import { LineChart, Line, ResponsiveContainer } from "recharts"
-import { TrendingUp, Brain, Loader2, RefreshCw, Plus, ChevronRight, CheckCircle, AlertTriangle } from "lucide-react"
+import { TrendingUp, Brain, Loader2, RefreshCw, Plus, ChevronRight, CheckCircle, AlertTriangle } from "@/lib/icons"
 import { AppLayout } from "@/components/app-layout"
 import { ChillSuggestions } from "@/components/chill-suggestions"
 import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib/store/overwhelmedStore"
@@ -74,15 +72,23 @@ function saveSparkHistory(entries: SparkEntry[]) {
   } catch { /* ignore */ }
 }
 
-// ── Sparkline micro-chart ──
+// ── Sparkline micro-chart (pure SVG, no library) ──
 function Spark({ data, dataKey, color }: { data: SparkEntry[]; dataKey: keyof SparkEntry; color: string }) {
   if (data.length < 2) return <div className="h-8 opacity-20 text-xs text-slate-400 flex items-end">no history</div>
+  const values = data.map(d => d[dataKey] as number)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const W = 100, H = 32, pad = 2
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * (W - pad * 2) + pad
+    const y = H - pad - ((v - min) / range) * (H - pad * 2)
+    return `${x},${y}`
+  }).join(' ')
   return (
-    <ResponsiveContainer width="100%" height={32}>
-      <LineChart data={data}>
-        <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={1.5} dot={false} />
-      </LineChart>
-    </ResponsiveContainer>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-8" preserveAspectRatio="none">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
 
@@ -123,24 +129,24 @@ function StatCard({ label, value, color, sparkData, sparkKey, sparkColor, deltaF
 // ── Overwhelmed Feedback (no emoji faces) ──
 function OverwhelmedFeedback({ score, state }: { score: number; state: 'normal' | 'elevated' | 'overwhelmed' }) {
   const cfg = {
-    normal:      { dot: 'bg-emerald-400', label: 'Light',    bar: 'bg-emerald-400', headline: "You're managing well",      sub: "Your workload looks balanced. Keep it up!" },
-    elevated:    { dot: 'bg-amber-400',   label: 'Moderate', bar: 'bg-amber-400',   headline: "Your plate is getting full", sub: "Things are building up. Consider completing a task before adding more." },
-    overwhelmed: { dot: 'bg-rose-500',    label: 'Heavy',    bar: 'bg-rose-500',    headline: "Time to take a breather",   sub: "Rest mode is active. Focus on what truly matters right now." },
+    normal:      { dot: '#34d399', label: 'Light',    headline: "You're managing well",      sub: "Your workload looks balanced. Keep it up!" },
+    elevated:    { dot: '#fbbf24', label: 'Moderate', headline: "Your plate is getting full", sub: "Things are building up. Consider completing a task before adding more." },
+    overwhelmed: { dot: '#f87171', label: 'Heavy',    headline: "Time to take a breather",   sub: "Rest mode is active. Focus on what truly matters right now." },
   }[state]
 
   return (
     <div className="flex items-center gap-4">
       {/* Dot + label */}
       <div className="flex flex-col items-center gap-1 shrink-0">
-        <span className={`w-4 h-4 rounded-full ${cfg.dot} shadow-sm`} />
-        <span className="text-[10px] font-bold text-slate-500">Load</span>
-        <span className="text-xs font-black text-slate-700">{cfg.label}</span>
+        <span className="w-4 h-4 rounded-full shadow-sm" style={{ background: cfg.dot, boxShadow: `0 0 6px ${cfg.dot}88`, border: '1px solid rgba(0,0,0,0.15)' }} />
+        <span className="text-[10px] font-bold" style={{ color: '#6a8aaa' }}>Load</span>
+        <span className="text-xs font-black" style={{ color: '#1a1a1a' }}>{cfg.label}</span>
       </div>
 
       {/* Text */}
       <div className="flex-1 min-w-0">
-        <p className="font-black text-xl text-slate-700">{cfg.headline}</p>
-        <p className="text-sm text-slate-500 mt-0.5">{cfg.sub}</p>
+        <p className="font-black text-xl" style={{ color: '#1a1a1a' }}>{cfg.headline}</p>
+        <p className="text-sm mt-0.5" style={{ color: '#4a6a8a' }}>{cfg.sub}</p>
         {/* Score bar — Aero aqua progress */}
         <div className="mt-2 h-3 progress-track rounded-full overflow-hidden">
           <div
@@ -151,7 +157,7 @@ function OverwhelmedFeedback({ score, state }: { score: number; state: 'normal' 
             style={{ width: `${Math.round(score * 100)}%` }}
           />
         </div>
-        <div className="flex justify-between text-[10px] text-slate-400 mt-0.5 font-medium">
+        <div className="flex justify-between text-[10px] mt-0.5 font-medium" style={{ color: '#7a9ab8' }}>
           <span>0</span>
           <span>score: {Math.round(score * 100)}/100</span>
           <span>100</span>
@@ -167,9 +173,9 @@ function BalanceSlider({ value, onChange, locked, lockDaysLeft }: { value: numbe
   const snap = (v: number) => SNAPS.reduce((best, s) => Math.abs(s - v) < Math.abs(best - v) ? s : best)
 
   const labels: Record<number, { name: string; desc: string; color: string }> = {
-    30: { name: 'Chill',     desc: 'Recovery first — max 30% work time.',           color: 'text-violet-600' },
-    50: { name: 'Balanced',  desc: 'Equal split between work and everything else.',  color: 'text-emerald-600' },
-    70: { name: 'Beast mode',desc: '70% work time — you\'re in a sprint.',           color: 'text-sky-600' },
+    30: { name: 'Chill',     desc: 'Recovery first — max 30% work time.',           color: '#5a2a9a' },
+    50: { name: 'Balanced',  desc: 'Equal split between work and everything else.',  color: '#1a7a50' },
+    70: { name: 'Beast mode',desc: '70% work time — you\'re in a sprint.',           color: '#1a4a90' },
   }
   const snapped = snap(value)
   const info = labels[snapped]
@@ -193,8 +199,8 @@ function BalanceSlider({ value, onChange, locked, lockDaysLeft }: { value: numbe
         className={`w-full accent-sky-500 ${locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
       />
       <div className="text-center">
-        <span className={`text-sm font-black ${info.color}`}>{info.name}</span>
-        <p className="text-xs text-slate-500 mt-0.5">{info.desc}</p>
+        <span className="text-sm font-black" style={{ color: info.color }}>{info.name}</span>
+        <p className="text-xs mt-0.5" style={{ color: '#4a6a8a' }}>{info.desc}</p>
         {locked && (
           <p className="text-[11px] text-amber-600 font-black mt-1.5 flex items-center justify-center gap-1">
             🔒 Chill Guy lock active · {lockDaysLeft}d remaining · change in Settings
@@ -206,7 +212,6 @@ function BalanceSlider({ value, onChange, locked, lockDaysLeft }: { value: numbe
 }
 
 export default function DashboardPage() {
-  const shouldReduceMotion = useReducedMotion()
   const { state, compositeScore, computeAndTransition } = useOverwhelmedStore()
   const { categories } = useCategoryStore()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -366,21 +371,16 @@ export default function DashboardPage() {
     ids.forEach(id => updateTask(id, { snoozedUntil }).catch(() => {}))
   }
 
-  const mc = shouldReduceMotion ? { duration: 0 } : { duration: 0.25, type: 'spring' as const, bounce: 0.15 }
-
   return (
     <AppLayout>
       <div className="space-y-4 max-w-4xl mx-auto">
 
         {/* ── Wellbeing card (OverwhelmedFeedback — no emoji faces) ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={mc}
-          className={`skeu-card p-5 border ${
-            state === 'overwhelmed' ? 'bg-gradient-to-br from-rose-100/80 to-pink-100/70 border-rose-300/60' :
-            state === 'elevated'    ? 'bg-gradient-to-br from-amber-100/80 to-yellow-100/70 border-amber-300/60' :
-                                      'bg-gradient-to-br from-emerald-100/80 to-teal-100/70 border-emerald-300/60'
+        <div
+          className={`skeu-card p-5 anim-fade-in-up ${
+            state === 'overwhelmed' ? 'aero-danger'  :
+            state === 'elevated'    ? 'aero-warning' :
+                                      'aero-success'
           }`}
         >
           <div className="flex items-center justify-between gap-4">
@@ -388,11 +388,11 @@ export default function DashboardPage() {
               <OverwhelmedFeedback score={compositeScore} state={state} />
             </div>
             <div className="hidden sm:flex flex-col items-end gap-1 shrink-0">
-              <span className="text-xs text-slate-400">Tasks left</span>
-              <span className="text-2xl font-black text-slate-700">{undoneTasks.length}</span>
+              <span className="text-xs" style={{ color: '#6a8aaa', fontWeight: 700 }}>Tasks left</span>
+              <span className="text-2xl font-black" style={{ color: '#1a1a1a' }}>{undoneTasks.length}</span>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* ── Chill Mode suggestions (only in chill balance mode) ── */}
         {balanceMode === 'chill' && tasks.length > 0 && (
@@ -403,36 +403,26 @@ export default function DashboardPage() {
         )}
 
         {/* ── Stats row with sparklines ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ ...mc, delay: 0.05 }}
-          className="grid grid-cols-2 sm:grid-cols-4 gap-3"
-        >
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 anim-fade-in-up" style={{ animationDelay: '0.05s' }}>
           <StatCard label="Total tasks"      value={tasks.length}                                      color="text-sky-600"                                    sparkData={sparkHistory} sparkKey="undone"   sparkColor="#0ea5e9" />
           <StatCard label="Completed"        value={tasks.filter(t => t.done).length}                  color="text-emerald-600"                                sparkData={sparkHistory} sparkKey="done"    sparkColor="#10b981" />
           <StatCard label="Hours estimated"  value={`${Math.round(activeMin / 60 * 10) / 10}h`}        color="text-purple-600"                                 sparkData={sparkHistory} sparkKey="minutes" sparkColor="#a855f7" deltaFormat={m => `${Math.round(m / 60 * 10) / 10}h`} />
           <StatCard label="Due soon"         value={dueSoon.length}                                     color={dueSoon.length > 0 ? 'text-red-500' : 'text-slate-500'} sparkData={sparkHistory} sparkKey="dueSoon" sparkColor="#ef4444" />
-        </motion.div>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-4">
           {/* ── Balance card with slider ── */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...mc, delay: 0.08 }}
-            className="skeu-card p-5"
-          >
+          <div className="skeu-card p-5 anim-fade-in-up" style={{ animationDelay: '0.08s' }}>
             <div className="flex items-center gap-2 mb-3">
               <TrendingUp className="w-5 h-5 text-emerald-600" />
-              <h2 className="font-black text-slate-700">Balance</h2>
+              <h2 className="font-black" style={{ color: '#1a2a3a' }}>Balance</h2>
             </div>
 
             {/* Work gauge */}
             <div className="mb-3">
               <div className="flex justify-between text-xs font-black mb-1.5">
-                <span className="text-slate-600">Work <strong className="text-sky-700">{workPct}%</strong></span>
-                <span className="text-slate-400">target {targetWork}%</span>
+                <span style={{ color: '#3a5a7a', fontWeight: 700 }}>Work <strong style={{ color: '#1a5a98' }}>{workPct}%</strong></span>
+                <span style={{ color: '#7a9ab8', fontWeight: 600 }}>target {targetWork}%</span>
               </div>
               <div className="relative progress-track h-5 overflow-hidden">
                 <div
@@ -446,8 +436,8 @@ export default function DashboardPage() {
             {/* Progress bar */}
             <div className="mb-4">
               <div className="flex justify-between text-xs font-black mb-1.5">
-                <span className="text-slate-600">Progress</span>
-                <span className="text-emerald-600 font-black">{donePct}% done</span>
+                <span style={{ color: '#3a5a7a', fontWeight: 700 }}>Progress</span>
+                <span style={{ color: '#1a7a50', fontWeight: 800 }}>{donePct}% done</span>
               </div>
               <div className="progress-track h-3 overflow-hidden">
                 <div className="h-full progress-aero !bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 transition-all duration-700" style={{ width: `${donePct}%` }} />
@@ -455,9 +445,9 @@ export default function DashboardPage() {
             </div>
 
             {workPct > targetWork + 15 && (
-              <div className="mb-4 bg-red-50/90 border border-red-300/60 rounded-2xl p-3 flex items-start gap-2">
-                <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-red-700">Work is taking over. Maybe move some tasks to next week?</p>
+              <div className="mb-4 aero-danger rounded-2xl p-3 flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <p className="text-xs">Work is taking over. Maybe move some tasks to next week?</p>
               </div>
             )}
 
@@ -468,21 +458,16 @@ export default function DashboardPage() {
               locked={chillLocked}
               lockDaysLeft={chillLockUntil ? Math.ceil((chillLockUntil - Date.now()) / 86400000) : 0}
             />
-          </motion.div>
+          </div>
 
           {/* ── Pending tasks preview ── */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...mc, delay: 0.1 }}
-            className="skeu-card p-5"
-          >
+          <div className="skeu-card p-5 anim-fade-in-up" style={{ animationDelay: '0.1s' }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-sky-600" />
-                <h2 className="font-black text-slate-700">Up next</h2>
+                <h2 className="font-black" style={{ color: '#1a2a3a' }}>Up next</h2>
               </div>
-              <Link href="/tasks" className="text-xs text-sky-600 hover:text-sky-900 font-medium flex items-center gap-1 transition-colors">
+              <Link href="/tasks" style={{ fontSize: 11, color: '#1a5a98', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3, textDecoration: 'none' }}>
                 See all <ChevronRight className="w-3 h-3" />
               </Link>
             </div>
@@ -496,7 +481,7 @@ export default function DashboardPage() {
                   return (
                     <div key={t.id} className="flex items-center gap-3 rounded-2xl p-3 skeu-card shadow-sm">
                       <span className="text-base">{cat?.emoji ?? '📌'}</span>
-                      <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{t.name}</span>
+                      <span className="flex-1 text-sm font-semibold truncate" style={{ color: '#1a1a1a' }}>{t.name}</span>
                       {isDueWithin48h(t.deadline) && (
                         <span className="text-xs text-red-500 font-bold shrink-0">Due soon!</span>
                       )}
@@ -513,28 +498,23 @@ export default function DashboardPage() {
             ) : (
               <div className="text-center py-8">
                 <CheckCircle className="w-10 h-10 mx-auto mb-2 text-emerald-500/40" />
-                <p className="text-sm text-slate-400 font-bold">All clear! Nothing pending.</p>
-                <Link href="/tasks/new" className="inline-flex items-center gap-1.5 mt-3 text-sky-600 text-sm font-bold hover:text-sky-900 transition-colors">
+                <p className="text-sm font-bold" style={{ color: '#5a7a9a' }}>All clear! Nothing pending.</p>
+                <Link href="/tasks/new" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 10, color: '#1a5a98', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
                   <Plus className="w-4 h-4" /> Add tasks
                 </Link>
               </div>
             )}
-          </motion.div>
+          </div>
         </div>
 
         {/* ── AI Advisory panel (spec: auto-generates, "AI workload analysis" indicator) ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ ...mc, delay: 0.12 }}
-          className="skeu-card p-5"
-        >
+        <div className="skeu-card p-5 anim-fade-in-up" style={{ animationDelay: '0.12s' }}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Brain className="w-5 h-5 text-purple-600" />
-              <h2 className="font-black text-slate-700">Workload Analysis</h2>
+              <h2 className="font-black" style={{ color: '#1a2a3a' }}>Workload Analysis</h2>
               {/* Spec: always-visible "AI workload analysis" indicator */}
-              <span className="text-[10px] text-slate-400 font-bold bg-slate-100/80 px-2 py-0.5 rounded-full border border-slate-200/60">AI workload analysis</span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full aero-info badge-skeu">AI workload analysis</span>
             </div>
             <button
               onClick={fetchSummary}
@@ -555,25 +535,25 @@ export default function DashboardPage() {
             <div className="space-y-3">
               {/* Real-time advisory (spec: 1-2 sentence observation) */}
               {advisory && (
-                <div className="skeu-inset rounded-2xl p-4 border-l-4 border-l-purple-300">
-                  <p className="text-sm text-slate-700 leading-relaxed font-medium">{advisory}</p>
+                <div className="skeu-inset rounded-2xl p-4 border-l-4" style={{ borderLeftColor: 'rgba(139,92,246,0.60)' }}>
+                  <p className="text-sm leading-relaxed font-medium" style={{ color: '#1a2a3a' }}>{advisory}</p>
                 </div>
               )}
 
               {weeklyAnalysis && (
                 <>
-                  <div className={`rounded-2xl px-4 py-3 font-black text-sm border ${
-                    weeklyAnalysis.verdict === 'overloaded' ? 'bg-red-50/90 text-red-700 border-red-300/60' :
-                    weeklyAnalysis.verdict === 'balanced'   ? 'bg-emerald-50/90 text-emerald-700 border-emerald-300/60' :
-                                                              'bg-sky-50/90 text-sky-700 border-sky-300/60'
+                  <div className={`rounded-2xl px-4 py-3 font-black text-sm ${
+                    weeklyAnalysis.verdict === 'overloaded' ? 'aero-danger'  :
+                    weeklyAnalysis.verdict === 'balanced'   ? 'aero-success' :
+                                                              'aero-info'
                   }`}>
                     {weeklyAnalysis.verdict === 'overloaded' ? '⚠ Overloaded' : weeklyAnalysis.verdict === 'balanced' ? '✓ Balanced' : 'Light week'}
                   </div>
-                  {weeklyAnalysis.trend && <p className="text-sm text-slate-600 leading-relaxed font-medium">{weeklyAnalysis.trend}</p>}
+                  {weeklyAnalysis.trend && <p className="text-sm leading-relaxed font-medium" style={{ color: '#2a3a50' }}>{weeklyAnalysis.trend}</p>}
                   {weeklyAnalysis.suggestion && (
                     <div className="skeu-inset rounded-2xl p-4">
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-1.5">Observation</p>
-                      <p className="text-sm text-slate-600 leading-relaxed font-medium">{weeklyAnalysis.suggestion}</p>
+                      <p className="text-xs font-black uppercase tracking-wide mb-1.5" style={{ color: '#6a8aaa' }}>Observation</p>
+                      <p className="text-sm leading-relaxed font-medium" style={{ color: '#2a3a50' }}>{weeklyAnalysis.suggestion}</p>
                     </div>
                   )}
                 </>
@@ -582,14 +562,14 @@ export default function DashboardPage() {
               {!advisory && !weeklyAnalysis && (
                 <div className="skeu-inset rounded-2xl p-6 text-center">
                   <Brain className="w-8 h-8 mx-auto mb-2 text-purple-500/50" />
-                  <p className="text-sm text-slate-400 font-bold">Add tasks to get workload insights</p>
+                  <p className="text-sm font-bold" style={{ color: '#5a7a9a' }}>Add tasks to get workload insights</p>
                 </div>
               )}
 
-              <p className="text-[10px] text-slate-400 font-bold">AI workload analysis · task data only · not medical advice</p>
+              <p className="text-[10px] font-bold" style={{ color: '#7a9ab8' }}>AI workload analysis · task data only · not medical advice</p>
             </div>
           )}
-        </motion.div>
+        </div>
       </div>
     </AppLayout>
   )

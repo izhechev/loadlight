@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
-import { CheckCircle, Circle, Trash2, Calendar, Plus, Filter, RefreshCw, Sparkles, Loader2, List, LayoutGrid, CalendarDays, ChevronLeft, ChevronRight, CalendarClock, Pencil, X } from "lucide-react"
+import { CheckCircle, Circle, Trash2, Calendar, Plus, Filter, RefreshCw, Sparkles, Loader2, List, LayoutGrid, CalendarDays, ChevronLeft, ChevronRight, CalendarClock, Pencil, X } from "@/lib/icons"
 import Link from "next/link"
 import { AppLayout } from "@/components/app-layout"
 import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib/store/overwhelmedStore"
@@ -51,7 +50,6 @@ function difficultyDots(d: number): string {
 }
 
 export default function TasksPage() {
-  const shouldReduceMotion = useReducedMotion()
   const { state: overwhelmedState, computeAndTransition } = useOverwhelmedStore()
   const { categories } = useCategoryStore()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -517,8 +515,6 @@ export default function TasksPage() {
   })
   const noDeadlineTasks = visible.filter(t => !t.deadline)
 
-  const mc = shouldReduceMotion ? { duration: 0 } : { duration: 0.18 }
-
   // ── Shared task row (list view) ──
   function renderTaskRow(task: Task) {
     const cat = categories.find(c =>
@@ -526,14 +522,9 @@ export default function TasksPage() {
     )
     const cls = getCategoryClasses(cat?.color ?? 'sky')
     return (
-      <motion.div
+      <div
         key={task.id}
-        layout
-        initial={{ opacity: 0, x: -12 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 12 }}
-        transition={mc}
-        className={`flex items-start gap-3 rounded-xl p-3 border-l-4 ${cls.bg.replace('bg-', 'border-l-')} ${task.done ? 'opacity-50' : task.snoozedUntil && task.snoozedUntil > (now || Date.now()) ? 'opacity-60 border-l-violet-300' : ''} skeu-card border-none border-l-4 shadow-sm`}
+        className={`flex items-start gap-3 rounded-xl p-3 border-l-4 ${cls.bg.replace('bg-', 'border-l-')} ${task.done ? 'opacity-50' : task.snoozedUntil && task.snoozedUntil > (now || Date.now()) ? 'opacity-60 border-l-violet-300' : ''} skeu-card border-none border-l-4 shadow-sm anim-fade-in-left`}
       >
         <button onClick={() => toggle(task.id)} className="shrink-0 mt-0.5">
           {task.done ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <Circle className="w-5 h-5 text-slate-400 hover:text-sky-500" />}
@@ -599,7 +590,7 @@ export default function TasksPage() {
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
-      </motion.div>
+      </div>
     )
   }
 
@@ -670,8 +661,8 @@ export default function TasksPage() {
           <div className="flex gap-1">
             {(['active', 'all', 'done'] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                  filter === f ? 'bg-sky-100/90 text-sky-800 shadow-inner border border-sky-300/70' : 'bg-white/50 text-slate-500 border border-sky-100/70 hover:bg-white/70'
+                className={`px-3 py-1.5 rounded-xl text-xs transition-all ${
+                  filter === f ? 'vista-chip-active' : 'vista-chip-inactive'
                 }`}>
                 {f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
@@ -683,10 +674,8 @@ export default function TasksPage() {
           {snoozedCount > 0 && (
             <button
               onClick={() => setShowSnoozed(s => !s)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all border ${
-                showSnoozed
-                  ? 'bg-violet-100/90 text-violet-800 border-violet-300/70 shadow-inner'
-                  : 'bg-white/50 text-violet-500 border-violet-100/70 hover:bg-violet-50/60'
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                showSnoozed ? 'vista-chip-active' : 'vista-chip-inactive'
               }`}
             >
               <RefreshCw className="w-3 h-3" />
@@ -694,7 +683,7 @@ export default function TasksPage() {
             </button>
           )}
           {/* View switcher */}
-          <div className="ml-auto flex gap-1 bg-white/60 rounded-xl p-1 border border-sky-100/60 shadow-sm">
+          <div className="ml-auto flex gap-1 glass-panel rounded-xl p-1">
             {([
               { id: 'list' as const, icon: List, label: 'List' },
               { id: 'board' as const, icon: LayoutGrid, label: 'Board' },
@@ -702,7 +691,7 @@ export default function TasksPage() {
             ]).map(({ id, icon: Icon, label }) => (
               <button key={id} onClick={() => setView(id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                  view === id ? 'bg-white/90 text-sky-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  view === id ? 'vista-chip-active' : 'vista-chip-inactive'
                 }`}>
                 <Icon className="w-3.5 h-3.5" /> {label}
               </button>
@@ -714,11 +703,11 @@ export default function TasksPage() {
         <div className="glass-panel overflow-hidden">
           <button
             onClick={() => { setShowScheduler(s => !s); setScheduleMsg(null) }}
-            className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-white/30 transition-colors"
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, color: '#2a3a50', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
           >
             <CalendarClock className="w-4 h-4 text-sky-500" />
             Schedule with AI
-            <span className="ml-auto text-[10px] text-slate-400 font-black uppercase tracking-wider">
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: '#7a9ab8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
               {showScheduler ? '▲ hide' : '▼ expand'}
             </span>
           </button>
@@ -756,9 +745,7 @@ export default function TasksPage() {
                     {chatHistory.map((msg, i) => (
                       <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs font-medium leading-relaxed ${
-                          msg.role === 'assistant'
-                            ? 'bg-sky-50/80 text-slate-700 border border-sky-200/60'
-                            : 'bg-sky-500/90 text-white'
+                          msg.role === 'assistant' ? 'aero-bubble-ai' : 'aero-bubble-user'
                         }`}>
                           {msg.text}
                         </div>
@@ -766,8 +753,8 @@ export default function TasksPage() {
                     ))}
                     {isScheduling && (
                       <div className="flex justify-start">
-                        <div className="bg-sky-50/80 border border-sky-200/60 px-3 py-2 rounded-xl">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-500" />
+                        <div className="aero-bubble-ai px-3 py-2 rounded-xl">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         </div>
                       </div>
                     )}
@@ -797,14 +784,14 @@ export default function TasksPage() {
                   <p className="text-xs font-black text-slate-600 uppercase tracking-wider">Review Schedule</p>
                   {pendingSchedule.scheduled.length > 0 && (
                     <div className="space-y-1">
-                      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Today</p>
+                      <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#80ffc8' }}>Today</p>
                       {pendingSchedule.scheduled.map(s => {
                         const startT = s.start_date.split('T')[1]
                         const endT   = s.deadline.split('T')[1]
                         return (
-                          <div key={s.id} className="flex items-center gap-2 text-xs bg-emerald-50/60 rounded-lg px-2.5 py-1.5 border border-emerald-200/60">
-                            <span className="font-mono text-emerald-700 font-black shrink-0">{startT}–{endT}</span>
-                            <span className="text-slate-700 font-bold truncate">{s.name}</span>
+                          <div key={s.id} className="flex items-center gap-2 text-xs aero-success rounded-lg px-2.5 py-1.5">
+                            <span className="font-mono font-black shrink-0">{startT}–{endT}</span>
+                            <span className="font-bold truncate">{s.name}</span>
                           </div>
                         )
                       })}
@@ -819,14 +806,14 @@ export default function TasksPage() {
                     })
                     return Array.from(byDate.entries()).map(([date, items]) => (
                       <div key={date} className="space-y-1">
-                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-wider">Moved to {date}</p>
+                        <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#ffd98a' }}>Moved to {date}</p>
                         {items.map(o => {
                           const startT = o.start_date?.split('T')[1]
                           const endT   = o.deadline.split('T')[1]
                           return (
-                            <div key={o.id} className="flex items-center gap-2 text-xs bg-amber-50/60 rounded-lg px-2.5 py-1.5 border border-amber-200/60">
-                              {startT && endT && <span className="font-mono text-amber-700 font-black shrink-0">{startT}–{endT}</span>}
-                              <span className="text-slate-700 font-bold truncate">{o.name}</span>
+                            <div key={o.id} className="flex items-center gap-2 text-xs aero-warning rounded-lg px-2.5 py-1.5">
+                              {startT && endT && <span className="font-mono font-black shrink-0">{startT}–{endT}</span>}
+                              <span className="font-bold truncate">{o.name}</span>
                             </div>
                           )
                         })}
@@ -838,7 +825,7 @@ export default function TasksPage() {
                       <CheckCircle className="w-3.5 h-3.5" /> Confirm
                     </button>
                     <button onClick={() => { setPendingSchedule(null); setChatPhase('idle'); setChatHistory([]) }}
-                      className="px-4 py-1.5 text-xs font-bold rounded-xl bg-white/60 border border-sky-100/60 text-slate-500 hover:text-slate-700 transition-colors">
+                      className="vista-btn-secondary text-xs font-bold px-4 py-1.5">
                       Cancel
                     </button>
                   </div>
@@ -850,8 +837,8 @@ export default function TasksPage() {
 
         {/* Rest mode notice */}
         {overwhelmedState !== 'normal' && (
-          <div className={`rounded-2xl px-4 py-3 text-sm font-bold flex items-center gap-2 border ${
-            overwhelmedState === 'elevated' ? 'bg-amber-50/90 border-amber-300/70 text-amber-700' : 'bg-rose-50/90 border-rose-300/70 text-rose-700'
+          <div className={`rounded-2xl px-4 py-3 text-sm font-bold flex items-center gap-2 ${
+            overwhelmedState === 'elevated' ? 'aero-warning' : 'aero-danger'
           }`}>
             {overwhelmedState === 'elevated' ? '⚠ Elevated state — consider completing tasks before adding more.' : '🌿 Rest mode active — focus on essential tasks only.'}
           </div>
@@ -872,7 +859,7 @@ export default function TasksPage() {
                     <span className="text-xs text-slate-400 font-bold ml-auto">{catTasks.length} task{catTasks.length !== 1 ? 's' : ''}</span>
                   </div>
                   <div className="p-3 space-y-2">
-                    <AnimatePresence>{catTasks.map(task => renderTaskRow(task))}</AnimatePresence>
+                    {catTasks.map(task => renderTaskRow(task))}
                   </div>
                 </div>
               )
@@ -909,12 +896,12 @@ export default function TasksPage() {
             {/* Month navigation */}
             <div className="flex items-center justify-between">
               <button onClick={() => setCalMonth(m => { const d = new Date(m); d.setMonth(d.getMonth() - 1); return d })}
-                className="w-8 h-8 rounded-full bg-white/60 border border-sky-100/60 flex items-center justify-center text-slate-500 hover:text-sky-700 hover:bg-sky-50/80 transition-all">
+                className="w-8 h-8 rounded-full vista-btn-secondary flex items-center justify-center transition-all">
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <h3 className="font-black text-slate-700">{MONTH_NAMES[calMonthNum]} {calYear}</h3>
+              <h3 className="font-black" style={{ color: '#1a2a3a' }}>{MONTH_NAMES[calMonthNum]} {calYear}</h3>
               <button onClick={() => setCalMonth(m => { const d = new Date(m); d.setMonth(d.getMonth() + 1); return d })}
-                className="w-8 h-8 rounded-full bg-white/60 border border-sky-100/60 flex items-center justify-center text-slate-500 hover:text-sky-700 hover:bg-sky-50/80 transition-all">
+                className="w-8 h-8 rounded-full vista-btn-secondary flex items-center justify-center transition-all">
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -936,11 +923,11 @@ export default function TasksPage() {
                 const today = new Date()
                 const isToday = today.getFullYear() === calYear && today.getMonth() === calMonthNum && today.getDate() === day
                 return (
-                  <div key={day} className={`min-h-[60px] rounded-xl p-1.5 border transition-all ${
-                    isToday ? 'bg-sky-100/80 border-sky-300/60' :
-                    dayTasks.length > 0 ? 'bg-white/60 border-sky-100/60' : 'bg-white/30 border-sky-100/30'
+                  <div key={day} className={`min-h-[60px] p-1.5 transition-all ${
+                    isToday ? 'cal-cell-today' :
+                    dayTasks.length > 0 ? 'cal-cell-has' : 'cal-cell'
                   }`}>
-                    <p className={`text-[11px] font-black mb-1 ${isToday ? 'text-sky-700' : 'text-slate-400'}`}>{day}</p>
+                    <p className="text-[11px] font-black mb-1" style={{ color: isToday ? '#1a5a98' : '#7a8aaa' }}>{day}</p>
                     <div className="space-y-0.5">
                       {dayTasks.slice(0, 2).map(task => {
                         const cat = categories.find(c => c.name.toLowerCase() === (task.category || 'Personal').toLowerCase())
@@ -964,7 +951,7 @@ export default function TasksPage() {
               <div className="border-t border-sky-100/50 pt-3">
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">No deadline · {noDeadlineTasks.length}</p>
                 <div className="space-y-2">
-                  <AnimatePresence>{noDeadlineTasks.map(task => renderTaskRow(task))}</AnimatePresence>
+                  {noDeadlineTasks.map(task => renderTaskRow(task))}
                 </div>
               </div>
             )}
@@ -976,20 +963,12 @@ export default function TasksPage() {
       </div>
 
       {/* ── Edit Task Modal (centred) ── */}
-      <AnimatePresence>
         {editingTask && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+            <div className="fixed inset-0 z-50 anim-overlay-in" style={{ background: 'rgba(0,0,0,0.50)' }}
               onClick={() => setEditingTask(null)} />
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.93, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.93, y: 16 }}
-              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
-            >
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none anim-scale-in">
               <div className="vista-dialog w-full max-w-md pointer-events-auto max-h-[90vh] flex flex-col">
                 {/* Vista-style title bar */}
                 <div className="vista-titlebar flex items-center justify-between px-4 py-2.5 shrink-0">
@@ -1120,10 +1099,9 @@ export default function TasksPage() {
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </>
         )}
-      </AnimatePresence>
 
       {pastDeadlinePending && (
         <PastDeadlineModal
