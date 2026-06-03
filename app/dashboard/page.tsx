@@ -471,16 +471,18 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Progress bar */}
-            <div className="mb-4">
-              <div className="flex justify-between text-xs font-black mb-1.5">
-                <span style={{ color: '#3a5a7a', fontWeight: 700 }}>Progress</span>
-                <span style={{ color: '#1a7a50', fontWeight: 800 }}>{donePct}% done</span>
+            {/* Progress — only show when there are enough tasks to make % meaningful */}
+            {tasks.length >= 4 && (
+              <div className="mb-4">
+                <div className="flex justify-between text-xs font-black mb-1.5">
+                  <span style={{ color: '#3a5a7a', fontWeight: 700 }}>All-time completion</span>
+                  <span style={{ color: '#1a7a50', fontWeight: 800 }}>{donePct}% done</span>
+                </div>
+                <div className="progress-track h-3 overflow-hidden">
+                  <div className="h-full progress-aero !bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 transition-all duration-700" style={{ width: `${donePct}%` }} />
+                </div>
               </div>
-              <div className="progress-track h-3 overflow-hidden">
-                <div className="h-full progress-aero !bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 transition-all duration-700" style={{ width: `${donePct}%` }} />
-              </div>
-            </div>
+            )}
 
             {undoneTasks.length >= 4 && workPct > targetWork + 15 && (
               <div className="mb-4 aero-danger rounded-2xl p-3 flex items-start gap-2">
