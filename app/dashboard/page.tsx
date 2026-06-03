@@ -44,7 +44,7 @@ interface SparkEntry {
   dueSoon: number
 }
 
-const WORK_CATEGORIES = ['work', 'study', 'administrative', 'creative', 'Work', 'Study', 'Admin', 'Creative', 'Administrative', 'Exercise', 'exercise']
+const WORK_CATEGORIES = ['work', 'study', 'administrative', 'admin', 'creative', 'Work', 'Study', 'Admin', 'Administrative', 'Creative']
 const SPARK_KEY = 'loadlight-sparkline-history'
 
 function isDueWithin48h(d: string | null) {
@@ -312,7 +312,12 @@ export default function DashboardPage() {
         fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'weekly', tasks, balanceMode }),
+          body: JSON.stringify({
+            mode: 'weekly',
+            tasks: undoneTasks,
+            balanceMode,
+            totalDone: tasks.filter(t => t.done).length,
+          }),
         }),
         fetch('/api/ai/advise', {
           method: 'POST',
@@ -418,20 +423,28 @@ export default function DashboardPage() {
               <h2 className="font-black" style={{ color: '#1a2a3a' }}>Balance</h2>
             </div>
 
-            {/* Work gauge */}
-            <div className="mb-3">
-              <div className="flex justify-between text-xs font-black mb-1.5">
-                <span style={{ color: '#3a5a7a', fontWeight: 700 }}>Work <strong style={{ color: '#1a5a98' }}>{workPct}%</strong></span>
-                <span style={{ color: '#7a9ab8', fontWeight: 600 }}>target {targetWork}%</span>
+            {/* Work gauge — only meaningful with enough active tasks */}
+            {undoneTasks.length >= 4 ? (
+              <div className="mb-3">
+                <div className="flex justify-between text-xs font-black mb-1.5">
+                  <span style={{ color: '#3a5a7a', fontWeight: 700 }}>Work <strong style={{ color: '#1a5a98' }}>{workPct}%</strong></span>
+                  <span style={{ color: '#7a9ab8', fontWeight: 600 }}>target {targetWork}%</span>
+                </div>
+                <div className="relative progress-track h-5 overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-700 ${workPct > targetWork + 15 ? '!bg-gradient-to-r from-orange-400 via-red-400 to-rose-500' : 'progress-aero'}`}
+                    style={{ width: `${workPct}%` }}
+                  />
+                  <div className="absolute top-0 h-full w-0.5 bg-white/40 shadow-sm" style={{ left: `${targetWork}%` }} />
+                </div>
               </div>
-              <div className="relative progress-track h-5 overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-700 ${workPct > targetWork + 15 ? '!bg-gradient-to-r from-orange-400 via-red-400 to-rose-500' : 'progress-aero'}`}
-                  style={{ width: `${workPct}%` }}
-                />
-                <div className="absolute top-0 h-full w-0.5 bg-white/40 shadow-sm" style={{ left: `${targetWork}%` }} />
+            ) : (
+              <div className="mb-3 aero-info rounded-xl p-3 text-xs" style={{ fontWeight: 600 }}>
+                {undoneTasks.length === 0
+                  ? 'No active tasks — add some to track your work/leisure balance.'
+                  : `Only ${undoneTasks.length} active task${undoneTasks.length > 1 ? 's' : ''} — balance gauge needs 4+ tasks to be meaningful.`}
               </div>
-            </div>
+            )}
 
             {/* Progress bar */}
             <div className="mb-4">
@@ -444,7 +457,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {workPct > targetWork + 15 && (
+            {undoneTasks.length >= 4 && workPct > targetWork + 15 && (
               <div className="mb-4 aero-danger rounded-2xl p-3 flex items-start gap-2">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <p className="text-xs">Work is taking over. Maybe move some tasks to next week?</p>
