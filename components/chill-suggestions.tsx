@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Moon, EyeOff, HelpCircle, CheckCircle, Loader2, X, Eye } from "lucide-react"
+import { Moon, EyeOff, HelpCircle, CheckCircle, Loader2, X, Eye } from "@/lib/icons"
 
 interface PostponeTask {
   id: string
@@ -71,24 +70,22 @@ export function ChillSuggestions({ tasks, onSnooze }: ChillSuggestionsProps) {
   if (!loading && suggestions.length === 0 && !question) return null
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      className="skeu-card p-5 relative overflow-hidden border-2 border-violet-200/50"
-    >
+    <div className="skeu-card p-5 relative overflow-hidden aero-purple anim-fade-in-up">
       {/* Vista-style header strip */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Moon className="w-5 h-5 text-violet-500 drop-shadow-sm" />
-          <h2 className="font-black text-slate-700">Chill Mode</h2>
-          <span className="text-xs font-black text-violet-600 bg-violet-100/80 border border-violet-200/60 px-2 py-0.5 rounded-full">
+          <Moon className="w-5 h-5 drop-shadow-sm" style={{ color: '#5a2a9a' }} />
+          <h2 className="font-black" style={{ color: '#3a1a6a' }}>Chill Mode</h2>
+          <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.30)', color: '#5a2a9a' }}>
             tasks that can wait
           </span>
         </div>
         <button
           onClick={() => setDismissed(true)}
-          className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-white/60 transition-all"
+          className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
+          style={{ color: '#7a8aaa' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(180,215,255,0.10)')}
+          onMouseLeave={e => (e.currentTarget.style.background = '')}
           aria-label="Dismiss"
         >
           <X className="w-4 h-4" />
@@ -97,58 +94,48 @@ export function ChillSuggestions({ tasks, onSnooze }: ChillSuggestionsProps) {
 
       {loading ? (
         <div className="flex items-center gap-3 py-2">
-          <Loader2 className="w-5 h-5 animate-spin text-violet-400 shrink-0" />
-          <span className="text-sm text-slate-500 font-bold">Checking which tasks can wait…</span>
+          <Loader2 className="w-5 h-5 animate-spin shrink-0" style={{ color: '#5a2a9a' }} />
+          <span className="text-sm font-bold" style={{ color: '#4a3a6a' }}>Checking which tasks can wait…</span>
         </div>
       ) : allSnoozed ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex items-center gap-3 py-2 bg-emerald-50/70 rounded-2xl px-4 border border-emerald-200/60"
-        >
-          <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
+        <div className="flex items-center gap-3 py-2 rounded-2xl px-4 anim-fade-in aero-success">
+          <CheckCircle className="w-5 h-5 shrink-0" />
           <div>
-            <p className="text-sm font-black text-emerald-700">All suggested tasks hidden for 24h</p>
-            <p className="text-xs text-emerald-600 font-bold">They'll reappear automatically tomorrow. Enjoy your rest!</p>
+            <p className="text-sm font-black">All suggested tasks hidden for 24h</p>
+            <p className="text-xs font-bold opacity-80">They'll reappear automatically tomorrow. Enjoy your rest!</p>
           </div>
-        </motion.div>
+        </div>
       ) : (
         <div className="space-y-3">
           {remaining.length > 0 && (
             <>
-              <p className="text-xs text-slate-500 font-bold">These have no urgent deadline. Hide them for 24h to keep your view calm:</p>
+              <p className="text-xs font-bold" style={{ color: '#4a3a6a' }}>These have no urgent deadline. Hide them for 24h to keep your view calm:</p>
 
               <div className="space-y-2">
-                <AnimatePresence>
-                  {remaining.map(s => (
-                    <motion.div
-                      key={s.id}
-                      layout
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 8, height: 0, marginTop: 0 }}
-                      className="flex items-center gap-3 bg-gradient-to-r from-violet-50/70 to-purple-50/50 border border-violet-100/80 rounded-2xl px-4 py-2.5"
+                {remaining.map(s => (
+                  <div
+                    key={s.id}
+                    className="flex items-center gap-3 rounded-2xl px-4 py-2.5 anim-fade-in-left aero-purple"
+                  >
+                    <EyeOff className="w-4 h-4 shrink-0 opacity-70" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-black truncate">{s.name}</p>
+                      <p className="text-[11px] font-bold opacity-70">{s.reason}</p>
+                    </div>
+                    <button
+                      onClick={() => snoozeOne(s.id)}
+                      className="vista-btn-secondary text-xs font-black px-3 py-1.5 shrink-0"
                     >
-                      <EyeOff className="w-4 h-4 text-violet-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-black text-slate-700 truncate">{s.name}</p>
-                        <p className="text-[11px] text-violet-600 font-bold">{s.reason}</p>
-                      </div>
-                      <button
-                        onClick={() => snoozeOne(s.id)}
-                        className="text-xs font-black text-violet-700 bg-violet-100/80 hover:bg-violet-200/80 px-3 py-1.5 rounded-full border border-violet-200/60 transition-all shrink-0 shadow-sm hover:shadow-md"
-                      >
-                        Hide 24h
-                      </button>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
+                      Hide 24h
+                    </button>
+                  </div>
+                ))}
               </div>
 
               {remaining.length > 1 && (
                 <button
                   onClick={snoozeAll}
-                  className="w-full text-sm font-black text-violet-800 bg-gradient-to-r from-violet-50/90 to-purple-50/80 hover:from-violet-100/90 hover:to-purple-100/80 border-2 border-violet-200/60 rounded-2xl px-4 py-2.5 transition-all hover:shadow-md flex items-center justify-center gap-2"
+                  className="w-full text-sm font-black rounded-2xl px-4 py-2.5 transition-all flex items-center justify-center gap-2 vista-btn-secondary"
                 >
                   <Eye className="w-4 h-4 opacity-60" />
                   Hide all {remaining.length} tasks for 24h
@@ -158,41 +145,34 @@ export function ChillSuggestions({ tasks, onSnooze }: ChillSuggestionsProps) {
           )}
 
           {/* Clarifying question */}
-          <AnimatePresence>
-            {question && !questionAnswered && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                className="bg-sky-50/80 border-2 border-sky-200/60 rounded-2xl px-4 py-3 space-y-3"
-              >
-                <div className="flex items-start gap-2">
-                  <HelpCircle className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
-                  <p className="text-sm font-black text-slate-700">{question}</p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => answerQuestion(true)}
-                    className="flex-1 text-xs font-black bg-sky-100/80 hover:bg-sky-200/80 text-sky-800 border border-sky-200/60 px-3 py-2 rounded-full transition-all hover:shadow-sm"
-                  >
-                    Yes, needed today
-                  </button>
-                  <button
-                    onClick={() => answerQuestion(false)}
-                    className="flex-1 text-xs font-black bg-violet-100/80 hover:bg-violet-200/80 text-violet-800 border border-violet-200/60 px-3 py-2 rounded-full transition-all hover:shadow-sm"
-                  >
-                    Can wait — hide it
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {question && !questionAnswered && (
+            <div className="aero-info rounded-2xl px-4 py-3 space-y-3 anim-fade-in-up">
+              <div className="flex items-start gap-2">
+                <HelpCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <p className="text-sm font-black">{question}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => answerQuestion(true)}
+                  className="flex-1 text-xs font-black vista-chip-active px-3 py-2 rounded-full transition-all"
+                >
+                  Yes, needed today
+                </button>
+                <button
+                  onClick={() => answerQuestion(false)}
+                  className="flex-1 text-xs font-black vista-btn-secondary px-3 py-2"
+                >
+                  Can wait — hide it
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      <p className="text-[10px] text-slate-400 font-bold mt-3 italic">
+      <p className="text-[10px] font-bold mt-3 italic" style={{ color: '#7a8aaa' }}>
         AI suggestions · snoozed tasks reappear after 24h · you stay in control
       </p>
-    </motion.div>
+    </div>
   )
 }

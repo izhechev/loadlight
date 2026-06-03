@@ -2,8 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
-import { Brain, Loader2, CheckCircle, Trash2, Plus, Calendar, ArrowLeft, Zap, AlertTriangle, RefreshCw, Flag, StickyNote, PlayCircle, HelpCircle } from "lucide-react"
+import { Brain, Loader2, CheckCircle, Trash2, Plus, Calendar, ArrowLeft, Zap, AlertTriangle, RefreshCw, Flag, StickyNote, PlayCircle, HelpCircle } from "@/lib/icons"
 import { AppLayout } from "@/components/app-layout"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
@@ -91,7 +90,6 @@ interface Clarification {
 
 export default function AddTaskPage() {
   const router = useRouter()
-  const shouldReduceMotion = useReducedMotion()
   const { state: overwhelmedState } = useOverwhelmedStore()
   const { categories } = useCategoryStore()
   const [input, setInput] = useState('')
@@ -275,14 +273,12 @@ export default function AddTaskPage() {
     }
   }
 
-  const mc = shouldReduceMotion ? { duration: 0 } : { duration: 0.22 }
-
   return (
     <AppLayout>
       <div className="max-w-2xl mx-auto space-y-5">
         {/* Header */}
         <div className="page-header flex items-center gap-3">
-          <button onClick={() => router.back()} className="text-slate-500 hover:text-slate-800 transition-colors bg-white/50 p-2 rounded-full border border-sky-100/60 shrink-0">
+          <button onClick={() => router.back()} className="vista-btn-secondary" style={{ padding: 8, borderRadius: '50%', flexShrink: 0 }}>
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
@@ -291,22 +287,10 @@ export default function AddTaskPage() {
           </div>
         </div>
 
-        {/* Crisis support modal — shown instead of task extraction when crisis phrases detected */}
-        <AnimatePresence>
+        {/* Crisis support modal */}
           {showCrisisModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-            >
-              <motion.div
-                initial={{ scale: 0.92, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.92, y: 20 }}
-                transition={mc}
-                className="glass-panel w-full max-w-md rounded-3xl p-6 shadow-2xl border border-rose-200/60"
-              >
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 anim-overlay-in">
+              <div className="glass-panel w-full max-w-md rounded-3xl p-6 shadow-2xl border border-rose-200/60 anim-scale-in">
                 <h2 className="text-lg font-black text-slate-800 mb-1">This app manages tasks, not crises</h2>
                 <p className="text-sm text-slate-500 mb-4">If you're going through something difficult, there are people who can help right now.</p>
                 <CrisisRedirect />
@@ -316,27 +300,14 @@ export default function AddTaskPage() {
                 >
                   Close
                 </button>
-              </motion.div>
-            </motion.div>
+              </div>
+            </div>
           )}
-        </AnimatePresence>
 
         {/* Harmful content blocked modal */}
-        <AnimatePresence>
           {showBlockedModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-            >
-              <motion.div
-                initial={{ scale: 0.92, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.92, y: 20 }}
-                transition={mc}
-                className="glass-panel w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-200/60"
-              >
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 anim-overlay-in">
+              <div className="glass-panel w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-200/60 anim-scale-in">
                 <h2 className="text-lg font-black text-slate-800 mb-2">That can't be added as a task</h2>
                 <p className="text-sm text-slate-500 mb-5">This app is for managing your work and daily tasks.</p>
                 <button
@@ -345,21 +316,13 @@ export default function AddTaskPage() {
                 >
                   OK
                 </button>
-              </motion.div>
-            </motion.div>
+              </div>
+            </div>
           )}
-        </AnimatePresence>
 
         {/* Overwhelmed confirmation dialog */}
-        <AnimatePresence>
           {showOverwhelmedConfirm && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={mc}
-              className="glass-panel p-6 border-2 border-amber-200/60"
-            >
+            <div className="glass-panel p-6 border-2 border-amber-200/60 anim-fade-in">
               <div className="flex items-start gap-3 mb-4">
                 <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
                 <div>
@@ -381,12 +344,11 @@ export default function AddTaskPage() {
                   Cancel — rest first
                 </button>
               </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
 
         {/* Input form */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={mc} className="glass-panel p-6">
+        <div className="glass-panel p-6 anim-fade-in-up">
             <div className="flex items-center gap-2 mb-4">
               <Zap className="w-5 h-5 text-sky-600" />
               <h2 className="font-bold text-slate-700">Natural Language Input</h2>
@@ -416,32 +378,19 @@ export default function AddTaskPage() {
                 {isExtracting ? 'Extracting...' : 'Extract Tasks'}
               </button>
             </div>
-          </motion.div>
+          </div>
 
         {/* Preview */}
-        <AnimatePresence>
           {preview && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={mc}
-              className="glass-panel p-6"
-            >
+            <div className="glass-panel p-6 anim-fade-in-up">
               <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-emerald-600" />
                 AI Extracted {preview.length} Task{preview.length !== 1 ? 's' : ''} — Review &amp; Confirm
               </p>
 
               {/* Clarifying question */}
-              <AnimatePresence>
                 {clarification && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    className="mb-4 bg-sky-50 border border-sky-200 rounded-2xl p-4"
-                  >
+                  <div className="mb-4 bg-sky-50 border border-sky-200 rounded-2xl p-4 anim-fade-in-down">
                     <p className="text-xs font-black text-sky-600 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
                       <HelpCircle className="w-3.5 h-3.5" /> Quick question
                     </p>
@@ -457,9 +406,8 @@ export default function AddTaskPage() {
                         </button>
                       ))}
                     </div>
-                  </motion.div>
+                  </div>
                 )}
-              </AnimatePresence>
 
               <div className="space-y-3">
                 {preview.map((task, i) => {
@@ -616,16 +564,15 @@ export default function AddTaskPage() {
                     <button onClick={confirm} className="glow-button font-black px-6 py-2.5 text-sm flex items-center gap-2">
                       <Plus className="w-4 h-4" /> Save {preview.length} Task{preview.length !== 1 ? 's' : ''}
                     </button>
-                    <button onClick={() => { setPreview(null); setInput('') }} className="bg-white/50 border border-sky-100/60 text-slate-500 font-bold px-4 py-2.5 rounded-xl text-sm hover:bg-white/80 hover:text-slate-700 transition-all">
+                    <button onClick={() => { setPreview(null); setInput('') }} className="vista-btn-secondary font-bold text-sm" style={{ padding: '8px 16px' }}>
                       Discard
                     </button>
                   </>
                 )}
               </div>
-              <p className="text-[10px] text-slate-500 font-bold mt-3 italic">🤖 AI-generated · all fields editable before saving</p>
-            </motion.div>
+              <p className="text-[10px] text-slate-500 font-bold mt-3 italic">AI-generated · all fields editable before saving</p>
+            </div>
           )}
-        </AnimatePresence>
 
         {currentPastDeadlineTask && (
           <PastDeadlineModal

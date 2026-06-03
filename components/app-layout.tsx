@@ -3,8 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { AnimatePresence } from "framer-motion"
-import { LayoutDashboard, CheckSquare, Plus, Settings, Heart, Tags } from "lucide-react"
+import { LayoutDashboard, CheckSquare, Plus, Settings, Heart, Tags } from "@/lib/icons"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 import { RestModeOverlay } from "@/components/rest-mode-overlay"
 import { useState, useEffect } from "react"
@@ -17,10 +16,10 @@ const NAV = [
   { href: "/settings",  label: "Settings",   icon: Settings },
 ]
 
-const STATE_BADGE: Record<string, { label: string; cls: string } | null> = {
+const STATE_BADGE: Record<string, { label: string; bgColor: string; textColor: string } | null> = {
   normal:      null,
-  elevated:    { label: "⚠ Heads up",  cls: "bg-amber-50 text-amber-700 border-2 border-amber-300 shadow-sm font-black" },
-  overwhelmed: { label: "🌿 Rest Mode", cls: "bg-pink-50 text-pink-700 border-2 border-pink-300 shadow-sm font-black" },
+  elevated:    { label: "Heads up",  bgColor: '#fff0c0', textColor: '#6a4800' },
+  overwhelmed: { label: "Rest Mode", bgColor: '#ffd8d4', textColor: '#7a1a1a' },
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -75,121 +74,196 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const badge = STATE_BADGE[state]
 
   return (
-    <div className={`aero-bg min-h-screen ${stateClass}`}>
-      {/* Shockwave orbs */}
-      <div className="orb-layer">
-        <div className="shockwave w-[520px] h-[520px] top-[15%] left-[5%]"  style={{ animationDelay: '0s',  animationDuration: '12s' }} />
-        <div className="shockwave w-[720px] h-[720px] top-[45%] left-[55%]" style={{ animationDelay: '2s',  animationDuration: '16s' }} />
-        <div className="shockwave w-[420px] h-[420px] top-[65%] left-[15%]" style={{ animationDelay: '4s',  animationDuration: '10s' }} />
-        <div className="shockwave w-[620px] h-[620px] top-[10%] left-[70%]" style={{ animationDelay: '6s',  animationDuration: '14s' }} />
-      </div>
+    <div className={`aero-bg min-h-screen ${stateClass}`} style={{ position: 'relative' }}>
+      <div className="orb-layer" />
       <div className="wave-layer" />
       <div className="wave-layer-2" />
 
-      <AnimatePresence>
-        {showCrisis && (
-          <RestModeOverlay onDismiss={() => setShowCrisis(false)} onExitRestMode={exitRestMode} />
-        )}
-      </AnimatePresence>
+      {showCrisis && (
+        <RestModeOverlay onDismiss={() => setShowCrisis(false)} onExitRestMode={exitRestMode} />
+      )}
 
-      {/* ── Rest mode banner ── */}
+      {/* Rest mode banner */}
       {state === 'overwhelmed' && (
-        <div className="mx-3 mt-3 px-5 py-2.5 rest-mode-banner rounded-2xl flex items-center justify-between text-sm">
-          <span className="font-black text-pink-700 tracking-tight">🌿 Rest mode active — take it easy today</span>
+        <div
+          className="rest-mode-banner"
+          style={{ margin: '10px 10px 0', padding: '8px 16px', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}
+        >
+          <span style={{ fontWeight: 800, color: '#7a1a1a' }}>Rest mode active — take it easy today</span>
           <button
             onClick={() => setShowCrisis(true)}
-            className="text-pink-600 hover:text-pink-900 font-black text-xs underline underline-offset-2 transition-colors"
+            style={{ fontWeight: 800, fontSize: 11, textDecoration: 'underline', color: '#a03030', background: 'none', border: 'none', cursor: 'pointer' }}
           >
             Open
           </button>
         </div>
       )}
 
-      {/* ── Top header ── */}
-      <header className={`vista-header mx-3 px-5 py-3.5 flex items-center justify-between sticky z-40 ${state === 'overwhelmed' ? 'top-3 mt-2' : 'mt-3 top-3'}`}>
-        <Link href="/dashboard" className="flex items-center gap-3 relative z-10">
+      {/* Top header — Vista title bar */}
+      <header
+        className="vista-header"
+        style={{
+          margin: state === 'overwhelmed' ? '8px 10px 0' : '10px 10px 0',
+          padding: '8px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 10,
+          zIndex: 40,
+        }}
+      >
+        <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', position: 'relative', zIndex: 2 }}>
           <Image
             src="/logo.png"
             alt="LoadLight"
-            width={38}
-            height={38}
-            className="drop-shadow-[0_2px_6px_rgba(0,100,200,0.35)]"
+            width={34}
+            height={34}
+            style={{ filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.40))' }}
           />
-          <span className="font-black text-xl gradient-text tracking-tight hidden sm:block">LoadLight</span>
+          <span style={{ fontWeight: 900, fontSize: 18, color: '#ffffff', textShadow: '0 1px 3px rgba(0,0,0,0.55)', letterSpacing: -0.3 }}>
+            LoadLight
+          </span>
         </Link>
 
-        <div className="flex items-center gap-2.5 relative z-10">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative', zIndex: 2 }}>
           {badge && (
-            <span className={`text-xs px-3 py-1.5 rounded-full ${badge.cls}`}>
+            <span
+              style={{
+                background: badge.bgColor,
+                color: badge.textColor,
+                fontWeight: 800,
+                fontSize: 11,
+                padding: '3px 10px',
+                borderRadius: 9999,
+                border: `1px solid ${state === 'overwhelmed' ? '#d06060' : '#c89820'}`,
+              }}
+            >
               {badge.label}
             </span>
           )}
           <button
             onClick={() => { triggerOverwhelmedButton(); setShowCrisis(true) }}
-            className="overwhelm-btn px-4 sm:px-5 py-2 text-sm flex items-center gap-2"
+            className="overwhelm-btn"
+            style={{ padding: '5px 14px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
-            <Heart className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline font-black">
+            <Heart style={{ width: 14, height: 14, flexShrink: 0 }} />
+            <span style={{ fontWeight: 800 }}>
               {state === 'overwhelmed' ? 'View Rest Mode' : "I'm overwhelmed"}
             </span>
-            <span className="sm:hidden font-black">{state === 'overwhelmed' ? 'Rest' : 'Help'}</span>
             {selfReportCount > 0 && (
-              <span className="text-[11px] font-black bg-white/25 px-1.5 py-0.5 rounded-full">{selfReportCount}</span>
+              <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(255,255,255,0.28)', padding: '1px 6px', borderRadius: 9999 }}>{selfReportCount}</span>
             )}
           </button>
         </div>
       </header>
 
-      {/* ── Body ── */}
-      <div className="flex max-w-6xl mx-auto w-full px-3 py-4 gap-4 pb-24 md:pb-6">
+      {/* Body */}
+      <div style={{ display: 'flex', maxWidth: 1100, margin: '0 auto', padding: '14px 10px 80px', gap: 14 }}>
 
-        {/* ── Desktop sidebar ── */}
-        <nav className="hidden md:flex vista-sidebar p-3 flex-col gap-1 w-56 shrink-0 self-stretch sticky top-20 shadow-lg">
+        {/* Desktop sidebar */}
+        <nav
+          className="vista-sidebar"
+          style={{
+            display: 'none',
+            flexDirection: 'column',
+            gap: 3,
+            width: 196,
+            flexShrink: 0,
+            padding: 10,
+            alignSelf: 'flex-start',
+            position: 'sticky',
+            top: 72,
+          }}
+          id="desktop-sidebar"
+        >
+          <style>{`@media (min-width: 768px) { #desktop-sidebar { display: flex !important; } }`}</style>
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
             return (
               <Link
                 key={href}
                 href={href}
-                className={`relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-all duration-150 z-10 ${
-                  active
-                    ? "nav-item-active"
-                    : "text-slate-600 font-semibold hover:bg-white/70 hover:text-slate-900 hover:shadow-sm"
-                }`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  textDecoration: 'none',
+                  fontSize: 13,
+                  fontWeight: active ? 700 : 600,
+                  color: active ? '#ffffff' : '#2a4a70',
+                  position: 'relative',
+                  zIndex: 2,
+                }}
+                className={active ? 'nav-item-active' : 'vista-chip-inactive'}
               >
-                <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-sky-700' : ''}`} />
+                <Icon style={{ width: 15, height: 15, flexShrink: 0, color: active ? '#ffffff' : '#4a6a90' }} />
                 {label}
               </Link>
             )
           })}
-
-          {/* Sidebar bottom decoration — aqua orb */}
-          <div className="mt-auto pt-3 flex justify-center opacity-30 pointer-events-none">
-            <div className="w-16 h-16 rounded-full bg-gradient-radial from-sky-300 via-cyan-200 to-transparent blur-lg" />
-          </div>
         </nav>
 
-        {/* ── Main content ── */}
-        <main className="flex-1 min-w-0 relative z-10">
+        {/* Main content — Vista window content area (light, no gloss pseudo-element) */}
+        <main
+          style={{
+            flex: 1,
+            minWidth: 0,
+            position: 'relative',
+            zIndex: 10,
+            padding: '18px 18px 22px',
+            borderRadius: 8,
+            backgroundColor: '#dce8f4',
+            backgroundImage: 'linear-gradient(to bottom, rgba(255,255,255,0.88), rgba(210,230,248,0.82))',
+            border: '1px solid #6a9fc8',
+            borderTopColor: '#a8cce8',
+            borderBottomColor: '#4a7aaa',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.90)',
+          }}
+        >
           {children}
         </main>
       </div>
 
-      {/* ── Mobile bottom nav — Vista taskbar ── */}
-      <nav className="md:hidden vista-taskbar fixed bottom-0 left-0 right-0 z-40 rounded-t-3xl px-2 py-2 flex justify-around">
+      {/* Mobile bottom nav — Vista taskbar */}
+      <nav
+        className="vista-taskbar"
+        style={{
+          position: 'fixed',
+          bottom: 0, left: 0, right: 0,
+          zIndex: 40,
+          padding: '6px 4px',
+          display: 'flex',
+          justifyContent: 'space-around',
+        }}
+        id="mobile-nav"
+      >
+        <style>{`@media (min-width: 768px) { #mobile-nav { display: none !important; } }`}</style>
         {NAV.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
             <Link
               key={href}
               href={href}
-              className={`relative flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all text-xs z-10 ${
-                active
-                  ? "nav-item-active font-black"
-                  : "text-slate-500 font-semibold hover:text-slate-700"
-              }`}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 3,
+                padding: '5px 10px',
+                borderRadius: 6,
+                textDecoration: 'none',
+                fontSize: 10,
+                fontWeight: active ? 800 : 600,
+                color: active ? '#ffffff' : '#90b0d0',
+                position: 'relative',
+                zIndex: 2,
+              }}
+              className={active ? 'nav-item-active' : ''}
             >
-              <Icon className={`w-5 h-5 ${active ? 'text-sky-700' : ''}`} />
+              <Icon style={{ width: 18, height: 18, color: active ? '#ffffff' : '#7090b8' }} />
               <span>{label}</span>
             </Link>
           )
