@@ -1,542 +1,201 @@
 @import "tailwindcss";
 
-@theme {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-nunito: var(--font-nunito);
-  --font-inter: var(--font-inter);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+/* =============================================
+   WINDOWS VISTA 2008 — Authentic Aero Theme
+   Written in the style of CSS circa 2008.
+   No CSS variables. No backdrop-filter.
+   No CSS Grid. Vendor prefixes throughout.
+   ============================================= */
+
+/* ── Font stack (Segoe UI was new in Vista) ── */
+* {
+  font-family: 'Segoe UI', Tahoma, 'Microsoft Sans Serif', Arial, sans-serif;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
 }
 
-:root {
-  --radius: 1.25rem;
-  --background: oklch(0.94 0.012 210);
-  --foreground: oklch(0.18 0.025 220);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.025 220);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.025 220);
-  --primary: oklch(0.55 0.20 215);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.94 0.018 200);
-  --secondary-foreground: oklch(0.18 0.025 220);
-  --muted: oklch(0.94 0.018 200);
-  --muted-foreground: oklch(0.48 0.05 220);
-  --accent: oklch(0.94 0.018 200);
-  --accent-foreground: oklch(0.18 0.025 220);
-  --destructive: oklch(0.55 0.28 25);
-  --border: oklch(0.84 0.030 210);
-  --input: oklch(0.84 0.030 210);
-  --ring: oklch(0.55 0.20 215);
+/* ── Body / Desktop ── */
+body {
+  background-color: #0a3a4a;
+  color: #1a1a1a;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
-@layer base {
-  * {
-    border-color: var(--border);
-    outline-color: var(--ring);
-    font-family: var(--font-nunito), 'Nunito', 'Segoe UI', system-ui, sans-serif;
-  }
-  body {
-    background-color: var(--background);
-    color: var(--foreground);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    background-attachment: fixed;
-  }
-}
-
-/* ══════════════════════════════════════
-   FRUTIGER AERO 2008 — Background
-══════════════════════════════════════ */
-@keyframes bg-pan {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
+/* =============================================
+   AURORA DESKTOP BACKGROUND
+   Vista's signature wallpaper: dark teal
+   with glowing blue-green aurora streaks
+   ============================================= */
 .aero-bg {
   min-height: 100vh;
   position: relative;
+  overflow-x: hidden;
+  background-color: #062030;
   background-image: url('/background.png');
   background-size: cover;
   background-attachment: fixed;
-  background-position: center;
-  overflow-x: hidden;
-  animation: bg-pan 60s ease-in-out infinite;
+  background-position: center center;
 }
 
-/* Blurred, saturated background layer */
+/* Aurora overlay — teal glow on dark blue */
 .aero-bg::before {
   content: '';
   position: fixed;
-  inset: 0;
-  background-image: url('/background.png');
-  background-size: cover;
-  background-position: center;
-  filter: blur(6px) saturate(1.6) brightness(1.05);
-  opacity: 0.78;
-  z-index: -2;
-  pointer-events: none;
-}
-
-/* Lens flare — bright white bloom top-left, signature Frutiger Aero */
-.aero-bg::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(circle at 15% 10%, rgba(255,255,255,0.72) 0%, rgba(186,230,253,0.28) 28%, transparent 55%),
-    radial-gradient(circle at 85% 80%, rgba(144,230,255,0.18) 0%, transparent 45%);
-  z-index: -1;
-  pointer-events: none;
-}
-
-/* ══════════════════════════════════════
-   SHOCKWAVES — more visible in 2008 style
-══════════════════════════════════════ */
-.orb-layer {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-
-@keyframes shockwave {
-  0%   { transform: scale(0.5); opacity: 0; border-width: 4px; }
-  12%  { opacity: 0.55; }
-  100% { transform: scale(3.0); opacity: 0; border-width: 0.5px; }
-}
-
-.shockwave {
-  position: absolute;
-  border-radius: 50%;
-  border: 3px solid rgba(100, 200, 255, 0.45);
-  background: radial-gradient(circle, rgba(160,220,255,0.12) 0%, transparent 70%);
-  animation: shockwave 12s cubic-bezier(0.23, 1, 0.32, 1) infinite;
-  pointer-events: none;
-}
-
-/* ══════════════════════════════════════
-   WAVES — more saturated, more visible
-══════════════════════════════════════ */
-@keyframes wave-flow {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.wave-layer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 200%;
-  height: 110px;
-  pointer-events: none;
-  z-index: -1;
-  opacity: 0.42;
-  background-repeat: repeat-x;
-  background-position: bottom;
-  background-size: 720px 110px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 90'%3E%3Cpath fill='%2338bdf8' d='M0,45 C180,90 360,0 540,45 C720,90 900,0 1080,45 C1260,90 1350,20 1440,45 L1440,90 L0,90 Z'/%3E%3C/svg%3E");
-  animation: wave-flow 10s linear infinite;
-}
-
-.wave-layer-2 {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 200%;
-  height: 75px;
-  pointer-events: none;
-  z-index: -1;
-  opacity: 0.30;
-  background-repeat: repeat-x;
-  background-position: bottom;
-  background-size: 960px 75px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1920 65'%3E%3Cpath fill='%230ea5e9' d='M0,32 C240,65 480,0 720,32 C960,65 1200,0 1440,32 C1680,65 1800,15 1920,32 L1920,65 L0,65 Z'/%3E%3C/svg%3E");
-  animation: wave-flow 15s linear infinite reverse;
-}
-
-.orb { display: none; }
-
-/* ══════════════════════════════════════
-   GLASS PANELS — Heavy Frutiger Aero
-══════════════════════════════════════ */
-.glass-panel {
-  background: linear-gradient(
-    160deg,
-    rgba(255,255,255,0.90) 0%,
-    rgba(220,242,255,0.78) 60%,
-    rgba(200,235,255,0.72) 100%
-  );
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1.5px solid rgba(255,255,255,0.98);
-  border-bottom: 1.5px solid rgba(140,200,255,0.45);
-  border-right: 1.5px solid rgba(170,215,255,0.40);
-  border-radius: 14px;
-  box-shadow:
-    0 8px 32px rgba(0,80,200,0.12),
-    0 2px 8px rgba(0,0,0,0.08),
-    inset 0 2px 0 rgba(255,255,255,1),
-    inset 0 -1px 0 rgba(140,200,255,0.30);
-  position: relative;
-  color: oklch(0.18 0.025 220);
-}
-
-/* Top gloss sweep on glass panels */
-.glass-panel::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 45%;
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,0.55) 0%,
-    rgba(255,255,255,0.12) 70%,
-    rgba(255,255,255,0.00) 100%
-  );
-  border-radius: 14px 14px 0 0;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3CradialGradient id='a' cx='30%25' cy='60%25' r='55%25'%3E%3Cstop offset='0%25' stop-color='%23006644' stop-opacity='0.45'/%3E%3Cstop offset='100%25' stop-color='%23000000' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='b' cx='75%25' cy='35%25' r='45%25'%3E%3Cstop offset='0%25' stop-color='%230066aa' stop-opacity='0.30'/%3E%3Cstop offset='100%25' stop-color='%23000000' stop-opacity='0'/%3E%3C/radialGradient%3E%3Crect width='100%25' height='100%25' fill='url(%23a)'/%3E%3Crect width='100%25' height='100%25' fill='url(%23b)'/%3E%3C/svg%3E");
   pointer-events: none;
   z-index: 0;
 }
 
-.glass-panel-strong {
-  background: linear-gradient(
-    160deg,
-    rgba(255,255,255,0.97) 0%,
-    rgba(228,245,255,0.92) 50%,
-    rgba(210,238,255,0.88) 100%
-  );
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 2px solid rgba(255,255,255,1);
-  border-bottom: 1.5px solid rgba(130,195,255,0.50);
-  border-right: 1.5px solid rgba(160,210,255,0.45);
-  border-radius: 16px;
-  box-shadow:
-    0 16px 48px rgba(0,80,200,0.16),
-    0 4px 12px rgba(0,0,0,0.10),
-    inset 0 2px 0 rgba(255,255,255,1),
-    inset 0 -2px 0 rgba(130,195,255,0.35);
-  position: relative;
-  color: oklch(0.18 0.025 220);
-}
-
-.glass-panel-strong::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 42%;
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,0.65) 0%,
-    rgba(255,255,255,0.18) 65%,
-    rgba(255,255,255,0.00) 100%
-  );
-  border-radius: 16px 16px 0 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.glass-panel::after, .glass-panel-strong::after {
-  display: none;
-}
-
-.glass-panel p, .glass-panel h1, .glass-panel h2, .glass-panel h3, .glass-panel span,
-.glass-panel-strong p, .glass-panel-strong h1, .glass-panel-strong h2, .glass-panel-strong h3, .glass-panel-strong span {
-  color: oklch(0.18 0.025 220);
-}
-
-/* ══════════════════════════════════════
-   SKEU CARDS — Candy-Coated Aero
-══════════════════════════════════════ */
+/* =============================================
+   VISTA WINDOW CHROME
+   The defining element: frosted glass panels.
+   Light, silver-white, slightly translucent.
+   In real Vista you see the desktop through it.
+   We fake it with a light semi-opaque bg.
+   ============================================= */
+.glass-panel,
+.glass-panel-strong,
 .skeu-card {
-  background: linear-gradient(
-    160deg,
-    rgba(255,255,255,0.97) 0%,
-    rgba(235,248,255,0.90) 45%,
-    rgba(215,240,255,0.82) 100%
-  );
-  border: 1.5px solid rgba(255,255,255,1);
-  border-top: 2px solid rgba(255,255,255,1);
-  border-bottom: 1.5px solid rgba(130,200,255,0.40);
-  border-radius: 14px;
-  box-shadow:
-    0 6px 24px rgba(0,80,200,0.11),
-    0 2px 6px rgba(0,0,0,0.07),
-    inset 0 2px 0 rgba(255,255,255,1),
-    inset 0 -1px 0 rgba(140,200,255,0.28);
+  background-color: #dce8f4;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.92)), to(rgba(210,230,248,0.88)));
+  background-image: -moz-linear-gradient(top, rgba(255,255,255,0.92), rgba(210,230,248,0.88));
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.92), rgba(210,230,248,0.88));
+  border: 1px solid #6a9fc8;
+  border-top-color: #a8cce8;
+  border-bottom-color: #4a7aaa;
+  -webkit-border-radius: 8px;
+  -moz-border-radius: 8px;
+  border-radius: 8px;
+  -webkit-box-shadow: 0 4px 12px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.90), 0 0 0 1px rgba(100,160,220,0.25);
+  -moz-box-shadow: 0 4px 12px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.90), 0 0 0 1px rgba(100,160,220,0.25);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.90), 0 0 0 1px rgba(100,160,220,0.25);
   position: relative;
-  transition: box-shadow 0.18s ease, transform 0.18s ease;
   overflow: hidden;
-  color: oklch(0.18 0.025 220);
+  color: #1a1a1a;
 }
 
-/* Gloss sweep */
+/* Gloss sweep — subtle top highlight on Vista windows */
+.glass-panel::before,
+.glass-panel-strong::before,
 .skeu-card::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 48%;
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,0.72) 0%,
-    rgba(255,255,255,0.18) 65%,
-    rgba(255,255,255,0.00) 100%
-  );
-  border-radius: 14px 14px 0 0;
+  height: 30%;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.45)), to(rgba(255,255,255,0.00)));
+  background-image: -moz-linear-gradient(top, rgba(255,255,255,0.45), rgba(255,255,255,0.00));
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.45), rgba(255,255,255,0.00));
+  -webkit-border-radius: 8px 8px 0 0;
+  -moz-border-radius: 8px 8px 0 0;
+  border-radius: 8px 8px 0 0;
   pointer-events: none;
   z-index: 1;
 }
 
+.glass-panel::after,
+.glass-panel-strong::after {
+  display: none;
+}
+
 .skeu-card:hover {
-  box-shadow:
-    0 10px 36px rgba(0,80,200,0.16),
-    0 3px 10px rgba(0,0,0,0.10),
-    inset 0 2px 0 rgba(255,255,255,1),
-    inset 0 -1px 0 rgba(140,200,255,0.28);
-  transform: translateY(-2px);
+  -webkit-box-shadow: 0 6px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.90), 0 0 0 1px rgba(74,130,200,0.40);
+  -moz-box-shadow: 0 6px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.90), 0 0 0 1px rgba(74,130,200,0.40);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.90), 0 0 0 1px rgba(74,130,200,0.40);
 }
 
-/* Inset well */
+/* Force text color inside glass panels */
+.glass-panel p, .glass-panel h1, .glass-panel h2, .glass-panel h3,
+.glass-panel span, .glass-panel label,
+.glass-panel-strong p, .glass-panel-strong h1, .glass-panel-strong h2,
+.glass-panel-strong h3, .glass-panel-strong span, .glass-panel-strong label,
+.skeu-card p, .skeu-card h1, .skeu-card h2, .skeu-card h3,
+.skeu-card span, .skeu-card label {
+  color: #1a1a1a;
+}
+
+/* Inset well (dark input area inside a panel) */
 .skeu-inset {
-  background: linear-gradient(180deg, rgba(215,240,255,0.80) 0%, rgba(230,245,255,0.70) 100%);
-  border: 1.5px solid rgba(140,200,255,0.55);
-  border-top: 1.5px solid rgba(100,170,230,0.60);
-  box-shadow:
-    inset 0 3px 8px rgba(0,60,150,0.10),
-    inset 0 1px 3px rgba(0,0,0,0.05);
+  background-color: #f0f5fa;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#e8f0f8), to(#f4f8fc));
+  background-image: -moz-linear-gradient(top, #e8f0f8, #f4f8fc);
+  background-image: linear-gradient(to bottom, #e8f0f8, #f4f8fc);
+  border: 1px solid #9bbad4;
+  border-top-color: #7a9ec0;
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  border-radius: 4px;
+  -webkit-box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
+  -moz-box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
 }
 
-/* ══════════════════════════════════════
-   BUTTONS — Authentic Frutiger Aero Gloss
-══════════════════════════════════════ */
-.glow-button {
-  position: relative;
-  overflow: hidden;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  padding: 0.5rem 1.4rem;
-  font-weight: 800;
-  cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
-
-  background: linear-gradient(
-    180deg,
-    #93d4ff 0%,
-    #1eaef5 38%,
-    #0284c7 55%,
-    #075985 100%
-  );
-
-  color: white;
-  text-shadow:
-    0 1px 3px rgba(0,30,100,0.65),
-    0 -1px 1px rgba(0,10,60,0.25);
-
-  border-top: 2px solid rgba(255,255,255,0.80);
-  border-bottom: 2px solid rgba(0,30,100,0.55);
-  border-left: 1.5px solid rgba(255,255,255,0.45);
-  border-right: 1.5px solid rgba(255,255,255,0.45);
-
-  box-shadow:
-    0 5px 16px rgba(2,132,199,0.55),
-    0 2px 4px rgba(0,0,0,0.25),
-    inset 0 -4px 8px rgba(0,20,100,0.35),
-    inset 0 1px 3px rgba(255,255,255,0.30);
-}
-
-.glow-button::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 2px; right: 2px;
-  height: 52%;
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,0.85) 0%,
-    rgba(255,255,255,0.32) 60%,
-    rgba(255,255,255,0.00) 100%
-  );
-  border-radius: 9999px 9999px 0 0;
-  pointer-events: none;
-}
-
-.glow-button:hover {
-  filter: brightness(1.10);
-  transform: translateY(-2px);
-  box-shadow:
-    0 9px 24px rgba(2,132,199,0.65),
-    0 3px 6px rgba(0,0,0,0.28),
-    inset 0 -4px 8px rgba(0,20,100,0.35),
-    inset 0 1px 3px rgba(255,255,255,0.30);
-}
-
-.glow-button:active {
-  transform: translateY(1px);
-  filter: brightness(0.93);
-  box-shadow:
-    0 1px 5px rgba(2,132,199,0.40),
-    inset 0 4px 10px rgba(0,20,100,0.45);
-}
-
-/* ══════════════════════════════════════
-   INPUTS — Deep Inset Well
-══════════════════════════════════════ */
-.input-skeu {
-  background: linear-gradient(180deg, rgba(225,242,255,0.88) 0%, rgba(240,250,255,0.78) 100%);
-  border: 1.5px solid rgba(130,190,240,0.65);
-  border-top: 1.5px solid rgba(90,160,220,0.60);
-  border-radius: 8px;
-  box-shadow:
-    inset 0 3px 8px rgba(0,60,150,0.10),
-    inset 0 1px 3px rgba(0,0,0,0.06);
-  transition: all 0.18s ease;
-  color: oklch(0.18 0.025 220);
-}
-
-.input-skeu:focus {
-  background: rgba(255,255,255,0.98);
-  box-shadow:
-    inset 0 2px 6px rgba(0,60,150,0.12),
-    0 0 0 3px rgba(100,180,255,0.40);
-  border-color: #60b4f0;
-}
-
-/* ══════════════════════════════════════
-   PAGE HEADER — Vista Chrome Pill
-══════════════════════════════════════ */
-.page-header {
-  background: linear-gradient(
-    160deg,
-    rgba(255,255,255,0.96) 0%,
-    rgba(220,242,255,0.88) 60%,
-    rgba(200,235,255,0.82) 100%
-  );
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1.5px solid rgba(255,255,255,1);
-  border-bottom: 1.5px solid rgba(130,200,255,0.45);
-  border-radius: 16px;
-  padding: 0.875rem 1.125rem;
-  box-shadow:
-    0 4px 20px rgba(0,80,200,0.12),
-    0 1px 4px rgba(0,0,0,0.07),
-    inset 0 2px 0 rgba(255,255,255,1),
-    inset 0 -1px 0 rgba(130,200,255,0.30);
-  position: relative;
-  overflow: hidden;
-}
-
-.page-header::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 50%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.60) 0%, rgba(255,255,255,0.00) 100%);
-  border-radius: 16px 16px 0 0;
-  pointer-events: none;
-}
-
-/* ══════════════════════════════════════
-   TYPOGRAPHY — Vibrant Gradient Text
-══════════════════════════════════════ */
-.gradient-text {
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  background-image: linear-gradient(180deg, #0c4a80 0%, #0284c7 45%, #38bdf8 100%);
-  font-weight: 900;
-  filter: drop-shadow(0 1px 1px rgba(0,80,180,0.18));
-}
-
-.gradient-text-green {
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  background-image: linear-gradient(180deg, #064e3b 0%, #059669 45%, #34d399 100%);
-  font-weight: 900;
-  filter: drop-shadow(0 1px 1px rgba(0,100,60,0.15));
-}
-
-/* ══════════════════════════════════════
-   VISTA HEADER — Top Navigation Bar
-══════════════════════════════════════ */
+/* =============================================
+   VISTA TITLE BAR (window header)
+   The iconic blue gradient header.
+   Active: medium blue → darker blue
+   ============================================= */
 .vista-header {
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,0.98) 0%,
-    rgba(225,244,255,0.95) 40%,
-    rgba(200,235,255,0.92) 60%,
-    rgba(210,240,255,0.95) 100%
-  );
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 2px solid rgba(255,255,255,1);
-  border-bottom: 1.5px solid rgba(120,190,255,0.55);
-  border-radius: 18px;
-  box-shadow:
-    0 8px 32px rgba(0,80,200,0.14),
-    0 2px 8px rgba(0,0,0,0.10),
-    inset 0 2px 0 rgba(255,255,255,1),
-    inset 0 -2px 0 rgba(120,190,255,0.35);
+  background-color: #3a85c8;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#7fc0e8), color-stop(45%, #2e7cc8), color-stop(50%, #1f6ab8), to(#2878c8));
+  background-image: -moz-linear-gradient(top, #7fc0e8 0%, #2e7cc8 45%, #1f6ab8 50%, #2878c8 100%);
+  background-image: linear-gradient(to bottom, #7fc0e8 0%, #2e7cc8 45%, #1f6ab8 50%, #2878c8 100%);
+  border: 1px solid #1a5598;
+  border-top-color: #8ecae8;
+  border-bottom-color: #0e3d7a;
+  -webkit-border-radius: 10px;
+  -moz-border-radius: 10px;
+  border-radius: 10px;
+  -webkit-box-shadow: 0 4px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.55), 0 0 0 1px rgba(10,50,120,0.30);
+  -moz-box-shadow: 0 4px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.55), 0 0 0 1px rgba(10,50,120,0.30);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.55), 0 0 0 1px rgba(10,50,120,0.30);
   position: relative;
   overflow: hidden;
 }
 
+/* Gloss highlight on header */
 .vista-header::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 50%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.70) 0%, rgba(255,255,255,0.00) 100%);
-  border-radius: 18px 18px 0 0;
+  height: 45%;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.30)), to(rgba(255,255,255,0.00)));
+  background-image: -moz-linear-gradient(top, rgba(255,255,255,0.30), rgba(255,255,255,0.00));
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.30), rgba(255,255,255,0.00));
+  -webkit-border-radius: 10px 10px 0 0;
+  -moz-border-radius: 10px 10px 0 0;
+  border-radius: 10px 10px 0 0;
   pointer-events: none;
 }
 
-/* ══════════════════════════════════════
-   VISTA SIDEBAR
-══════════════════════════════════════ */
+/* Text in header */
+.vista-header,
+.vista-header * {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.60);
+}
+
+/* =============================================
+   VISTA SIDEBAR NAVIGATION
+   Left navigation panel — light frosted glass
+   ============================================= */
 .vista-sidebar {
-  background: linear-gradient(
-    170deg,
-    rgba(245,252,255,0.96) 0%,
-    rgba(225,244,255,0.92) 50%,
-    rgba(205,235,255,0.88) 100%
-  );
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1.5px solid rgba(255,255,255,0.98);
-  border-bottom: 1.5px solid rgba(130,200,255,0.45);
-  border-radius: 16px;
-  box-shadow:
-    0 8px 28px rgba(0,80,200,0.12),
-    inset 0 2px 0 rgba(255,255,255,1),
-    inset 0 -1px 0 rgba(130,190,255,0.28);
+  background-color: #d0e4f4;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.85)), to(rgba(190,218,244,0.80)));
+  background-image: -moz-linear-gradient(top, rgba(255,255,255,0.85), rgba(190,218,244,0.80));
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.85), rgba(190,218,244,0.80));
+  border: 1px solid #7aadd0;
+  border-top-color: #a8cce0;
+  -webkit-border-radius: 10px;
+  -moz-border-radius: 10px;
+  border-radius: 10px;
+  -webkit-box-shadow: 0 4px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.85);
+  -moz-box-shadow: 0 4px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.85);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.85);
   position: relative;
   overflow: hidden;
 }
@@ -545,29 +204,32 @@
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 35%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.00) 100%);
-  border-radius: 16px 16px 0 0;
+  height: 30%;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.35)), to(rgba(255,255,255,0.00)));
+  background-image: -moz-linear-gradient(top, rgba(255,255,255,0.35), rgba(255,255,255,0.00));
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.35), rgba(255,255,255,0.00));
+  -webkit-border-radius: 10px 10px 0 0;
+  -moz-border-radius: 10px 10px 0 0;
+  border-radius: 10px 10px 0 0;
   pointer-events: none;
 }
 
-/* ══════════════════════════════════════
-   NAV ITEMS — Active & Hover States
-══════════════════════════════════════ */
+/* =============================================
+   NAV ITEMS — Active state (Vista blue glow)
+   ============================================= */
 .nav-item-active {
-  background: linear-gradient(
-    180deg,
-    rgba(147,212,255,0.55) 0%,
-    rgba(56,189,248,0.38) 50%,
-    rgba(14,165,233,0.30) 100%
-  ) !important;
-  border: 1.5px solid rgba(100,190,255,0.70) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.85),
-    inset 0 -1px 0 rgba(14,165,233,0.35),
-    0 2px 6px rgba(14,165,233,0.22) !important;
-  color: #0c4a80 !important;
-  font-weight: 800;
+  background-color: #2878c8 !important;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#5aa8e0), color-stop(50%, #1e6ab8), to(#1258a0)) !important;
+  background-image: -moz-linear-gradient(top, #5aa8e0 0%, #1e6ab8 50%, #1258a0 100%) !important;
+  background-image: linear-gradient(to bottom, #5aa8e0 0%, #1e6ab8 50%, #1258a0 100%) !important;
+  border: 1px solid #0e4a90 !important;
+  border-top-color: #6aace0 !important;
+  -webkit-box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 1px 4px rgba(0,0,0,0.30) !important;
+  -moz-box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 1px 4px rgba(0,0,0,0.30) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 1px 4px rgba(0,0,0,0.30) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.50);
   position: relative;
 }
 
@@ -576,55 +238,153 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 50%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.00) 100%);
+  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.30)), to(rgba(255,255,255,0.00)));
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.30), rgba(255,255,255,0.00));
+  -webkit-border-radius: inherit;
   border-radius: inherit;
   pointer-events: none;
 }
 
-/* ══════════════════════════════════════
-   MOBILE TASKBAR — Vista Style
-══════════════════════════════════════ */
+/* =============================================
+   VISTA TASKBAR (bottom mobile nav)
+   Dark blue — almost black, like XP/Vista taskbar
+   ============================================= */
 .vista-taskbar {
-  background: linear-gradient(
-    180deg,
-    rgba(225,245,255,0.98) 0%,
-    rgba(200,235,255,0.96) 100%
-  );
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-top: 2px solid rgba(255,255,255,1);
-  box-shadow:
-    0 -6px 24px rgba(0,80,200,0.14),
-    inset 0 2px 0 rgba(255,255,255,1);
+  background-color: #0a1830;
+  background-image: -webkit-gradient(linear, left bottom, left top, from(#060e1e), color-stop(70%, #0e2040), to(#162850));
+  background-image: -moz-linear-gradient(bottom, #060e1e 0%, #0e2040 70%, #162850 100%);
+  background-image: linear-gradient(to top, #060e1e 0%, #0e2040 70%, #162850 100%);
+  border-top: 1px solid #2a4870;
+  -webkit-box-shadow: 0 -2px 8px rgba(0,0,0,0.70), inset 0 1px 0 rgba(100,150,220,0.20);
+  -moz-box-shadow: 0 -2px 8px rgba(0,0,0,0.70), inset 0 1px 0 rgba(100,150,220,0.20);
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.70), inset 0 1px 0 rgba(100,150,220,0.20);
 }
 
-/* ══════════════════════════════════════
-   OVERWHELM BUTTON — Danger Red Aero
-══════════════════════════════════════ */
+.vista-taskbar * { color: #d0e0f0; }
+
+/* =============================================
+   VISTA BUTTONS
+   Primary (blue pill): the classic Vista button.
+   Silver (default): the standard Vista button.
+   ============================================= */
+
+/* Blue primary — the Aero gloss pill button */
+.glow-button {
+  position: relative;
+  overflow: hidden;
+  display: inline-block;
+  -webkit-border-radius: 9999px;
+  -moz-border-radius: 9999px;
+  border-radius: 9999px;
+  padding: 6px 20px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  background-color: #1e7cd6;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#80c8f0), color-stop(38%, #1eaef5), color-stop(55%, #0284c7), to(#075985));
+  background-image: -moz-linear-gradient(top, #80c8f0 0%, #1eaef5 38%, #0284c7 55%, #075985 100%);
+  background-image: linear-gradient(to bottom, #80c8f0 0%, #1eaef5 38%, #0284c7 55%, #075985 100%);
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0,20,80,0.70);
+  border-top: 2px solid rgba(255,255,255,0.75);
+  border-bottom: 2px solid rgba(0,30,80,0.50);
+  border-left: 1px solid rgba(255,255,255,0.40);
+  border-right: 1px solid rgba(255,255,255,0.40);
+  -webkit-box-shadow: 0 3px 8px rgba(2,100,180,0.50), 0 1px 2px rgba(0,0,0,0.25), inset 0 -3px 6px rgba(0,20,80,0.30), inset 0 1px 2px rgba(255,255,255,0.25);
+  -moz-box-shadow: 0 3px 8px rgba(2,100,180,0.50), 0 1px 2px rgba(0,0,0,0.25), inset 0 -3px 6px rgba(0,20,80,0.30), inset 0 1px 2px rgba(255,255,255,0.25);
+  box-shadow: 0 3px 8px rgba(2,100,180,0.50), 0 1px 2px rgba(0,0,0,0.25), inset 0 -3px 6px rgba(0,20,80,0.30), inset 0 1px 2px rgba(255,255,255,0.25);
+  text-decoration: none;
+}
+
+/* Gloss highlight on button */
+.glow-button::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 2px; right: 2px;
+  height: 52%;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.80)), to(rgba(255,255,255,0.22)));
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.80), rgba(255,255,255,0.22));
+  -webkit-border-radius: 9999px 9999px 0 0;
+  border-radius: 9999px 9999px 0 0;
+  pointer-events: none;
+}
+
+.glow-button:hover {
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#a0d8ff), color-stop(38%, #40c0ff), color-stop(55%, #0294d7), to(#086898));
+  background-image: linear-gradient(to bottom, #a0d8ff 0%, #40c0ff 38%, #0294d7 55%, #086898 100%);
+  -webkit-box-shadow: 0 5px 14px rgba(2,120,200,0.60), inset 0 -3px 6px rgba(0,20,80,0.30);
+  box-shadow: 0 5px 14px rgba(2,120,200,0.60), inset 0 -3px 6px rgba(0,20,80,0.30);
+}
+
+.glow-button:active {
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#075985), to(#0284c7));
+  background-image: linear-gradient(to bottom, #075985, #0284c7);
+  -webkit-box-shadow: inset 0 2px 5px rgba(0,20,80,0.50);
+  box-shadow: inset 0 2px 5px rgba(0,20,80,0.50);
+  padding-top: 7px;
+  padding-bottom: 5px;
+}
+
+/* Silver secondary button */
+.vista-btn-secondary {
+  display: inline-block;
+  -webkit-border-radius: 9999px;
+  -moz-border-radius: 9999px;
+  border-radius: 9999px;
+  padding: 6px 16px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  background-color: #e0e8f0;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#f4f8fc), to(#ccdae8));
+  background-image: -moz-linear-gradient(top, #f4f8fc, #ccdae8);
+  background-image: linear-gradient(to bottom, #f4f8fc, #ccdae8);
+  color: #2a4a70;
+  border-top: 1px solid rgba(255,255,255,0.90);
+  border-bottom: 1px solid #8aaac8;
+  border-left: 1px solid #a8c0d8;
+  border-right: 1px solid #a8c0d8;
+  -webkit-box-shadow: 0 1px 4px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.85);
+  -moz-box-shadow: 0 1px 4px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.85);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.85);
+  text-decoration: none;
+}
+
+.vista-btn-secondary:hover {
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#ffffff), to(#d8e8f4));
+  background-image: linear-gradient(to bottom, #ffffff, #d8e8f4);
+  color: #1a3a60;
+}
+
+.vista-btn-secondary:active {
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#c0d4e8), to(#e8f0f8));
+  background-image: linear-gradient(to bottom, #c0d4e8, #e8f0f8);
+}
+
+/* Red overwhelm button */
 .overwhelm-btn {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(
-    180deg,
-    #ff7070 0%,
-    #ef4444 38%,
-    #dc2626 55%,
-    #991b1b 100%
-  );
-  border-top: 2px solid rgba(255,200,200,0.75);
-  border-bottom: 2px solid rgba(100,0,0,0.55);
-  border-left: 1.5px solid rgba(255,180,180,0.45);
-  border-right: 1.5px solid rgba(255,180,180,0.45);
+  display: inline-block;
+  -webkit-border-radius: 9999px;
+  -moz-border-radius: 9999px;
   border-radius: 9999px;
-  color: white;
-  font-weight: 800;
-  text-shadow: 0 1px 3px rgba(80,0,0,0.60);
-  box-shadow:
-    0 5px 16px rgba(220,38,38,0.60),
-    0 2px 4px rgba(0,0,0,0.25),
-    inset 0 -4px 8px rgba(100,0,0,0.35),
-    inset 0 1px 3px rgba(255,255,255,0.30);
-  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  background-color: #dc2626;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#ff7070), color-stop(38%, #ef4444), color-stop(55%, #dc2626), to(#991b1b));
+  background-image: -moz-linear-gradient(top, #ff7070 0%, #ef4444 38%, #dc2626 55%, #991b1b 100%);
+  background-image: linear-gradient(to bottom, #ff7070 0%, #ef4444 38%, #dc2626 55%, #991b1b 100%);
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(80,0,0,0.60);
+  border-top: 2px solid rgba(255,200,200,0.75);
+  border-bottom: 2px solid rgba(80,0,0,0.50);
+  border-left: 1px solid rgba(255,180,180,0.40);
+  border-right: 1px solid rgba(255,180,180,0.40);
+  -webkit-box-shadow: 0 3px 8px rgba(200,30,30,0.55), inset 0 -3px 6px rgba(80,0,0,0.30), inset 0 1px 2px rgba(255,255,255,0.25);
+  -moz-box-shadow: 0 3px 8px rgba(200,30,30,0.55), inset 0 -3px 6px rgba(80,0,0,0.30), inset 0 1px 2px rgba(255,255,255,0.25);
+  box-shadow: 0 3px 8px rgba(200,30,30,0.55), inset 0 -3px 6px rgba(80,0,0,0.30), inset 0 1px 2px rgba(255,255,255,0.25);
 }
 
 .overwhelm-btn::after {
@@ -632,123 +392,81 @@
   position: absolute;
   top: 0; left: 2px; right: 2px;
   height: 52%;
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,0.80) 0%,
-    rgba(255,255,255,0.28) 60%,
-    rgba(255,255,255,0.00) 100%
-  );
+  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.75)), to(rgba(255,255,255,0.20)));
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.75), rgba(255,255,255,0.20));
+  -webkit-border-radius: 9999px 9999px 0 0;
   border-radius: 9999px 9999px 0 0;
   pointer-events: none;
 }
 
 .overwhelm-btn:hover {
-  filter: brightness(1.10);
-  transform: translateY(-2px);
-  box-shadow:
-    0 9px 24px rgba(220,38,38,0.70),
-    0 3px 6px rgba(0,0,0,0.28),
-    inset 0 -4px 8px rgba(100,0,0,0.35),
-    inset 0 1px 3px rgba(255,255,255,0.30);
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#ff9090), color-stop(38%, #ff5555), color-stop(55%, #e83030), to(#aa2020));
+  background-image: linear-gradient(to bottom, #ff9090 0%, #ff5555 38%, #e83030 55%, #aa2020 100%);
 }
 
-.overwhelm-btn:active {
-  transform: translateY(1px);
-  filter: brightness(0.92);
+/* =============================================
+   VISTA INPUT CONTROLS
+   The classic Windows text box look
+   ============================================= */
+.input-skeu {
+  background-color: #ffffff;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#e8f0f8), to(#ffffff));
+  background-image: -moz-linear-gradient(top, #e8f0f8, #ffffff);
+  background-image: linear-gradient(to bottom, #e8f0f8, #ffffff);
+  border: 1px solid #8aaac8;
+  border-top-color: #6a8ab0;
+  -webkit-border-radius: 3px;
+  -moz-border-radius: 3px;
+  border-radius: 3px;
+  -webkit-box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
+  -moz-box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
+  color: #1a1a1a;
+  padding: 5px 8px;
+  font-size: 13px;
 }
 
-/* ══════════════════════════════════════
-   BADGES — Candy Plastic
-══════════════════════════════════════ */
-.badge-skeu {
-  position: relative;
-  overflow: hidden;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.85),
-    inset 0 -1px 0 rgba(0,0,0,0.10),
-    0 1px 3px rgba(0,0,0,0.12);
+.input-skeu::placeholder {
+  color: #8a9ab0;
 }
 
-.badge-skeu::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 1px; right: 1px;
-  height: 50%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.60) 0%, rgba(255,255,255,0.00) 100%);
-  border-radius: inherit;
-  pointer-events: none;
+.input-skeu:focus {
+  border-color: #3a88d8;
+  border-top-color: #2268b8;
+  -webkit-box-shadow: inset 0 1px 2px rgba(0,0,0,0.10), 0 0 0 2px rgba(58,136,216,0.30);
+  -moz-box-shadow: inset 0 1px 2px rgba(0,0,0,0.10), 0 0 0 2px rgba(58,136,216,0.30);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.10), 0 0 0 2px rgba(58,136,216,0.30);
+  outline: none;
+  background-color: #ffffff;
+  background-image: none;
 }
 
-/* ══════════════════════════════════════
-   PROGRESS BARS — Aqua Gloss
-══════════════════════════════════════ */
-.progress-aero {
-  position: relative;
-  overflow: hidden;
-  border-radius: 9999px;
-  background: linear-gradient(
-    180deg,
-    #7dd3fc 0%,
-    #0ea5e9 50%,
-    #0369a1 100%
-  );
-  box-shadow:
-    0 1px 4px rgba(3,105,161,0.40),
-    inset 0 -1px 0 rgba(0,30,80,0.30);
-}
-
-.progress-aero::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 55%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.00) 100%);
-  border-radius: 9999px 9999px 0 0;
-  pointer-events: none;
-}
-
-.progress-track {
-  background: linear-gradient(180deg, rgba(200,235,255,0.90) 0%, rgba(220,242,255,0.80) 100%);
-  border: 1px solid rgba(130,195,255,0.55);
-  border-radius: 9999px;
-  overflow: hidden;
-  box-shadow: inset 0 2px 5px rgba(0,60,150,0.10);
-}
-
-/* ══════════════════════════════════════
-   WINDOWS VISTA DIALOG
-══════════════════════════════════════ */
+/* =============================================
+   VISTA DIALOG / MODAL
+   ============================================= */
 .vista-dialog {
-  background: linear-gradient(
-    160deg,
-    rgba(248,252,255,0.98) 0%,
-    rgba(228,245,255,0.96) 100%
-  );
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-radius: 12px;
-  border: 2px solid rgba(255,255,255,1);
-  border-bottom: 1.5px solid rgba(100,170,230,0.45);
-  box-shadow:
-    0 32px 72px rgba(0,40,120,0.32),
-    0 6px 20px rgba(0,80,200,0.18),
-    inset 0 2px 0 rgba(255,255,255,1),
-    inset 0 -2px 0 rgba(160,210,255,0.50);
+  background-color: #dce8f4;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.95)), to(rgba(210,230,248,0.90)));
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(210,230,248,0.90));
+  -webkit-border-radius: 10px;
+  -moz-border-radius: 10px;
+  border-radius: 10px;
+  border: 1px solid #5a8cbc;
+  border-top-color: #a0c4e0;
+  -webkit-box-shadow: 0 12px 40px rgba(0,0,0,0.65), 0 2px 8px rgba(0,50,120,0.25), inset 0 1px 0 rgba(255,255,255,0.90);
+  -moz-box-shadow: 0 12px 40px rgba(0,0,0,0.65), 0 2px 8px rgba(0,50,120,0.25), inset 0 1px 0 rgba(255,255,255,0.90);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.65), 0 2px 8px rgba(0,50,120,0.25), inset 0 1px 0 rgba(255,255,255,0.90);
   overflow: hidden;
+  color: #1a1a1a;
 }
 
 .vista-titlebar {
-  background: linear-gradient(
-    180deg,
-    #62b5ec 0%,
-    #2279cc 45%,
-    #1866bb 50%,
-    #2a88d8 100%
-  );
-  border-bottom: 1.5px solid rgba(0,50,140,0.55);
-  box-shadow:
-    inset 0 1.5px 0 rgba(255,255,255,0.55),
-    0 1px 4px rgba(0,0,0,0.28);
+  background-color: #2e7cc8;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#60b4ec), color-stop(45%, #2279cc), color-stop(50%, #1866bb), to(#2a88d8));
+  background-image: linear-gradient(to bottom, #60b4ec 0%, #2279cc 45%, #1866bb 50%, #2a88d8 100%);
+  border-bottom: 1px solid #0e3d7a;
+  -webkit-box-shadow: inset 0 1px 0 rgba(255,255,255,0.50), 0 1px 3px rgba(0,0,0,0.25);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.50), 0 1px 3px rgba(0,0,0,0.25);
   position: relative;
 }
 
@@ -756,63 +474,484 @@
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 52%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0.04) 100%);
+  height: 45%;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.28)), to(rgba(255,255,255,0.00)));
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.28), rgba(255,255,255,0.00));
+  -webkit-border-radius: 10px 10px 0 0;
   border-radius: 10px 10px 0 0;
   pointer-events: none;
 }
 
+.vista-titlebar, .vista-titlebar * {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+}
+
+/* Vista close button (red X) */
 .vista-close-btn {
-  background: linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.06) 100%);
-  border: 1px solid rgba(255,255,255,0.28);
+  background-color: #cc2222;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#ee5555), to(#aa1111));
+  background-image: linear-gradient(to bottom, #ee5555, #aa1111);
+  border: 1px solid #881111;
+  -webkit-border-radius: 4px;
   border-radius: 4px;
-  transition: background 0.1s;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 .vista-close-btn:hover {
-  background: linear-gradient(180deg, #f06060 0%, #c02020 100%);
-  border-color: rgba(255,200,200,0.60);
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#ff7777), to(#cc2222));
+  background-image: linear-gradient(to bottom, #ff7777, #cc2222);
 }
 
+/* Label */
 .vista-label {
   display: block;
-  font-size: 10px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #1d6fbe;
+  letter-spacing: 0.06em;
+  color: #3a5a80;
   margin-bottom: 3px;
-  text-shadow: 0 1px 0 rgba(255,255,255,0.80);
 }
 
-/* ══════════════════════════════════════
-   REST MODE BANNER — Pink Aero
-══════════════════════════════════════ */
+/* =============================================
+   PROGRESS BARS — Vista Aqua style
+   ============================================= */
+.progress-aero {
+  position: relative;
+  overflow: hidden;
+  -webkit-border-radius: 9999px;
+  -moz-border-radius: 9999px;
+  border-radius: 9999px;
+  background-color: #1e90d0;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#80d0f8), color-stop(50%, #1e90d0), to(#0a5a90));
+  background-image: -moz-linear-gradient(top, #80d0f8, #1e90d0 50%, #0a5a90);
+  background-image: linear-gradient(to bottom, #80d0f8, #1e90d0 50%, #0a5a90);
+  -webkit-box-shadow: 0 0 6px rgba(30,144,208,0.50), inset 0 -1px 0 rgba(0,30,70,0.25);
+  box-shadow: 0 0 6px rgba(30,144,208,0.50), inset 0 -1px 0 rgba(0,30,70,0.25);
+}
+
+.progress-aero::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 55%;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.55)), to(rgba(255,255,255,0.00)));
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.55), rgba(255,255,255,0.00));
+  -webkit-border-radius: 9999px 9999px 0 0;
+  border-radius: 9999px 9999px 0 0;
+  pointer-events: none;
+}
+
+.progress-track {
+  background-color: #c8d8e8;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#b8cce0), to(#d8e8f4));
+  background-image: linear-gradient(to bottom, #b8cce0, #d8e8f4);
+  border: 1px solid #9ab0c8;
+  -webkit-border-radius: 9999px;
+  border-radius: 9999px;
+  overflow: hidden;
+  -webkit-box-shadow: inset 0 1px 3px rgba(0,0,0,0.20);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.20);
+}
+
+/* =============================================
+   BADGE (candy-style skeumorphic)
+   ============================================= */
+.badge-skeu {
+  position: relative;
+  overflow: hidden;
+  -webkit-box-shadow: inset 0 1px 0 rgba(255,255,255,0.40), inset 0 -1px 0 rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.25);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.40), inset 0 -1px 0 rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.25);
+}
+
+.badge-skeu::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 1px; right: 1px;
+  height: 50%;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.40)), to(rgba(255,255,255,0.00)));
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.40), rgba(255,255,255,0.00));
+  -webkit-border-radius: inherit;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* =============================================
+   TYPOGRAPHY — Vista heading style
+   ============================================= */
+.gradient-text {
+  color: #1a5a98;
+  font-weight: 900;
+}
+
+.gradient-text-green {
+  color: #1a7a50;
+  font-weight: 900;
+}
+
+/* =============================================
+   STATE VARIANTS — Semantic panels
+   ============================================= */
+.aero-success {
+  background-color: #e8f8f0;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#f0faf4), to(#d8f0e4));
+  background-image: linear-gradient(to bottom, #f0faf4, #d8f0e4);
+  border: 1px solid #60c080;
+  border-top-color: #90d8a8;
+  color: #1a5a30;
+}
+.aero-success * { color: #1a5a30; }
+
+.aero-warning {
+  background-color: #fff8e0;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#fffbec), to(#fff0c0));
+  background-image: linear-gradient(to bottom, #fffbec, #fff0c0);
+  border: 1px solid #d0a820;
+  border-top-color: #e8cc60;
+  color: #6a4800;
+}
+.aero-warning * { color: #6a4800; }
+
+.aero-danger {
+  background-color: #ffeae8;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#fff0ee), to(#ffd8d4));
+  background-image: linear-gradient(to bottom, #fff0ee, #ffd8d4);
+  border: 1px solid #d06060;
+  border-top-color: #e89090;
+  color: #7a1a1a;
+}
+.aero-danger * { color: #7a1a1a; }
+
+.aero-info {
+  background-color: #e8f4ff;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#f0f8ff), to(#d8ecfc));
+  background-image: linear-gradient(to bottom, #f0f8ff, #d8ecfc);
+  border: 1px solid #5a9ad8;
+  border-top-color: #90c0f0;
+  color: #1a3a6a;
+}
+.aero-info * { color: #1a3a6a; }
+
+.aero-purple {
+  background-color: #f0eaff;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#f6f0ff), to(#e4d8ff));
+  background-image: linear-gradient(to bottom, #f6f0ff, #e4d8ff);
+  border: 1px solid #8a60c8;
+  border-top-color: #b090e0;
+  color: #3a1a6a;
+}
+.aero-purple * { color: #3a1a6a; }
+
+/* =============================================
+   RECOVERY CARDS
+   ============================================= */
+.aero-card-amber  { background-color: #fff8e0; border: 1px solid #d0a820; -webkit-border-radius: 8px; border-radius: 8px; }
+.aero-card-sky    { background-color: #e8f4ff; border: 1px solid #5a9ad8; -webkit-border-radius: 8px; border-radius: 8px; }
+.aero-card-violet { background-color: #f0eaff; border: 1px solid #8a60c8; -webkit-border-radius: 8px; border-radius: 8px; }
+.aero-card-green  { background-color: #e8f8f0; border: 1px solid #60c080; -webkit-border-radius: 8px; border-radius: 8px; }
+.aero-card-pink   { background-color: #ffeaf4; border: 1px solid #d060a0; -webkit-border-radius: 8px; border-radius: 8px; }
+
+/* =============================================
+   FILTER CHIPS (tabs / toggles)
+   ============================================= */
+.vista-chip-active {
+  background-color: #2878c8;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#5aa8e0), to(#1258a0));
+  background-image: linear-gradient(to bottom, #5aa8e0, #1258a0);
+  border: 1px solid #0e4a90;
+  border-top-color: #6aace0;
+  -webkit-box-shadow: inset 0 1px 0 rgba(255,255,255,0.30), 0 1px 3px rgba(0,0,0,0.25);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.30), 0 1px 3px rgba(0,0,0,0.25);
+  color: #ffffff;
+  font-weight: 700;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.40);
+}
+
+.vista-chip-inactive {
+  background-color: #d8e8f4;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#eaf2fa), to(#c8daea));
+  background-image: linear-gradient(to bottom, #eaf2fa, #c8daea);
+  border: 1px solid #9ab8d0;
+  color: #3a5a80;
+  font-weight: 600;
+}
+
+.vista-chip-inactive:hover {
+  background-color: #e0eef8;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#f0f8ff), to(#d0e4f4));
+  background-image: linear-gradient(to bottom, #f0f8ff, #d0e4f4);
+  color: #1a3a60;
+}
+
+/* =============================================
+   REST MODE BANNER
+   ============================================= */
 .rest-mode-banner {
-  background: linear-gradient(
-    160deg,
-    rgba(255,240,245,0.97) 0%,
-    rgba(255,225,240,0.92) 100%
-  );
-  border: 1.5px solid rgba(255,200,220,0.80);
-  border-top: 2px solid rgba(255,255,255,0.98);
-  box-shadow:
-    0 4px 16px rgba(220,0,80,0.12),
-    inset 0 2px 0 rgba(255,255,255,1),
-    inset 0 -1px 0 rgba(255,150,190,0.30);
+  background-color: #fff0f0;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#fff4f4), to(#ffe0e0));
+  background-image: linear-gradient(to bottom, #fff4f4, #ffe0e0);
+  border: 1px solid #d88090;
+  border-top-color: #f0a0b0;
 }
 
-/* ══════════════════════════════════════
-   AERO STATE VARIANTS
-══════════════════════════════════════ */
+.rest-mode-banner * { color: #7a1a1a; }
+
+/* =============================================
+   PAGE HEADER
+   ============================================= */
+.page-header {
+  border-bottom: 1px solid #9ab8d0;
+  padding: 0 0 12px 0;
+  background-color: transparent;
+}
+
+/* =============================================
+   GLASS DARK (for contrast areas)
+   ============================================= */
+.glass-dark {
+  background-color: #f0f5fa;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#eaf2f8), to(#f8fafc));
+  background-image: linear-gradient(to bottom, #eaf2f8, #f8fafc);
+  border: 1px solid #9ab8d0;
+  border-top-color: #c8daea;
+  -webkit-box-shadow: inset 0 1px 0 rgba(255,255,255,0.80);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.80);
+  color: #1a1a1a;
+}
+
+/* =============================================
+   WORKLOAD STATE — subtle panel highlight
+   ============================================= */
+.aero-state-elevated .skeu-card,
 .aero-state-elevated .glass-panel,
-.aero-state-elevated .glass-panel-strong,
-.aero-state-elevated .skeu-card {
-  filter: saturate(0.75);
+.aero-state-elevated .glass-panel-strong {
+  border-color: #c8a020;
 }
 
+.aero-state-overwhelmed .skeu-card,
 .aero-state-overwhelmed .glass-panel,
-.aero-state-overwhelmed .glass-panel-strong,
-.aero-state-overwhelmed .skeu-card {
-  filter: saturate(0.35) brightness(0.97);
+.aero-state-overwhelmed .glass-panel-strong {
+  border-color: #c04040;
+}
+
+/* =============================================
+   LOGO
+   ============================================= */
+.logo-glow {
+  -webkit-filter: drop-shadow(0 2px 8px rgba(30,120,220,0.50)) drop-shadow(0 4px 12px rgba(0,0,0,0.40));
+  filter: drop-shadow(0 2px 8px rgba(30,120,220,0.50)) drop-shadow(0 4px 12px rgba(0,0,0,0.40));
+}
+
+.logo-glow-sm {
+  -webkit-filter: drop-shadow(0 1px 5px rgba(30,120,220,0.40));
+  filter: drop-shadow(0 1px 5px rgba(30,120,220,0.40));
+}
+
+/* =============================================
+   ANIMATIONS
+   CSS2.1 compatible — simple class toggles
+   for fade-in effects using keyframes
+   (Firefox 5+ / Chrome 4+ / Safari 4+ — 2010)
+   ============================================= */
+@-webkit-keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@-moz-keyframes    fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes         fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+@-webkit-keyframes fadeInUp { from { opacity: 0; top: 10px; } to { opacity: 1; top: 0; } }
+@-moz-keyframes    fadeInUp { from { opacity: 0; } to { opacity: 1; } }
+@keyframes         fadeInUp {
+  from { opacity: 0; -webkit-transform: translateY(10px); transform: translateY(10px); }
+  to   { opacity: 1; -webkit-transform: translateY(0);    transform: translateY(0);    }
+}
+
+@-webkit-keyframes scaleIn {
+  from { opacity: 0; -webkit-transform: scale(0.94); transform: scale(0.94); }
+  to   { opacity: 1; -webkit-transform: scale(1);    transform: scale(1);    }
+}
+@keyframes scaleIn {
+  from { opacity: 0; -webkit-transform: scale(0.94) translateY(16px); transform: scale(0.94) translateY(16px); }
+  to   { opacity: 1; -webkit-transform: scale(1) translateY(0);       transform: scale(1) translateY(0);       }
+}
+
+.anim-fade-in       { -webkit-animation: fadeIn    0.18s ease-out both; animation: fadeIn    0.18s ease-out both; }
+.anim-fade-in-up    { -webkit-animation: fadeInUp  0.20s ease-out both; animation: fadeInUp  0.20s ease-out both; }
+.anim-fade-in-down  { -webkit-animation: fadeIn    0.18s ease-out both; animation: fadeIn    0.18s ease-out both; }
+.anim-fade-in-left  { -webkit-animation: fadeIn    0.18s ease-out both; animation: fadeIn    0.18s ease-out both; }
+.anim-scale-in      { -webkit-animation: scaleIn   0.22s cubic-bezier(0.34,1.2,0.64,1) both; animation: scaleIn 0.22s cubic-bezier(0.34,1.2,0.64,1) both; }
+.anim-overlay-in    { -webkit-animation: fadeIn    0.18s ease-out both; animation: fadeIn    0.18s ease-out both; }
+
+/* Logo float — Vista style */
+@-webkit-keyframes logoFloat {
+  0%, 100% { -webkit-transform: translateY(0px);  transform: translateY(0px);  }
+  50%       { -webkit-transform: translateY(-10px); transform: translateY(-10px); }
+}
+@keyframes logoFloat {
+  0%, 100% { transform: translateY(0px);  }
+  50%       { transform: translateY(-10px); }
+}
+
+.logo-float { -webkit-animation: logoFloat 4s ease-in-out infinite; animation: logoFloat 4s ease-in-out infinite; }
+.float-med  { -webkit-animation: logoFloat 5s ease-in-out infinite; animation: logoFloat 5s ease-in-out infinite; }
+
+/* =============================================
+   ORB LAYER (decorative — keep in place)
+   ============================================= */
+.orb-layer {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+/* Vista-style shimmer waves (subtle, bottom) */
+@-webkit-keyframes waveFlow { 0% { left: 0; } 100% { left: -50%; } }
+@keyframes         waveFlow { 0% { left: 0; } 100% { left: -50%; } }
+
+.wave-layer {
+  position: fixed;
+  bottom: 0; left: 0;
+  width: 200%;
+  height: 80px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.15;
+  background-repeat: repeat-x;
+  background-position: bottom;
+  background-size: 720px 80px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 80'%3E%3Cpath fill='%2338bdf8' d='M0,40 C180,80 360,0 540,40 C720,80 900,0 1080,40 C1260,80 1350,15 1440,40 L1440,80 L0,80 Z'/%3E%3C/svg%3E");
+  -webkit-animation: waveFlow 14s linear infinite;
+  animation: waveFlow 14s linear infinite;
+}
+
+.wave-layer-2 {
+  position: fixed;
+  bottom: 0; left: 0;
+  width: 200%;
+  height: 55px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.10;
+  background-repeat: repeat-x;
+  background-position: bottom;
+  background-size: 960px 55px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1920 55'%3E%3Cpath fill='%230ea5e9' d='M0,28 C240,55 480,0 720,28 C960,55 1200,0 1440,28 C1680,55 1800,12 1920,28 L1920,55 L0,55 Z'/%3E%3C/svg%3E");
+  -webkit-animation: waveFlow 20s linear infinite reverse;
+  animation: waveFlow 20s linear infinite reverse;
+}
+
+/* Shockwave rings (keep as decorative element) */
+.shockwave { display: none; }
+.orb       { display: none; }
+
+/* =============================================
+   CALENDAR CELLS
+   ============================================= */
+.cal-cell       { background-color: #eef4fa; border: 1px solid #c0d4e8; -webkit-border-radius: 6px; border-radius: 6px; }
+.cal-cell-today { background-color: #d0e8ff; border: 1px solid #4a90d8; -webkit-border-radius: 6px; border-radius: 6px; }
+.cal-cell-has   { background-color: #e0eef8; border: 1px solid #90b8d8; -webkit-border-radius: 6px; border-radius: 6px; }
+
+/* =============================================
+   TASK CARDS — colored left border
+   ============================================= */
+.task-card-work,
+.task-card-exercise,
+.task-card-chores,
+.task-card-social,
+.task-card-leisure {
+  background-color: #f0f6fc !important;
+  border-top: 1px solid #c0d4e8 !important;
+  border-right: 1px solid #c0d4e8 !important;
+  border-bottom: 1px solid #b0c8e0 !important;
+}
+.task-card-work     { border-left: 3px solid #2878c8 !important; }
+.task-card-exercise { border-left: 3px solid #28a060 !important; }
+.task-card-chores   { border-left: 3px solid #c89820 !important; }
+.task-card-social   { border-left: 3px solid #20a0c8 !important; }
+.task-card-leisure  { border-left: 3px solid #8860c8 !important; }
+
+/* =============================================
+   BALANCE MODE BUTTONS
+   ============================================= */
+.vista-mode-active {
+  border: 2px solid #2878c8 !important;
+  background-color: #dce8f8 !important;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#eef4ff), to(#c8daf0)) !important;
+  background-image: linear-gradient(to bottom, #eef4ff, #c8daf0) !important;
+  -webkit-box-shadow: inset 0 1px 0 rgba(255,255,255,0.70), 0 1px 4px rgba(40,120,200,0.25) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.70), 0 1px 4px rgba(40,120,200,0.25) !important;
+}
+
+.vista-mode-inactive {
+  border: 2px solid #9ab8d0 !important;
+  background-color: #e8f0f8 !important;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#f4f8fc), to(#dce8f4)) !important;
+  background-image: linear-gradient(to bottom, #f4f8fc, #dce8f4) !important;
+}
+
+.vista-mode-inactive:hover:not(:disabled) {
+  border-color: #5a90c8 !important;
+  background-color: #e0ecf8 !important;
+}
+
+/* =============================================
+   AERO CHAT BUBBLES
+   ============================================= */
+.aero-bubble-ai {
+  background-color: #e8f4ff;
+  border: 1px solid #7ab0e0;
+  color: #1a3a6a;
+}
+
+.aero-bubble-user {
+  background-color: #1e6ab8;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#4090d8), to(#1258a0));
+  background-image: linear-gradient(to bottom, #4090d8, #1258a0);
+  border: 1px solid #0e4888;
+  color: #ffffff;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.30);
+}
+
+/* =============================================
+   TAILWIND UTILITY OVERRIDES
+   Force correct colors on Tailwind classes
+   used throughout the app components
+   ============================================= */
+.text-slate-900, .text-gray-900 { color: #1a1a1a !important; }
+.text-slate-800, .text-gray-800 { color: #2a2a2a !important; }
+.text-slate-700, .text-gray-700 { color: #3a3a3a !important; }
+.text-slate-600, .text-gray-600 { color: #4a4a5a !important; }
+.text-slate-500, .text-gray-500 { color: #5a6a7a !important; }
+.text-slate-400, .text-gray-400 { color: #7a8a9a !important; }
+
+.text-sky-600     { color: #1a6ab8 !important; }
+.text-sky-700     { color: #155090 !important; }
+.text-emerald-600 { color: #1a7a50 !important; }
+.text-purple-600  { color: #5a2a9a !important; }
+.text-red-500     { color: #c83030 !important; }
+.text-emerald-500 { color: #20a060 !important; }
+
+.bg-white         { background-color: #ffffff !important; background-image: none !important; }
+.bg-gray-50       { background-color: #f4f8fc !important; }
+.bg-gray-100      { background-color: #eaf2f8 !important; }
+.bg-gray-200      { background-color: #dce8f4 !important; }
+.bg-slate-50      { background-color: #f4f8fc !important; }
+.bg-slate-100     { background-color: #eaf2f8 !important; }
+
+.border-gray-100  { border-color: #d0e0ec !important; }
+.border-gray-200  { border-color: #c0d4e8 !important; }
+.border-slate-200 { border-color: #c0d4e8 !important; }
+
+.divide-gray-100 > * + * { border-color: #d0e0ec !important; }
+.divide-gray-200 > * + * { border-color: #c0d4e8 !important; }
+
+/* Pulse glow — still blue, just lighter */
+.pulse-glow {
+  -webkit-animation: none;
+  animation: none;
+  -webkit-box-shadow: 0 3px 8px rgba(2,100,180,0.50), inset 0 -3px 6px rgba(0,20,80,0.30);
+  box-shadow: 0 3px 8px rgba(2,100,180,0.50), inset 0 -3px 6px rgba(0,20,80,0.30);
 }

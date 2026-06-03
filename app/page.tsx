@@ -2,33 +2,28 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Brain, BarChart3, Heart, ArrowRight, CheckCircle, Sparkles, Leaf } from "lucide-react";
+import { Brain, BarChart3, Heart, ArrowRight, CheckCircle, Sparkles, Leaf } from "@/lib/icons";
 
 const features = [
   {
-    icon: <Sparkles className="w-6 h-6 text-sky-500" />,
+    icon: <BarChart3 style={{ width: 24, height: 24, color: '#1a6ab8' }} />,
     title: "Natural Language Input",
     desc: 'Just type "did laundry, need to study for exam, call landlord" — AI extracts each task automatically.',
-    color: "from-sky-400/20 to-cyan-400/10",
   },
   {
-    icon: <BarChart3 className="w-6 h-6 text-emerald-500" />,
+    icon: <BarChart3 style={{ width: 24, height: 24, color: '#1a7a50' }} />,
     title: "Workload Monitoring",
     desc: "AI analyzes your week and tells you when you're overloaded — before burnout hits.",
-    color: "from-emerald-400/20 to-teal-400/10",
   },
   {
-    icon: <Heart className="w-6 h-6 text-pink-500" />,
+    icon: <Heart style={{ width: 24, height: 24, color: '#c83060' }} />,
     title: "Mental Health Aware",
     desc: "Overwhelmed? One button activates Rest Mode, hiding non-essential tasks so you can breathe.",
-    color: "from-pink-400/20 to-rose-400/10",
   },
   {
-    icon: <Brain className="w-6 h-6 text-purple-500" />,
+    icon: <Brain style={{ width: 24, height: 24, color: '#5a2a9a' }} />,
     title: "Balance Tracking",
     desc: "Choose your mode: Beast Worker (70/30), Average (50/50), or Chill Guy (30/70). AI adapts advice.",
-    color: "from-purple-400/20 to-indigo-400/10",
   },
 ];
 
@@ -44,201 +39,194 @@ const perks = [
 export default function LandingPage() {
   return (
     <div className="aero-bg min-h-screen overflow-x-hidden">
-      {/* Floating orbs for extra depth */}
-      <div className="orb-layer">
-        <div className="orb w-64 h-64 -top-20 -left-20 opacity-20"></div>
-        <div className="orb w-96 h-96 top-[40%] -right-20 opacity-10"></div>
-        <div className="orb w-48 h-48 bottom-[10%] left-[20%] opacity-15"></div>
-      </div>
+      <div className="orb-layer" />
 
       {/* Nav */}
-      <nav className="glass-panel-strong mx-4 mt-4 px-5 py-3 flex items-center justify-between sticky top-4 z-50">
+      <nav
+        className="glass-panel mx-4 mt-4 px-5 py-3 flex items-center justify-between sticky top-4 z-50"
+        style={{ position: 'sticky', top: 16, zIndex: 50 }}
+      >
         <div className="flex items-center gap-3">
-          <Image src="/logo.png" alt="LoadLight" width={42} height={42} className="logo-glow-sm" />
-          <span className="font-black text-xl gradient-text tracking-tight">LoadLight</span>
+          <Image src="/logo.png" alt="LoadLight" width={38} height={38} className="logo-glow-sm" />
+          <span className="gradient-text" style={{ fontWeight: 900, fontSize: 20, letterSpacing: -0.5 }}>LoadLight</span>
         </div>
         <Link
           href="/dashboard"
-          className="glow-button text-white font-bold px-5 py-2.5 rounded-xl text-sm inline-flex items-center gap-2"
+          className="glow-button"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '7px 18px' }}
         >
-          Try Demo <ArrowRight className="w-4 h-4" />
+          Try Demo
         </Link>
       </nav>
 
       {/* Hero */}
-      <section className="max-w-5xl mx-auto px-6 pt-16 pb-12 text-center">
-        {/* Big Logo */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.7, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.8, type: "spring", bounce: 0.35 }}
-          className="flex justify-center mb-8"
-        >
+      <section style={{ maxWidth: 900, margin: '0 auto', padding: '60px 24px 40px', textAlign: 'center' }}>
+        <div className="flex justify-center mb-8 anim-scale-in" style={{ justifyContent: 'center', marginBottom: 32 }}>
           <Image
             src="/logo.png"
             alt="LoadLight"
-            width={260}
-            height={260}
+            width={220}
+            height={220}
             className="logo-glow logo-float"
             priority
           />
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.2 }}
-        >
-          <div className="inline-flex items-center gap-2 glass-panel px-4 py-2 mb-6 text-sm text-emerald-700 font-semibold">
-            <Leaf className="w-4 h-4 text-emerald-500" />
+        <div className="anim-fade-in-up" style={{ animationDelay: '0.15s' }}>
+          <div
+            className="glass-panel badge-skeu"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 14px',
+              marginBottom: 20,
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#1a7a50',
+            }}
+          >
+            <Leaf style={{ width: 14, height: 14, color: '#20a060' }} />
             AI-powered task management meets mental health awareness
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-black mb-5 leading-tight">
-            <span className="gradient-text">Balance Your Load.</span>
+          <h1 style={{ fontSize: 52, fontWeight: 900, marginBottom: 16, lineHeight: 1.15, color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.60)' }}>
+            <span className="gradient-text" style={{ color: '#a8d0ff', textShadow: '0 2px 8px rgba(0,50,150,0.50)' }}>Balance Your Load.</span>
             <br />
-            <span className="text-slate-700">Lighten Your Mind.</span>
+            <span style={{ color: '#ffffff' }}>Lighten Your Mind.</span>
           </h1>
 
-          <p className="text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed">
+          <p style={{ fontSize: 17, maxWidth: 560, margin: '0 auto 32px', lineHeight: 1.65, color: 'rgba(220,240,255,0.85)', textShadow: '0 1px 3px rgba(0,0,0,0.50)' }}>
             Existing apps store tasks but never tell you when you&apos;re doing too much.{" "}
-            <strong className="text-slate-800">LoadLight fills that gap</strong> — with AI that actually cares about your wellbeing.
+            <strong style={{ color: '#ffffff' }}>LoadLight fills that gap</strong> — with AI that actually cares about your wellbeing.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
             <Link
               href="/dashboard"
-              className="glow-button text-white font-black px-9 py-4 rounded-2xl text-lg inline-flex items-center gap-3 pulse-glow"
+              className="glow-button pulse-glow"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 15, padding: '10px 28px', fontWeight: 900 }}
             >
-              <Sparkles className="w-5 h-5" />
+              <Sparkles style={{ width: 18, height: 18 }} />
               Try the Demo
-              <ArrowRight className="w-5 h-5" />
+              <ArrowRight style={{ width: 18, height: 18 }} />
             </Link>
-            <span className="text-slate-400 text-sm font-medium">No sign-up · No credit card · 100% free</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(200,230,255,0.60)', textShadow: '0 1px 2px rgba(0,0,0,0.40)' }}>
+              No sign-up · No credit card · 100% free
+            </span>
           </div>
-        </motion.div>
+        </div>
 
         {/* Hero card preview */}
-        <motion.div
-          initial={{ opacity: 0, y: 60, scale: 0.93 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.9, delay: 0.4, type: "spring", bounce: 0.2 }}
-          className="mt-14 glass-panel p-6 max-w-2xl mx-auto text-left"
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-2 h-2 rounded-full bg-red-400" />
-            <div className="w-2 h-2 rounded-full bg-yellow-400" />
-            <div className="w-2 h-2 rounded-full bg-green-400" />
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-2">AI Task Extraction</p>
+        <div className="glass-panel anim-fade-in-up" style={{ marginTop: 48, padding: 20, maxWidth: 580, marginLeft: 'auto', marginRight: 'auto', textAlign: 'left', animationDelay: '0.3s' }}>
+          {/* Window chrome dots */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 14 }}>
+            <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#c83030', border: '1px solid #a02020' }} />
+            <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#c8a020', border: '1px solid #9a7a10' }} />
+            <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#28a040', border: '1px solid #1a7a30' }} />
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', marginLeft: 8, color: '#5a7a9a' }}>AI Task Extraction</span>
           </div>
-          <div className="glass-dark p-4 rounded-xl mb-4 border border-white/20">
-            <p className="text-white text-sm leading-relaxed font-medium">
+          <div className="skeu-inset" style={{ padding: 14, marginBottom: 14, borderRadius: 5 }}>
+            <p style={{ fontSize: 13, lineHeight: 1.6, fontWeight: 600, color: '#1a1a1a' }}>
               &ldquo;Need to finish the report by Thursday, hit the gym, buy groceries, call mom, and maybe start that online course&rdquo;
             </p>
           </div>
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {[
-              { title: "Finish report by Thursday", type: "work",     badge: "bg-blue-100 text-blue-700",    min: 120 },
-              { title: "Hit the gym",               type: "exercise", badge: "bg-emerald-100 text-emerald-700", min: 60 },
-              { title: "Buy groceries",             type: "chores",   badge: "bg-amber-100 text-amber-700",  min: 45 },
-              { title: "Call mom",                  type: "social",   badge: "bg-cyan-100 text-cyan-700",    min: 20 },
-              { title: "Start online course",       type: "leisure",  badge: "bg-purple-100 text-purple-700",min: 60 },
+              { title: "Finish report by Thursday", type: "work",     badgeCls: "aero-info badge-skeu",    min: 120 },
+              { title: "Hit the gym",               type: "exercise", badgeCls: "aero-success badge-skeu", min: 60 },
+              { title: "Buy groceries",             type: "chores",   badgeCls: "aero-warning badge-skeu", min: 45 },
+              { title: "Call mom",                  type: "social",   badgeCls: "aero-info badge-skeu",    min: 20 },
+              { title: "Start online course",       type: "leisure",  badgeCls: "aero-purple badge-skeu",  min: 60 },
             ].map((task, i) => (
-              <motion.div
+              <div
                 key={i}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.7 + i * 0.1 }}
-                className={`flex items-center gap-3 bg-white/75 rounded-xl p-3 border border-white/60 task-card-${task.type} shadow-sm`}
+                className={`task-card-${task.type} anim-fade-in-left`}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, borderRadius: 6, padding: '8px 12px', animationDelay: `${0.5 + i * 0.08}s` }}
               >
-                <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span className="text-sm font-semibold text-slate-800 flex-1">{task.title}</span>
-                <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${task.badge}`}>{task.type}</span>
-                <span className="text-xs text-slate-500 font-bold">{task.min}m</span>
-              </motion.div>
+                <CheckCircle style={{ width: 15, height: 15, flexShrink: 0, color: '#28a060' }} />
+                <span style={{ fontSize: 13, fontWeight: 600, flex: 1, color: '#1a1a1a' }}>{task.title}</span>
+                <span className={`${task.badgeCls}`} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 9999, fontWeight: 700 }}>{task.type}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#5a7a9a' }}>{task.min}m</span>
+              </div>
             ))}
           </div>
-          <p className="text-xs text-slate-500 mt-4 text-center font-bold">
-            ✓ AI extracted 5 tasks from one sentence — review &amp; confirm before saving
+          <p style={{ fontSize: 11, marginTop: 12, textAlign: 'center', fontWeight: 700, color: '#5a7a9a' }}>
+            AI extracted 5 tasks from one sentence — review and confirm before saving
           </p>
-        </motion.div>
+        </div>
       </section>
 
       {/* Features */}
-      <section className="max-w-5xl mx-auto px-6 pb-20">
-        <motion.h2
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          className="text-3xl font-black text-center mb-12 gradient-text-green"
-        >
+      <section style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px 60px' }}>
+        <h2 className="gradient-text" style={{ fontSize: 26, fontWeight: 900, textAlign: 'center', marginBottom: 32, color: '#a8d8ff', textShadow: '0 2px 6px rgba(0,0,0,0.50)' }}>
           Everything you need to stay balanced
-        </motion.h2>
-        <div className="grid md:grid-cols-2 gap-5">
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {features.map((f, i) => (
-            <motion.div
+            <div
               key={i}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="glass-panel p-6 relative overflow-hidden"
+              className="glass-panel anim-fade-in-up"
+              style={{ padding: 20, animationDelay: `${i * 0.08}s` }}
             >
-              {/* Gradient tint */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${f.color} rounded-3xl pointer-events-none`} />
-              <div className="relative flex items-start gap-4">
-                <div className="glass-panel-strong rounded-xl p-3 shrink-0">{f.icon}</div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                <div className="skeu-inset" style={{ padding: 10, borderRadius: 6, flexShrink: 0 }}>{f.icon}</div>
                 <div>
-                  <h3 className="font-black text-slate-800 mb-1.5">{f.title}</h3>
-                  <p className="text-slate-600 text-sm leading-relaxed">{f.desc}</p>
+                  <h3 style={{ fontWeight: 900, marginBottom: 5, color: '#1a1a1a', fontSize: 14 }}>{f.title}</h3>
+                  <p style={{ fontSize: 12, lineHeight: 1.6, color: '#4a5a70' }}>{f.desc}</p>
                 </div>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
 
         {/* Perks */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          className="glass-panel p-8 mt-8"
-        >
-          <h3 className="font-black text-slate-800 text-xl mb-6 text-center">What LoadLight does for you</h3>
-          <div className="grid sm:grid-cols-2 gap-3">
+        <div className="glass-panel anim-fade-in-up" style={{ padding: 28, marginTop: 24 }}>
+          <h3 style={{ fontWeight: 900, fontSize: 17, marginBottom: 20, textAlign: 'center', color: '#1a1a1a' }}>What LoadLight does for you</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
             {perks.map((perk, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-sky-400 to-emerald-500 flex items-center justify-center shrink-0 shadow-sm">
-                  <CheckCircle className="w-3 h-3 text-white" />
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: 'linear-gradient(to bottom, #80d8a0, #28a060)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                    border: '1px solid #20904e',
+                  }}
+                >
+                  <CheckCircle style={{ width: 11, height: 11, color: '#ffffff' }} />
                 </div>
-                <span className="text-slate-700 text-sm font-medium">{perk}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#2a3a50' }}>{perk}</span>
               </div>
             ))}
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* CTA */}
-      <section className="max-w-3xl mx-auto px-6 pb-24 text-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          className="glass-panel p-12"
-        >
-          <div className="flex justify-center mb-6">
-            <Image src="/logo.png" alt="LoadLight" width={140} height={140} className="logo-glow float-med" />
+      <section style={{ maxWidth: 700, margin: '0 auto', padding: '0 24px 80px', textAlign: 'center' }}>
+        <div className="glass-panel anim-fade-in-up" style={{ padding: 48 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+            <Image src="/logo.png" alt="LoadLight" width={110} height={110} className="logo-glow float-med" />
           </div>
-          <h2 className="text-3xl font-black mb-3 gradient-text">Ready to find your balance?</h2>
-          <p className="text-slate-600 mb-8 font-bold">See how LoadLight transforms the way you manage your day.</p>
+          <h2 style={{ fontSize: 26, fontWeight: 900, marginBottom: 10, color: '#1a3a6a' }}>Ready to find your balance?</h2>
+          <p style={{ marginBottom: 28, fontWeight: 600, color: '#4a6a90', fontSize: 14 }}>
+            See how LoadLight transforms the way you manage your day.
+          </p>
           <Link
             href="/dashboard"
-            className="glow-button text-white font-black px-10 py-4 rounded-2xl text-lg inline-flex items-center gap-3"
+            className="glow-button"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 15, padding: '10px 32px', fontWeight: 900 }}
           >
-            <Sparkles className="w-5 h-5" />
+            <Sparkles style={{ width: 18, height: 18 }} />
             Open Demo Dashboard
           </Link>
-        </motion.div>
+        </div>
       </section>
 
-      <footer className="text-center pb-8 text-slate-500 text-sm font-bold">
-        LoadLight — Free, no ads, built with care 💙
+      <footer style={{ textAlign: 'center', paddingBottom: 28, color: '#7a9ab8', fontSize: 12, fontWeight: 700 }}>
+        LoadLight — Free, no ads, built with care
       </footer>
     </div>
   );
