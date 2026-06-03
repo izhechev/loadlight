@@ -393,10 +393,31 @@ export default function TasksPage() {
 
   const snoozedCount = tasks.filter(t => !t.done && t.snoozedUntil && t.snoozedUntil > (now || Date.now())).length
 
+  // For recurring tasks, only keep the earliest undone instance per name+category.
+  // Future copies pile up when previous instances aren't completed — hide them.
+  const recurringEarliestIds = (() => {
+    const keep = new Set<string>()
+    const seen = new Map<string, string>() // key → id of earliest-deadline task
+    const undone = tasks.filter(t => !t.done && t.recurring && t.recurring !== 'none')
+    // Sort by deadline ascending so the first one we see is the earliest
+    const sorted = [...undone].sort((a, b) => {
+      if (!a.deadline) return 1
+      if (!b.deadline) return -1
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+    })
+    sorted.forEach(t => {
+      const key = `${t.name.trim().toLowerCase()}||${(t.category || '').toLowerCase()}`
+      if (!seen.has(key)) { seen.set(key, t.id); keep.add(t.id) }
+    })
+    return keep
+  })()
+
   const visible = tasks
     .filter(t => {
       // Hide snoozed tasks unless user opts to show them
       if (!showSnoozed && !t.done && t.snoozedUntil && t.snoozedUntil > (now || Date.now())) return false
+      // For recurring tasks in active view, hide all instances except the earliest undone one
+      if (!t.done && t.recurring && t.recurring !== 'none' && filter !== 'all' && !recurringEarliestIds.has(t.id)) return false
       return filter === 'all' ? true : filter === 'active' ? !t.done : t.done
     })
     .sort((a, b) => {
