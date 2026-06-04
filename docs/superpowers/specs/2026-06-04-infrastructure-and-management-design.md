@@ -77,14 +77,13 @@ In-app admin dashboard, protected by existing Supabase middleware (no new auth n
 - **State Events** — last 10 `overwhelm_events` rows with trigger, previous state, new state, timestamp
 - **Incidents** — count of open vs resolved incidents, link to `/admin/incidents`
 
-Implemented as a Next.js server component — reads from Supabase directly using the existing `supabaseServer` client (same pattern as other server-side pages in the codebase). No client-side TanStack Query needed; data is fetched at render time on the server.
+Implemented as a "use client" component — consistent with all existing pages in the codebase. Auth is checked client-side via `supabase.auth.getUser()` (browser client); redirects to `/login` if unauthenticated. Data fetched from Supabase browser client on mount.
 
-### 5. `app/admin/incidents/page.tsx` + `app/api/incidents/route.ts`
-Incidents CRUD:
+### 5. `app/admin/incidents/page.tsx`
+Incidents CRUD (no separate API route needed — all operations use the browser Supabase client with RLS enforced at DB level):
 - **List view**: table of all incidents sorted by `detected_at` desc, with severity badge, open/resolved status
-- **Log incident** button: opens a form (title, severity select, description, root_cause, detected_at)
+- **Log incident** button: inline form (title, severity select, description, root_cause, detected_at)
 - **Resolve** button on each open incident: fills `resolved_at` + `resolution` inline
-- API route handles POST (create) and PATCH (update/resolve), server-side, uses supabaseServer
 
 ### 6. `next.config.ts` — Security Headers
 Add to `headers()` export:
