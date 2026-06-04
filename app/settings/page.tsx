@@ -34,6 +34,8 @@ export default function SettingsPage() {
   const [showOverrideModal, setShowOverrideModal] = useState(false)
   const [overridePhrase, setOverridePhrase] = useState('')
   const [pendingMode, setPendingMode] = useState<BalanceMode | null>(null)
+  const [showLockDurationModal, setShowLockDurationModal] = useState(false)
+  const [pendingChillMode, setPendingChillMode] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const OVERRIDE_PHRASE = 'I want to switch'
 
@@ -59,13 +61,11 @@ export default function SettingsPage() {
     return mode !== 'chill' && balanceMode === 'chill' && !!chillLockUntil && currentTime > 0 && currentTime < chillLockUntil
   }, [balanceMode, chillLockUntil])
 
-  function applyMode(mode: BalanceMode) {
-    const currentTime = now || Date.now()
-    let updatedLockUntil = chillLockUntil
-    if (mode === 'chill' && balanceMode !== 'chill') {
-      updatedLockUntil = currentTime + 30 * 24 * 60 * 60 * 1000
-      setChillLockUntil(updatedLockUntil)
-      localStorage.setItem('loadlight-chill-lock', String(updatedLockUntil))
+  function applyMode(mode: BalanceMode, lockDays?: number | null) {
+    if (mode === 'chill' && balanceMode !== 'chill' && lockDays) {
+      const until = (now || Date.now()) + lockDays * 24 * 60 * 60 * 1000
+      setChillLockUntil(until)
+      try { localStorage.setItem('loadlight-chill-lock', String(until)) } catch { /* ignore */ }
     }
     setBalanceMode(mode)
     try {
@@ -77,13 +77,23 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000)
   }
 
+  function confirmLockDuration(lockDays: number | null) {
+    setShowLockDurationModal(false)
+    setPendingChillMode(false)
+    applyMode('chill', lockDays)
+  }
+
   const selectMode = useCallback((mode: BalanceMode) => {
     const currentTime = now || Date.now()
     if (isLocked(mode, currentTime)) {
-      // Offer override instead of silently blocking
       setPendingMode(mode)
       setOverridePhrase('')
       setShowOverrideModal(true)
+      return
+    }
+    if (mode === 'chill' && balanceMode !== 'chill') {
+      setPendingChillMode(true)
+      setShowLockDurationModal(true)
       return
     }
     applyMode(mode)
@@ -142,6 +152,40 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+
+      {showLockDurationModal && pendingChillMode && (
+        <div className="anim-overlay-in" style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.45)', padding: 16 }}>
+          <div className="skeu-card max-w-sm w-full p-6 anim-scale-in">
+            <div className="mb-4">
+              <h2 className="font-black text-lg mb-1" style={{ color: '#1a1a1a' }}>Switching to Chill Guy</h2>
+              <p className="text-sm font-bold" style={{ color: '#5a7a9a' }}>Do you want to set a commitment lock? This prevents impulsive switching back.</p>
+            </div>
+            <div className="flex flex-col gap-2 mb-4">
+              {[7, 14, 30].map(days => (
+                <button
+                  key={days}
+                  onClick={() => confirmLockDuration(days)}
+                  className="vista-btn-secondary font-bold text-sm py-2.5 text-left px-4 rounded-xl"
+                >
+                  Lock for {days} days
+                </button>
+              ))}
+              <button
+                onClick={() => confirmLockDuration(null)}
+                className="vista-btn-secondary font-bold text-sm py-2.5 text-left px-4 rounded-xl opacity-70"
+              >
+                No lock, switch freely
+              </button>
+            </div>
+            <button
+              onClick={() => { setShowLockDurationModal(false); setPendingChillMode(false) }}
+              className="w-full vista-btn-secondary font-bold text-sm py-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-xl mx-auto space-y-6">
         <div className="page-header flex items-center justify-between">
