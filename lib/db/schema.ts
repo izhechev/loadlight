@@ -85,6 +85,22 @@ export const aiLogs = pgTable('ai_logs', {
 })
 
 // ─────────────────────────────────────────────
+// incidents
+// ─────────────────────────────────────────────
+export const incidents = pgTable('incidents', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  userId:      uuid('user_id').notNull(),
+  detectedAt:  timestamp('detected_at', { withTimezone: true }).notNull(),
+  resolvedAt:  timestamp('resolved_at', { withTimezone: true }),
+  severity:    text('severity').notNull(),  // low | medium | high | critical
+  title:       text('title').notNull(),
+  description: text('description'),
+  rootCause:   text('root_cause'),
+  resolution:  text('resolution'),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// ─────────────────────────────────────────────
 // TypeScript inferred types
 // ─────────────────────────────────────────────
 export type Profile         = typeof profiles.$inferSelect
@@ -95,6 +111,8 @@ export type StateSnapshot   = typeof stateSnapshots.$inferSelect
 export type NewStateSnapshot = typeof stateSnapshots.$inferInsert
 export type OverwhelmEvent  = typeof overwhelmEvents.$inferSelect
 export type AiLog           = typeof aiLogs.$inferSelect
+export type Incident        = typeof incidents.$inferSelect
+export type NewIncident     = typeof incidents.$inferInsert
 
 /*
 ──────────────────────────────────────────────────────────────────
@@ -172,6 +190,21 @@ create table ai_logs (
 );
 alter table ai_logs enable row level security;
 create policy "own ai_logs" on ai_logs for all using (auth.uid() = user_id);
+
+create table incidents (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid references profiles(id) on delete cascade not null,
+  detected_at  timestamptz not null,
+  resolved_at  timestamptz,
+  severity     text check (severity in ('low','medium','high','critical')) not null,
+  title        text not null,
+  description  text,
+  root_cause   text,
+  resolution   text,
+  created_at   timestamptz not null default now()
+);
+alter table incidents enable row level security;
+create policy "own incidents" on incidents for all using (auth.uid() = user_id);
 
 ──────────────────────────────────────────────────────────────────
 */
