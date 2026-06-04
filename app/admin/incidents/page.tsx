@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -43,20 +43,24 @@ export default function IncidentsPage() {
     detected_at: new Date().toISOString().slice(0, 16),
   })
 
-  const load = useCallback(async () => {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+  const [reloadKey, setReloadKey] = useState(0)
+  const reload = () => setReloadKey(k => k + 1)
 
-    const { data } = await supabase
-      .from('incidents')
-      .select('*')
-      .order('detected_at', { ascending: false })
-    setIncidents(data ?? [])
-    setLoading(false)
-  }, [router])
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
 
-  useEffect(() => { load() }, [load])
+      const { data } = await supabase
+        .from('incidents')
+        .select('*')
+        .order('detected_at', { ascending: false })
+      setIncidents(data ?? [])
+      setLoading(false)
+    }
+    load()
+  }, [router, reloadKey])
 
   async function createIncident(e: React.FormEvent) {
     e.preventDefault()
@@ -73,7 +77,7 @@ export default function IncidentsPage() {
     })
     setForm({ title: '', severity: 'medium', description: '', root_cause: '', detected_at: new Date().toISOString().slice(0, 16) })
     setShowForm(false)
-    load()
+    reload()
   }
 
   async function resolveIncident(id: string) {
@@ -84,7 +88,7 @@ export default function IncidentsPage() {
     }).eq('id', id)
     setResolving(null)
     setResolution('')
-    load()
+    reload()
   }
 
   if (loading) {

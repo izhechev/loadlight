@@ -73,6 +73,7 @@ export default function CategoriesPage() {
       if (u) {
         const p = JSON.parse(u) as { balanceMode?: string }
         const bm = p.balanceMode === 'balanced' ? 'average' : p.balanceMode
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (bm) setBalanceMode(bm as BalanceMode)
       }
     } catch { /* ignore */ }
