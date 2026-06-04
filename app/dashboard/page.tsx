@@ -218,6 +218,8 @@ export default function DashboardPage() {
   const [sliderValue, setSliderValue] = useState(50)
   const [balanceMode, setBalanceMode] = useState<BalanceMode>('average')
   const [chillLockUntil, setChillLockUntil] = useState<number | null>(null)
+  const [showChillLockModal, setShowChillLockModal] = useState(false)
+  const [pendingChillValue, setPendingChillValue] = useState<number | null>(null)
   const [weeklyAnalysis, setWeeklyAnalysis] = useState<AnalysisResult | null>(null)
   const [isAnalysing, setIsAnalysing] = useState(false)
   const [advisory, setAdvisory] = useState<string | null>(null)
@@ -376,19 +378,40 @@ export default function DashboardPage() {
   const chillLocked = !!chillLockUntil && Date.now() < chillLockUntil
 
   function handleSliderChange(v: number) {
-    // Chill lock: prevent sliding away from chill while lock is active
     if (chillLocked && v > 40) {
       setSliderValue(30)
       return
     }
-    setSliderValue(v)
     const mode: BalanceMode = v <= 40 ? 'chill' : v <= 60 ? 'average' : 'beast'
+    if (mode === 'chill' && balanceMode !== 'chill') {
+      setPendingChillValue(v)
+      setShowChillLockModal(true)
+      return
+    }
+    applySliderMode(v, mode, null)
+  }
+
+  function applySliderMode(v: number, mode: BalanceMode, lockDays: number | null) {
+    setSliderValue(v)
     setBalanceMode(mode)
+    if (mode === 'chill' && lockDays) {
+      const until = Date.now() + lockDays * 24 * 60 * 60 * 1000
+      setChillLockUntil(until)
+      try { localStorage.setItem('loadlight-chill-lock', String(until)) } catch { /* ignore */ }
+    }
     try {
       const u = localStorage.getItem('loadlight-user')
       const p = u ? JSON.parse(u) as Record<string, unknown> : {}
       localStorage.setItem('loadlight-user', JSON.stringify({ ...p, balanceMode: mode, sliderValue: v }))
     } catch { /* ignore */ }
+  }
+
+  function confirmChillLock(lockDays: number | null) {
+    if (pendingChillValue !== null) {
+      applySliderMode(pendingChillValue, 'chill', lockDays)
+    }
+    setShowChillLockModal(false)
+    setPendingChillValue(null)
   }
 
   function handleSnooze(ids: string[]) {
@@ -403,6 +426,40 @@ export default function DashboardPage() {
 
   return (
     <AppLayout>
+      {showChillLockModal && (
+        <div className="anim-overlay-in" style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.45)', padding: 16 }}>
+          <div className="skeu-card max-w-sm w-full p-6 anim-scale-in">
+            <div className="mb-4">
+              <h2 className="font-black text-lg mb-1" style={{ color: '#1a1a1a' }}>Switching to Chill Guy</h2>
+              <p className="text-sm font-bold" style={{ color: '#5a7a9a' }}>Do you want to set a commitment lock? This prevents impulsive switching back.</p>
+            </div>
+            <div className="flex flex-col gap-2 mb-4">
+              {[7, 14, 30].map(days => (
+                <button
+                  key={days}
+                  onClick={() => confirmChillLock(days)}
+                  className="vista-btn-secondary font-bold text-sm py-2.5 text-left px-4 rounded-xl"
+                >
+                  Lock for {days} days
+                </button>
+              ))}
+              <button
+                onClick={() => confirmChillLock(null)}
+                className="vista-btn-secondary font-bold text-sm py-2.5 text-left px-4 rounded-xl opacity-70"
+              >
+                No lock, switch freely
+              </button>
+            </div>
+            <button
+              onClick={() => { setShowChillLockModal(false); setPendingChillValue(null) }}
+              className="w-full vista-btn-secondary font-bold text-sm py-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4 max-w-4xl mx-auto">
 
         {/* ── Wellbeing card (OverwhelmedFeedback — no emoji faces) ── */}
