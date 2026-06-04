@@ -38,7 +38,7 @@ jobs:
     name: Deploy to Vercel
     runs-on: ubuntu-latest
     needs: ci
-    if: false # disabled until VERCEL_TOKEN/ORG_ID/PROJECT_ID secrets are configured
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
 
