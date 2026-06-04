@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export const runtime = 'edge'
 
 // Direct Gemini API call using simple fetch
