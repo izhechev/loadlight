@@ -95,6 +95,23 @@ const ICONS = {
     <path d="M16 3 L20 12 L30 13 L22 19 L25 29 L16 23 L7 29 L10 19 L2 13 L12 12 Z"
       fill="#f5c518" stroke="#9a7400" stroke-width="2" stroke-linejoin="round"/>`,
 
+  // ── Headings ──
+  chart: `
+    <line x1="5" y1="27" x2="28" y2="27" stroke="#444" stroke-width="2"/>
+    <line x1="5" y1="4" x2="5" y2="27" stroke="#444" stroke-width="2"/>
+    <rect x="8" y="16" width="5" height="10" fill="#2a66b8" stroke="#163f7a" stroke-width="1.5"/>
+    <rect x="14" y="9" width="5" height="17" fill="#4caf50" stroke="#2e7d32" stroke-width="1.5"/>
+    <rect x="20" y="13" width="5" height="13" fill="#f5c518" stroke="#9a7400" stroke-width="1.5"/>`,
+
+  tasks: `
+    <rect x="5" y="4" width="22" height="24" rx="1" fill="#ffffff" stroke="#7a7a7a" stroke-width="2"/>
+    <path d="M7 10 l2 2 l3 -4" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="14" y="9" width="10" height="2" fill="#888888"/>
+    <path d="M7 17 l2 2 l3 -4" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="14" y="16" width="10" height="2" fill="#888888"/>
+    <path d="M7 24 l2 2 l3 -4" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="14" y="23" width="10" height="2" fill="#888888"/>`,
+
   // ── Status ──
   warning: `
     <path d="M16 4 L29 27 H3 Z" fill="#f5c518" stroke="#9a7400" stroke-width="2" stroke-linejoin="round"/>

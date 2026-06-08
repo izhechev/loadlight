@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
-import { TrendingUp, Brain, Loader2, RefreshCw, Plus, ChevronRight, CheckCircle, AlertTriangle, Lock } from "@/lib/icons"
+import { Loader2, RefreshCw, Plus, ChevronRight, CheckCircle, AlertTriangle, Lock } from "@/lib/icons"
 import { AppLayout } from "@/components/app-layout"
 import { ChillSuggestions } from "@/components/chill-suggestions"
 import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib/store/overwhelmedStore"
@@ -74,23 +74,27 @@ function saveSparkHistory(entries: SparkEntry[]) {
   } catch { /* ignore */ }
 }
 
-// ── Sparkline micro-chart (pure SVG, no library) ──
+// ── Classic bar mini-chart (chunky bars, 2008 style) ──
 function Spark({ data, dataKey, color }: { data: SparkEntry[]; dataKey: keyof SparkEntry; color: string }) {
-  if (data.length < 2) return <div className="h-8 opacity-20 text-xs text-slate-400 flex items-end">no history</div>
+  if (data.length < 2) return <div className="h-8 flex items-center text-[10px]" style={{ color: '#9ab0c8' }}>no history</div>
   const values = data.map(d => d[dataKey] as number)
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const range = max - min || 1
-  const W = 100, H = 32, pad = 2
-  const pts = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * (W - pad * 2) + pad
-    const y = H - pad - ((v - min) / range) * (H - pad * 2)
-    return `${x},${y}`
-  }).join(' ')
+  const max = Math.max(...values, 1)
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-8" preserveAspectRatio="none">
-      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <div className="flex items-end gap-px h-8" style={{ borderBottom: '1px solid #9ab0c8' }}>
+      {values.map((v, i) => (
+        <div
+          key={i}
+          className="flex-1"
+          style={{
+            height: `${Math.max(6, (v / max) * 100)}%`,
+            backgroundColor: color,
+            border: '1px solid rgba(0,0,0,0.30)',
+            borderBottom: 'none',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.45)',
+          }}
+        />
+      ))}
+    </div>
   )
 }
 
@@ -115,14 +119,14 @@ function StatCard({ label, value, color, sparkData, sparkKey, sparkColor, deltaF
       : (delta > 0 ? `+${delta}` : String(delta))
 
   return (
-    <div className="skeu-card p-5 flex flex-col gap-1.5">
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{label}</p>
+    <div className="skeu-card p-4 flex flex-col gap-1.5">
+      <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: '#5a7a9a' }}>{label}</span>
+      <span className={`text-2xl font-bold ${color}`} style={{ lineHeight: 1 }}>{value}</span>
       <Spark data={sparkData} dataKey={sparkKey} color={sparkColor} />
       {deltaStr !== null && (
-        <p className={`text-[10px] font-bold ${delta! > 0 ? 'text-rose-500' : delta! < 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
-          {deltaStr} vs 8 days ago
-        </p>
+        <span className="text-[10px]" style={{ color: delta! > 0 ? '#a83232' : delta! < 0 ? '#1a7a50' : '#7a8a9a' }}>
+          {deltaStr} since last week
+        </span>
       )}
     </div>
   )
@@ -503,7 +507,7 @@ export default function DashboardPage() {
           {/* ── Balance card with slider ── */}
           <div className="skeu-card p-5 anim-fade-in-up" style={{ animationDelay: '0.08s' }}>
             <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
+              <ClassicIcon name="balanced" size={20} />
               <h2 className="font-black" style={{ color: '#1a2a3a' }}>Balance</h2>
             </div>
 
@@ -563,7 +567,7 @@ export default function DashboardPage() {
           <div className="skeu-card p-5 anim-fade-in-up" style={{ animationDelay: '0.1s' }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-sky-600" />
+                <ClassicIcon name="tasks" size={20} />
                 <h2 className="font-black" style={{ color: '#1a2a3a' }}>Up next</h2>
               </div>
               <Link href="/tasks" style={{ fontSize: 11, color: '#1a5a98', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3, textDecoration: 'none' }}>
@@ -610,7 +614,7 @@ export default function DashboardPage() {
         <div className="skeu-card p-5 anim-fade-in-up" style={{ animationDelay: '0.12s' }}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Brain className="w-5 h-5 text-purple-600" />
+              <ClassicIcon name="chart" size={20} />
               <h2 className="font-black" style={{ color: '#1a2a3a' }}>Workload Analysis</h2>
               {/* Spec: always-visible "AI workload analysis" indicator */}
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full aero-info badge-skeu">AI workload analysis</span>
@@ -660,7 +664,7 @@ export default function DashboardPage() {
 
               {!advisory && !weeklyAnalysis && (
                 <div className="skeu-inset rounded-2xl p-6 text-center">
-                  <Brain className="w-8 h-8 mx-auto mb-2 text-purple-500/50" />
+                  <ClassicIcon name="chart" size={32} className="mx-auto mb-2 opacity-60" />
                   <p className="text-sm font-bold" style={{ color: '#5a7a9a' }}>Add tasks to get workload insights</p>
                 </div>
               )}
