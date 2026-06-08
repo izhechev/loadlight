@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { Lock, Mail } from "@/lib/icons"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -115,7 +116,7 @@ export default function LoginPage() {
         ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#7a9ab8', fontSize: 14 }}>✉</span>
+              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#7a9ab8', display: 'flex' }}><Mail style={{ width: 14, height: 14 }} /></span>
               <input
                 id="email"
                 name="email"
@@ -131,7 +132,7 @@ export default function LoginPage() {
             </div>
 
             <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#7a9ab8', fontSize: 14 }}>🔒</span>
+              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#7a9ab8', display: 'flex' }}><Lock style={{ width: 14, height: 14 }} /></span>
               <input
                 id="password"
                 name="password"

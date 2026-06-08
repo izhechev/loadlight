@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { Brain, Loader2, CheckCircle, Trash2, Plus, Calendar, ArrowLeft, Zap, AlertTriangle, RefreshCw, Flag, StickyNote, PlayCircle, HelpCircle } from "@/lib/icons"
 import { AppLayout } from "@/components/app-layout"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
+import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 import { addTasks, IS_DEMO } from "@/lib/data/tasks"
 import { CrisisRedirect } from "@/components/rest-mode-overlay"
@@ -422,7 +423,7 @@ export default function AddTaskPage() {
                       <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span className="flex-1 font-bold text-slate-800 text-sm">{task.name}</span>
                       <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${cls.bg} ${cls.text} badge-skeu shrink-0 border border-sky-100/50 shadow-sm`}>{cat?.emoji ?? '📌'} {task.category}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${cls.bg} ${cls.text} badge-skeu shrink-0 border border-sky-100/50 shadow-sm inline-flex items-center gap-1`}><ClassicIcon name={categoryIconName(cat ?? { name: task.category })} size={12} /> {task.category}</span>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${DEMAND_COLORS[task.demand_type]} border border-sky-100/50 shadow-sm`}>{task.demand_type}</span>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${difficultyColor(task.difficulty)} border border-white/5 shadow-sm`}>{difficultyLabel(task.difficulty)}</span>
                         {task.estimated_minutes && <span className="text-[10px] text-slate-400 font-bold">{task.estimated_minutes}m</span>}

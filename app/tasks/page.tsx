@@ -7,6 +7,7 @@ import Link from "next/link"
 import { AppLayout } from "@/components/app-layout"
 import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib/store/overwhelmedStore"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
+import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { getTasks, updateTask, deleteTask, addTasks, IS_DEMO } from "@/lib/data/tasks"
 import { PastDeadlineModal } from "@/components/past-deadline-modal"
 
@@ -876,7 +877,8 @@ export default function TasksPage() {
           <div className={`rounded-2xl px-4 py-3 text-sm font-bold flex items-center gap-2 ${
             overwhelmedState === 'elevated' ? 'aero-warning' : 'aero-danger'
           }`}>
-            {overwhelmedState === 'elevated' ? '⚠ Elevated state — consider completing tasks before adding more.' : '🌿 Rest mode active — focus on essential tasks only.'}
+            <ClassicIcon name={overwhelmedState === 'elevated' ? 'warning' : 'chill'} size={16} />
+            {overwhelmedState === 'elevated' ? 'Elevated state — consider completing tasks before adding more.' : 'Rest mode active — focus on essential tasks only.'}
           </div>
         )}
 
@@ -890,7 +892,7 @@ export default function TasksPage() {
               return (
                 <div key={cat.id} className="glass-panel overflow-hidden">
                   <div className={`px-4 py-2.5 flex items-center gap-2 border-b border-sky-100/50 ${cls.bg}`}>
-                    <span className="text-base">{cat.emoji}</span>
+                    <ClassicIcon name={categoryIconName(cat)} size={18} alt={cat.name} />
                     <span className={`font-black text-sm ${cls.text}`}>{cat.name}</span>
                     <span className="text-xs text-slate-400 font-bold ml-auto">{catTasks.length} task{catTasks.length !== 1 ? 's' : ''}</span>
                   </div>
@@ -913,7 +915,7 @@ export default function TasksPage() {
               return (
                 <div key={cat.id} className="w-52 flex-shrink-0 glass-panel overflow-hidden">
                   <div className={`px-3 py-2 flex items-center gap-2 border-b border-sky-100/50 ${cls.bg}`}>
-                    <span className="text-sm">{cat.emoji}</span>
+                    <ClassicIcon name={categoryIconName(cat)} size={16} alt={cat.name} />
                     <span className={`font-black text-xs ${cls.text}`}>{cat.name}</span>
                     <span className="ml-auto text-xs text-slate-400 font-bold">{catTasks.length}</span>
                   </div>
@@ -1064,7 +1066,7 @@ export default function TasksPage() {
                       <label className="vista-label">Category</label>
                       <select value={editingTask.category} onChange={e => setEditingTask({ ...editingTask, category: e.target.value })}
                         className="input-skeu w-full rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none">
-                        {categories.map(c => <option key={c.id} value={c.name}>{c.emoji} {c.name}</option>)}
+                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                       </select>
                     </div>
                     <div className="space-y-1">

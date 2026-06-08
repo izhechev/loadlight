@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from "react"
 import {
-  Plus, Trash2, Tag, RefreshCw, Palette, ChevronDown, ChevronRight,
+  Plus, Trash2, Tag, RefreshCw, Palette, ChevronDown, ChevronRight, ChevronUp,
   CheckCircle, LayoutGrid, CalendarDays, Calendar, ChevronLeft,
   GripVertical, AlertTriangle, Settings2,
 } from "@/lib/icons"
 import { AppLayout } from "@/components/app-layout"
+import { ClassicIcon, categoryIconName, PICKABLE_ICONS, type IconName } from "@/lib/classic-icons"
 import { useCategoryStore, COLOR_OPTIONS, getCategoryClasses, type ColorKey } from "@/lib/store/categoryStore"
 import { getTasks } from "@/lib/data/tasks"
 
@@ -50,7 +51,7 @@ export default function CategoriesPage() {
   const [view, setView] = useState<'manage' | 'board' | 'calendar'>('manage')
   const [isAdding, setIsAdding] = useState(false)
   const [newName, setNewName] = useState("")
-  const [newEmoji, setNewEmoji] = useState("✨")
+  const [newIcon, setNewIcon] = useState<IconName>('default')
   const [newColor, setNewColor] = useState<ColorKey>('blue')
   const [tasks, setTasks] = useState<Task[]>([])
   const [expandedCat, setExpandedCat] = useState<string | null>(null)
@@ -81,8 +82,8 @@ export default function CategoriesPage() {
 
   function handleAdd() {
     if (!newName.trim()) return
-    addCategory({ name: newName.trim(), emoji: newEmoji, color: newColor })
-    setNewName(""); setNewEmoji("✨"); setNewColor('blue'); setIsAdding(false)
+    addCategory({ name: newName.trim(), emoji: newIcon, color: newColor })
+    setNewName(""); setNewIcon('default'); setNewColor('blue'); setIsAdding(false)
   }
 
   // ── Per-category stats ──
@@ -177,14 +178,21 @@ export default function CategoriesPage() {
                     <Tag className="w-4 h-4 text-sky-500" /> New Category
                   </h3>
                   <div className="space-y-4">
-                    <div className="grid grid-cols-[3rem_1fr] gap-3">
-                      <input type="text" value={newEmoji} onChange={e => setNewEmoji(e.target.value)} maxLength={2}
-                        className="input-skeu text-center text-xl p-2 rounded-xl border border-white/60 focus:outline-none focus:ring-2 focus:ring-sky-400"
-                        placeholder="✨" />
-                      <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
-                        className="input-skeu w-full p-3 rounded-xl border border-white/60 focus:outline-none focus:ring-2 focus:ring-sky-400 text-sm font-semibold"
-                        placeholder="Category name (e.g. Fitness, Chores)" autoFocus
-                        onKeyDown={e => { if (e.key === 'Enter') handleAdd() }} />
+                    <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
+                      className="input-skeu w-full p-3 rounded-xl border border-white/60 focus:outline-none focus:ring-2 focus:ring-sky-400 text-sm font-semibold"
+                      placeholder="Category name (e.g. Fitness, Chores)" autoFocus
+                      onKeyDown={e => { if (e.key === 'Enter') handleAdd() }} />
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5"><Tag className="w-3 h-3" /> Icon</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {PICKABLE_ICONS.map(ic => (
+                          <button key={ic} type="button" onClick={() => setNewIcon(ic)}
+                            className={`w-9 h-9 flex items-center justify-center rounded-lg border-2 transition-all ${newIcon === ic ? 'border-sky-500 bg-sky-50 shadow-md' : 'border-white/60 bg-white/40 hover:bg-white/70'}`}
+                            title={ic}>
+                            <ClassicIcon name={ic} size={20} alt={ic} />
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <p className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5"><Palette className="w-3 h-3" /> Color</p>
@@ -233,9 +241,9 @@ export default function CategoriesPage() {
                       {/* Drag handle */}
                       <GripVertical className="w-4 h-4 text-slate-300 shrink-0 cursor-grab active:cursor-grabbing" />
 
-                      {/* Emoji + color swatch */}
-                      <div className={`w-8 h-8 rounded-lg ${colorData.bg} flex items-center justify-center text-sm border border-white/50 shrink-0`}>
-                        {cat.emoji}
+                      {/* Icon + color swatch */}
+                      <div className={`w-8 h-8 rounded-lg ${colorData.bg} flex items-center justify-center border border-white/50 shrink-0`}>
+                        <ClassicIcon name={categoryIconName(cat)} size={20} alt={cat.name} />
                       </div>
 
                       {/* Name + stats */}
@@ -243,8 +251,8 @@ export default function CategoriesPage() {
                         <div className="flex items-center gap-2">
                           <span className={`font-black text-sm ${overshootCat ? 'text-orange-700' : colorData.text}`}>{cat.name}</span>
                           {overshootCat && (
-                            <span className="text-[9px] font-black bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full border border-orange-200">
-                              ↑{stats.workSharePct}% work load
+                            <span className="text-[9px] font-black bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full border border-orange-200 inline-flex items-center gap-0.5">
+                              <ChevronUp className="w-2.5 h-2.5" />{stats.workSharePct}% work load
                             </span>
                           )}
                           {isWork && !overshootCat && (
@@ -342,7 +350,7 @@ export default function CategoriesPage() {
                   <div key={cat.id} className={`w-52 flex-shrink-0 rounded-2xl overflow-hidden border ${overshootCat ? 'border-orange-200 bg-orange-50/40' : 'border-sky-100/40 bg-white/50'} shadow-sm`}>
                     {/* Column header */}
                     <div className={`px-3 py-2.5 flex items-center gap-2 border-b ${overshootCat ? 'border-orange-200 bg-orange-50' : `border-sky-100/50 ${cls.bg}`}`}>
-                      <span className="text-sm">{cat.emoji}</span>
+                      <ClassicIcon name={categoryIconName(cat)} size={16} alt={cat.name} />
                       <span className={`font-black text-xs flex-1 ${overshootCat ? 'text-orange-700' : cls.text}`}>{cat.name}</span>
                       <span className="text-[10px] text-slate-400 font-bold">{stats.active.length} active</span>
                     </div>
@@ -459,7 +467,7 @@ export default function CategoriesPage() {
                     const cls = getCategoryClasses(cat?.color ?? 'sky')
                     return (
                       <div key={task.id} className={`flex items-center gap-2 p-2 skeu-card border-l-4 ${cls.bg.replace('bg-', 'border-l-')}`}>
-                        <span className="text-sm shrink-0">{cat?.emoji ?? '📌'}</span>
+                        <ClassicIcon name={categoryIconName(cat ?? { name: task.category })} size={16} alt={task.category} />
                         <p className="text-xs font-bold text-slate-700 flex-1 truncate">{task.name}</p>
                       </div>
                     )

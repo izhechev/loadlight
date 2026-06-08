@@ -3,11 +3,12 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
-import { TrendingUp, Brain, Loader2, RefreshCw, Plus, ChevronRight, CheckCircle, AlertTriangle } from "@/lib/icons"
+import { TrendingUp, Brain, Loader2, RefreshCw, Plus, ChevronRight, CheckCircle, AlertTriangle, Lock } from "@/lib/icons"
 import { AppLayout } from "@/components/app-layout"
 import { ChillSuggestions } from "@/components/chill-suggestions"
 import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib/store/overwhelmedStore"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
+import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { getTasks, updateTask, IS_DEMO } from "@/lib/data/tasks"
 
 type BalanceMode = 'beast' | 'average' | 'chill'
@@ -115,8 +116,8 @@ function StatCard({ label, value, color, sparkData, sparkKey, sparkColor, deltaF
 
   return (
     <div className="skeu-card p-5 flex flex-col gap-1.5">
-      <p className={`text-3xl font-black ${color} drop-shadow-sm`}>{value}</p>
-      <p className="text-xs font-black text-slate-500 uppercase tracking-wide">{label}</p>
+      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{label}</p>
       <Spark data={sparkData} dataKey={sparkKey} color={sparkColor} />
       {deltaStr !== null && (
         <p className={`text-[10px] font-bold ${delta! > 0 ? 'text-rose-500' : delta! < 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
@@ -197,14 +198,14 @@ function BalanceSlider({ value, onChange, locked, lockDaysLeft }: { value: numbe
         disabled={locked}
         onChange={e => onChange(Number(e.target.value))}
         onPointerUp={e => onChange(snap(Number((e.target as HTMLInputElement).value)))}
-        className={`w-full accent-sky-500 ${locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+        className={`trackbar-classic w-full ${locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
       />
       <div className="text-center">
         <span className="text-sm font-black" style={{ color: info.color }}>{info.name}</span>
         <p className="text-xs mt-0.5" style={{ color: '#4a6a8a' }}>{info.desc}</p>
         {locked && (
           <p className="text-[11px] text-amber-600 font-black mt-1.5 flex items-center justify-center gap-1">
-            🔒 Chill Guy lock active · {lockDaysLeft}d remaining · change in Settings
+            <Lock style={{ width: 12, height: 12 }} /> Chill Guy lock active · {lockDaysLeft}d remaining · change in Settings
           </p>
         )}
       </div>
@@ -578,7 +579,7 @@ export default function DashboardPage() {
                   const cls = getCategoryClasses(cat?.color ?? 'sky')
                   return (
                     <div key={t.id} className="flex items-center gap-3 rounded-2xl p-3 skeu-card shadow-sm">
-                      <span className="text-base">{cat?.emoji ?? '📌'}</span>
+                      <ClassicIcon name={categoryIconName(cat ?? { name: t.category })} size={18} alt={t.category} />
                       <span className="flex-1 text-sm font-semibold truncate" style={{ color: '#1a1a1a' }}>{t.name}</span>
                       {isDueWithin48h(t.deadline) && (
                         <span className="text-xs text-red-500 font-bold shrink-0">Due soon!</span>
@@ -640,12 +641,12 @@ export default function DashboardPage() {
 
               {weeklyAnalysis && (
                 <>
-                  <div className={`rounded-2xl px-4 py-3 font-black text-sm ${
+                  <div className={`rounded-2xl px-4 py-3 font-bold text-sm flex items-center gap-2 ${
                     weeklyAnalysis.verdict === 'overloaded' ? 'aero-danger'  :
                     weeklyAnalysis.verdict === 'balanced'   ? 'aero-success' :
                                                               'aero-info'
                   }`}>
-                    {weeklyAnalysis.verdict === 'overloaded' ? '⚠ Overloaded' : weeklyAnalysis.verdict === 'balanced' ? '✓ Balanced' : 'Light week'}
+                    {weeklyAnalysis.verdict === 'overloaded' ? <><ClassicIcon name="warning" size={16} /> Overloaded</> : weeklyAnalysis.verdict === 'balanced' ? <><ClassicIcon name="check" size={16} /> Balanced</> : 'Light week'}
                   </div>
                   {weeklyAnalysis.trend && <p className="text-sm leading-relaxed font-medium" style={{ color: '#2a3a50' }}>{weeklyAnalysis.trend}</p>}
                   {weeklyAnalysis.suggestion && (
