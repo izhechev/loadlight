@@ -7,9 +7,9 @@
    No CSS Grid. Vendor prefixes throughout.
    ============================================= */
 
-/* ── Font stack (Segoe UI was new in Vista) ── */
+/* ── Font stack (classic Windows UI — Tahoma / MS Sans Serif) ── */
 * {
-  font-family: 'Segoe UI', Tahoma, 'Microsoft Sans Serif', Arial, sans-serif;
+  font-family: Tahoma, 'MS Sans Serif', 'Microsoft Sans Serif', Geneva, Verdana, sans-serif;
   -webkit-box-sizing: border-box;
   -moz-box-sizing: border-box;
   box-sizing: border-box;
@@ -954,4 +954,177 @@ body {
   animation: none;
   -webkit-box-shadow: 0 3px 8px rgba(2,100,180,0.50), inset 0 -3px 6px rgba(0,20,80,0.30);
   box-shadow: 0 3px 8px rgba(2,100,180,0.50), inset 0 -3px 6px rgba(0,20,80,0.30);
+}
+
+/* =============================================
+   CLASSIC WINDOWS SCROLLBARS (2008-era)
+   Chunky grey track + raised arrow buttons.
+   Old IE props for nostalgia + WebKit/Blink.
+   ============================================= */
+html {
+  /* Legacy IE / old Trident scrollbar colors */
+  scrollbar-face-color: #c0c0c0;
+  scrollbar-track-color: #dfdfdf;
+  scrollbar-arrow-color: #202020;
+  scrollbar-shadow-color: #808080;
+  scrollbar-highlight-color: #ffffff;
+  scrollbar-3dlight-color: #dfdfdf;
+  scrollbar-darkshadow-color: #404040;
+  /* Firefox — width auto + classic-ish colors */
+  scrollbar-color: #c0c0c0 #dfdfdf;
+  scrollbar-width: auto;
+}
+
+::-webkit-scrollbar {
+  width: 17px;
+  height: 17px;
+  background: #dfdfdf;
+}
+
+/* Sunken, hatched track (the classic grey "speckle") */
+::-webkit-scrollbar-track {
+  background-color: #dfdfdf;
+  background-image: -webkit-gradient(linear, left top, right top, color-stop(0, #d4d0c8), color-stop(0.5, #e4e0d8), color-stop(0.5, #d4d0c8));
+  background-image: repeating-linear-gradient(45deg, #d8d4cc 0, #d8d4cc 1px, #e8e4dc 1px, #e8e4dc 2px);
+  box-shadow: inset 1px 0 0 #808080, inset -1px 0 0 #ffffff;
+}
+
+/* Raised, beveled scrollbar thumb */
+::-webkit-scrollbar-thumb {
+  background-color: #c0c0c0;
+  background-image: -webkit-gradient(linear, left top, right top, from(#e4e4e4), to(#b8b8b8));
+  background-image: linear-gradient(to right, #e4e4e4, #b8b8b8);
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #404040;
+  border-bottom: 1px solid #404040;
+  box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+}
+
+::-webkit-scrollbar-thumb:hover { background-color: #c8c8c8; }
+
+::-webkit-scrollbar-thumb:active {
+  background-image: none;
+  background-color: #b0b0b0;
+  border-top: 1px solid #404040;
+  border-left: 1px solid #404040;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+  box-shadow: inset 1px 1px 0 #808080;
+}
+
+/* Arrow buttons — raised bevel + a triangle glyph */
+::-webkit-scrollbar-button {
+  background-color: #c0c0c0;
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #404040;
+  border-bottom: 1px solid #404040;
+  box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+  background-repeat: no-repeat;
+  background-position: center center;
+  display: block;
+}
+::-webkit-scrollbar-button:active {
+  border-top: 1px solid #404040;
+  border-left: 1px solid #404040;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+  box-shadow: inset 1px 1px 0 #808080;
+}
+::-webkit-scrollbar-button:vertical:decrement {
+  height: 17px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9'%3E%3Cpath d='M4.5 2 L8 6 L1 6 Z' fill='%23202020'/%3E%3C/svg%3E");
+}
+::-webkit-scrollbar-button:vertical:increment {
+  height: 17px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9'%3E%3Cpath d='M1 3 L8 3 L4.5 7 Z' fill='%23202020'/%3E%3C/svg%3E");
+}
+::-webkit-scrollbar-button:horizontal:decrement {
+  width: 17px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9'%3E%3Cpath d='M3 4.5 L7 1 L7 8 Z' fill='%23202020'/%3E%3C/svg%3E");
+}
+::-webkit-scrollbar-button:horizontal:increment {
+  width: 17px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9'%3E%3Cpath d='M2 1 L6 4.5 L2 8 Z' fill='%23202020'/%3E%3C/svg%3E");
+}
+/* Hide the double-button pairs at each end so we get one arrow per end */
+::-webkit-scrollbar-button:vertical:start:increment,
+::-webkit-scrollbar-button:vertical:end:decrement,
+::-webkit-scrollbar-button:horizontal:start:increment,
+::-webkit-scrollbar-button:horizontal:end:decrement {
+  display: none;
+}
+::-webkit-scrollbar-corner { background: #c0c0c0; }
+
+/* =============================================
+   CLASSIC WINDOWS TRACKBAR (slider)
+   Sunken channel + raised draggable thumb.
+   ============================================= */
+input[type="range"].trackbar-classic {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Track — thin sunken channel */
+input[type="range"].trackbar-classic::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #a8a8a8;
+  border-top: 1px solid #808080;
+  border-left: 1px solid #808080;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+}
+input[type="range"].trackbar-classic::-moz-range-track {
+  height: 4px;
+  background: #a8a8a8;
+  border-top: 1px solid #808080;
+  border-left: 1px solid #808080;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+}
+
+/* Thumb — raised beveled grey block */
+input[type="range"].trackbar-classic::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 22px;
+  margin-top: -10px;
+  background-color: #c0c0c0;
+  background-image: -webkit-gradient(linear, left top, right top, from(#e8e8e8), to(#b0b0b0));
+  background-image: linear-gradient(to right, #e8e8e8, #b0b0b0);
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #404040;
+  border-bottom: 1px solid #404040;
+  box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+  border-radius: 0;
+}
+input[type="range"].trackbar-classic::-moz-range-thumb {
+  width: 12px;
+  height: 22px;
+  background-color: #c0c0c0;
+  background-image: linear-gradient(to right, #e8e8e8, #b0b0b0);
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #404040;
+  border-bottom: 1px solid #404040;
+  box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+  border-radius: 0;
+}
+input[type="range"].trackbar-classic:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* =============================================
+   CLASSIC ICON IMAGES — render crisp, no blur
+   ============================================= */
+.classic-icon {
+  display: inline-block;
+  image-rendering: -webkit-optimize-contrast;
+  vertical-align: middle;
 }

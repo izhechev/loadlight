@@ -2,15 +2,16 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Lock, ChevronRight, Brain, RefreshCw, BarChart3, Info, Download, Upload, CheckCircle, KeyRound } from "@/lib/icons"
+import { ClassicIcon, type IconName } from "@/lib/classic-icons"
 import { AppLayout } from "@/components/app-layout"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 
 type BalanceMode = 'beast' | 'average' | 'chill'
 
-const MODES: { id: BalanceMode; emoji: string; label: string; ratio: string; targetWork: number; desc: string }[] = [
-  { id: 'beast',   emoji: '⚡', label: 'Beast Worker',   ratio: '70/30', targetWork: 70, desc: 'Maximize productivity. High output focus.' },
-  { id: 'average', emoji: '⚖️', label: 'Average Worker', ratio: '50/50', targetWork: 50, desc: 'Healthy balance. Sustainable long-term.' },
-  { id: 'chill',   emoji: '🌿', label: 'Chill Guy',      ratio: '30/70', targetWork: 30, desc: 'Rest and leisure first. Recovery-focused.' },
+const MODES: { id: BalanceMode; icon: IconName; label: string; ratio: string; targetWork: number; desc: string }[] = [
+  { id: 'beast',   icon: 'beast',    label: 'Beast Worker',   ratio: '70/30', targetWork: 70, desc: 'Maximize productivity. High output focus.' },
+  { id: 'average', icon: 'balanced', label: 'Average Worker', ratio: '50/50', targetWork: 50, desc: 'Healthy balance. Sustainable long-term.' },
+  { id: 'chill',   icon: 'chill',    label: 'Chill Guy',      ratio: '30/70', targetWork: 30, desc: 'Rest and leisure first. Recovery-focused.' },
 ]
 
 const BACKUP_KEYS = [
@@ -225,7 +226,7 @@ export default function SettingsPage() {
                               'vista-mode-inactive'
                   }`}
                 >
-                  <span className="text-3xl">{mode.emoji}</span>
+                  <ClassicIcon name={mode.icon} size={32} alt={mode.label} />
                   <div className="flex-1">
                     <p className="font-black" style={{ color: active ? '#1a3a6a' : '#1a1a1a' }}>{mode.label}</p>
                     <p className="text-xs mt-0.5 font-bold" style={{ color: '#4a6a8a' }}>{mode.ratio} work/leisure · {mode.desc}</p>
@@ -240,7 +241,7 @@ export default function SettingsPage() {
               )
             })}
           </div>
-          {saved && <p className="text-xs text-emerald-600 mt-3 font-bold">✓ Settings saved</p>}
+          {saved && <p className="text-xs text-emerald-600 mt-3 font-bold flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Settings saved</p>}
         </div>
 
         {/* ── Data backup ── */}
@@ -294,10 +295,10 @@ export default function SettingsPage() {
                         count++
                       }
                     })
-                    setImportMsg(`✓ Restored ${count} data keys. Reloading…`)
+                    setImportMsg(`Restored ${count} data keys. Reloading…`)
                     setTimeout(() => window.location.reload(), 1500)
                   } catch {
-                    setImportMsg('⚠ Could not parse backup file.')
+                    setImportMsg('Could not parse backup file.')
                   }
                 }
                 reader.readAsText(file)
@@ -305,7 +306,9 @@ export default function SettingsPage() {
               }}
             />
             {importMsg && (
-              <p className={`text-xs font-bold ${importMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{importMsg}</p>
+              <p className={`text-xs font-bold flex items-center gap-1 ${importMsg.startsWith('Restored') ? 'text-emerald-600' : 'text-red-500'}`}>
+                <ClassicIcon name={importMsg.startsWith('Restored') ? 'check' : 'warning'} size={14} /> {importMsg}
+              </p>
             )}
           </div>
         </div>
@@ -342,8 +345,8 @@ export default function SettingsPage() {
                 <p className="text-xs font-black uppercase tracking-wider opacity-70 mb-0.5">Current Status</p>
                 <p className="text-xl font-black">{state === 'normal' ? 'Everything looks good' : state === 'elevated' ? 'Workload is high' : 'You are overwhelmed'}</p>
               </div>
-              <div className="text-3xl">
-                {state === 'normal' ? '✅' : state === 'elevated' ? '⚠️' : '🌿'}
+              <div>
+                <ClassicIcon name={state === 'normal' ? 'check' : state === 'elevated' ? 'warning' : 'chill'} size={32} alt={state} />
               </div>
             </div>
 

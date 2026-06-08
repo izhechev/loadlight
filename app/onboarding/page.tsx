@@ -4,23 +4,24 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
-import { ArrowRight, ArrowLeft } from "lucide-react"
+import { ArrowRight, ArrowLeft } from "@/lib/icons"
+import { ClassicIcon, type IconName } from "@/lib/classic-icons"
 import { upsertProfile, IS_DEMO } from "@/lib/data/tasks"
 
 type BalanceMode = 'beast' | 'average' | 'chill'
 type WorkType = 'student' | 'professional' | 'freelancer' | 'other'
 
-const WORK_TYPES: { id: WorkType; emoji: string; label: string; desc: string }[] = [
-  { id: 'student',      emoji: '📚', label: 'Student',      desc: 'Managing studies, assignments, exams' },
-  { id: 'professional', emoji: '💼', label: 'Professional', desc: 'Work projects, meetings, deadlines' },
-  { id: 'freelancer',   emoji: '🎯', label: 'Freelancer',   desc: 'Client work, self-managed schedule' },
-  { id: 'other',        emoji: '✨', label: 'Other',        desc: 'My own mix of everything' },
+const WORK_TYPES: { id: WorkType; icon: IconName; label: string; desc: string }[] = [
+  { id: 'student',      icon: 'study',      label: 'Student',      desc: 'Managing studies, assignments, exams' },
+  { id: 'professional', icon: 'work',       label: 'Professional', desc: 'Work projects, meetings, deadlines' },
+  { id: 'freelancer',   icon: 'freelancer', label: 'Freelancer',   desc: 'Client work, self-managed schedule' },
+  { id: 'other',        icon: 'other',      label: 'Other',        desc: 'My own mix of everything' },
 ]
 
-const BALANCE_MODES: { id: BalanceMode; emoji: string; label: string; ratio: string; desc: string; note?: string }[] = [
-  { id: 'beast',    emoji: '⚡', label: 'Beast Worker',    ratio: '70% work / 30% leisure', desc: 'Maximize productivity' },
-  { id: 'average',  emoji: '⚖️', label: 'Average Worker',  ratio: '50% work / 50% leisure', desc: 'Healthy balance' },
-  { id: 'chill',    emoji: '🌿', label: 'Chill Guy',       ratio: '30% work / 70% leisure', desc: 'Rest & leisure first', note: 'Includes 30-day lock to prevent impulsive switching' },
+const BALANCE_MODES: { id: BalanceMode; icon: IconName; label: string; ratio: string; desc: string; note?: string }[] = [
+  { id: 'beast',    icon: 'beast',    label: 'Beast Worker',    ratio: '70% work / 30% leisure', desc: 'Maximize productivity' },
+  { id: 'average',  icon: 'balanced', label: 'Average Worker',  ratio: '50% work / 50% leisure', desc: 'Healthy balance' },
+  { id: 'chill',    icon: 'chill',    label: 'Chill Guy',       ratio: '30% work / 70% leisure', desc: 'Rest & leisure first', note: 'Includes 30-day lock to prevent impulsive switching' },
 ]
 
 const SLIDE = {
@@ -149,7 +150,7 @@ export default function OnboardingPage() {
                         : 'border-white/40 bg-white/40 hover:bg-white/60'
                     }`}
                   >
-                    <span className="text-2xl block mb-2">{wt.emoji}</span>
+                    <ClassicIcon name={wt.icon} size={28} alt={wt.label} className="block mb-2" />
                     <p className="font-bold text-slate-800 text-sm">{wt.label}</p>
                     <p className="text-xs text-slate-500 mt-0.5 leading-tight">{wt.desc}</p>
                   </button>
@@ -200,11 +201,11 @@ export default function OnboardingPage() {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{bm.emoji}</span>
+                      <ClassicIcon name={bm.icon} size={28} alt={bm.label} />
                       <div className="flex-1">
                         <p className="font-bold text-slate-800">{bm.label}</p>
                         <p className="text-xs text-slate-500">{bm.ratio} · {bm.desc}</p>
-                        {bm.note && <p className="text-xs text-amber-600 mt-0.5">⚠ {bm.note}</p>}
+                        {bm.note && <p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1"><ClassicIcon name="warning" size={12} /> {bm.note}</p>}
                       </div>
                     </div>
                   </button>
