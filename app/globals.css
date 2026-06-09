@@ -1128,3 +1128,41 @@ input[type="range"].trackbar-classic:disabled { opacity: 0.55; cursor: not-allow
   image-rendering: -webkit-optimize-contrast;
   vertical-align: middle;
 }
+
+/* =============================================
+   DE-MODERNIZE — tighter corners, no full pills,
+   classic dotted focus, square chunky icon strokes
+   ============================================= */
+
+/* Classic ~4-6px corners instead of modern oversized radii.
+   (rounded-full left alone so dots/progress stay circular.) */
+.rounded-3xl { border-radius: 6px !important; }
+.rounded-2xl { border-radius: 5px !important; }
+.rounded-xl  { border-radius: 4px !important; }
+
+/* Un-pill the buttons (were 9999px stadium pills) */
+.glow-button, .overwhelm-btn, .vista-btn-secondary {
+  -webkit-border-radius: 4px !important;
+  -moz-border-radius: 4px !important;
+  border-radius: 4px !important;
+}
+.glow-button::after, .overwhelm-btn::after {
+  -webkit-border-radius: 4px 4px 0 0 !important;
+  border-radius: 4px 4px 0 0 !important;
+}
+
+/* Square, chunkier strokes on the remaining line icons — removes the
+   thin rounded "feather/lucide" signature. CSS overrides the round
+   stroke-linecap presentation attribute on the SVGs. */
+svg[fill="none"][stroke="currentColor"] {
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-width: 2.25;
+}
+
+/* Classic dotted keyboard focus instead of modern soft glow rings */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 1px dotted #1a3a60;
+  outline-offset: 1px;
+}

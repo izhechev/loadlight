@@ -14,6 +14,20 @@ const SIZE = 64
 const wrap = (inner) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 32 32">${inner}</svg>`
 
+// Build a cog/gear outline path (alternating outer/inner radius).
+const gearPath = (cx, cy, rO, rI, teeth) => {
+  const steps = teeth * 2
+  let d = ''
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2 - Math.PI / 2
+    const r = i % 2 === 0 ? rO : rI
+    const x = (cx + Math.cos(a) * r).toFixed(1)
+    const y = (cy + Math.sin(a) * r).toFixed(1)
+    d += (i === 0 ? 'M' : 'L') + x + ',' + y + ' '
+  }
+  return d + 'Z'
+}
+
 const ICONS = {
   // ── Categories ──
   work: `
@@ -111,6 +125,29 @@ const ICONS = {
     <rect x="14" y="16" width="10" height="2" fill="#888888"/>
     <path d="M7 24 l2 2 l3 -4" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     <rect x="14" y="23" width="10" height="2" fill="#888888"/>`,
+
+  // ── Navigation (classic toolbar) ──
+  navoverview: `
+    <rect x="3" y="3" width="11" height="11" rx="1" fill="#2a66b8" stroke="#163f7a" stroke-width="1.5"/>
+    <rect x="18" y="3" width="11" height="11" rx="1" fill="#4caf50" stroke="#2e7d32" stroke-width="1.5"/>
+    <rect x="3" y="18" width="11" height="11" rx="1" fill="#f5c518" stroke="#9a7400" stroke-width="1.5"/>
+    <rect x="18" y="18" width="11" height="11" rx="1" fill="#c0392b" stroke="#7a1f16" stroke-width="1.5"/>`,
+
+  navadd: `
+    <circle cx="16" cy="16" r="12" fill="#4caf50" stroke="#2e7d32" stroke-width="2"/>
+    <path d="M16 9 V23 M9 16 H23" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>`,
+
+  navcategories: `
+    <path d="M4 7 H12 L15 10 H28 V25 H4 Z" fill="#d9a93a" stroke="#8a6a1a" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M4 12 H28 V25 H4 Z" fill="#f0c860" stroke="#8a6a1a" stroke-width="1.5" stroke-linejoin="round"/>`,
+
+  navsettings: `
+    <path d="${gearPath(16, 16, 14, 9.5, 8)}" fill="#a8a8a8" stroke="#555555" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="16" cy="16" r="4.5" fill="#e8e8e8" stroke="#555555" stroke-width="1.5"/>`,
+
+  navheart: `
+    <path d="M16 27 C3 18 4 7 11 7 C14 7 16 10 16 11 C16 10 18 7 21 7 C28 7 29 18 16 27 Z" fill="#e0392b" stroke="#9a1f16" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M9 11 C9 9 10 8.5 11 8.5" fill="none" stroke="#ff9a90" stroke-width="1.5" stroke-linecap="round"/>`,
 
   // ── Status ──
   warning: `
