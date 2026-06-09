@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { motion, AnimatePresence } from "framer-motion"
 import { ArrowRight, ArrowLeft } from "@/lib/icons"
 import { ClassicIcon, type IconName } from "@/lib/classic-icons"
 import { upsertProfile, IS_DEMO } from "@/lib/data/tasks"
@@ -24,16 +23,9 @@ const BALANCE_MODES: { id: BalanceMode; icon: IconName; label: string; ratio: st
   { id: 'chill',    icon: 'chill',    label: 'Chill Guy',       ratio: '30% work / 70% leisure', desc: 'Rest & leisure first', note: 'Includes 30-day lock to prevent impulsive switching' },
 ]
 
-const SLIDE = {
-  enter: (dir: number) => ({ x: dir * 40, opacity: 0 }),
-  center: { x: 0, opacity: 1 },
-  exit: (dir: number) => ({ x: dir * -40, opacity: 0 }),
-}
-
 export default function OnboardingPage() {
   const router = useRouter()
   const [step, setStep] = useState(0)
-  const [dir, setDir] = useState(1)
   const [name, setName] = useState('')
   const [workType, setWorkType] = useState<WorkType | null>(null)
   const [balanceMode, setBalanceMode] = useState<BalanceMode | null>(null)
@@ -49,7 +41,6 @@ export default function OnboardingPage() {
   }, [router])
 
   function go(nextStep: number) {
-    setDir(nextStep > step ? 1 : -1)
     setStep(nextStep)
   }
 
@@ -89,18 +80,9 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        <AnimatePresence mode="wait" custom={dir}>
+        <div>
           {step === 0 && (
-            <motion.div
-              key="step0"
-              custom={dir}
-              variants={SLIDE}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.22 }}
-              className="space-y-6"
-            >
+            <div key="step0" className="space-y-6 anim-fade-in">
               <div>
                 <h1 className="text-2xl font-black text-slate-800 mb-1">What should we call you?</h1>
                 <p className="text-slate-500 text-sm">This helps LoadLight personalise your experience.</p>
@@ -121,20 +103,11 @@ export default function OnboardingPage() {
               >
                 Continue <ArrowRight className="w-4 h-4" />
               </button>
-            </motion.div>
+            </div>
           )}
 
           {step === 1 && (
-            <motion.div
-              key="step1"
-              custom={dir}
-              variants={SLIDE}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.22 }}
-              className="space-y-5"
-            >
+            <div key="step1" className="space-y-5 anim-fade-in">
               <div>
                 <h1 className="text-2xl font-black text-slate-800 mb-1">What best describes you?</h1>
                 <p className="text-slate-500 text-sm">So LoadLight can tailor its workload advice.</p>
@@ -171,20 +144,11 @@ export default function OnboardingPage() {
                   Continue <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
-            </motion.div>
+            </div>
           )}
 
           {step === 2 && (
-            <motion.div
-              key="step2"
-              custom={dir}
-              variants={SLIDE}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.22 }}
-              className="space-y-5"
-            >
+            <div key="step2" className="space-y-5 anim-fade-in">
               <div>
                 <h1 className="text-2xl font-black text-slate-800 mb-1">How do you want to balance your time?</h1>
                 <p className="text-slate-500 text-sm">This sets your work/leisure ratio target.</p>
@@ -212,8 +176,8 @@ export default function OnboardingPage() {
                 ))}
               </div>
 
-              <p className="text-xs text-slate-400 bg-white/40 rounded-xl p-3 leading-relaxed">
-                🤖 LoadLight uses AI for task extraction and workload analysis only — not for mental health support.
+              <p className="text-xs text-slate-400 bg-white/40 rounded-xl p-3 leading-relaxed flex items-start gap-1.5">
+                <ClassicIcon name="chart" size={14} /> LoadLight uses AI for task extraction and workload analysis only — not for mental health support.
               </p>
 
               <div className="flex gap-3">
@@ -231,9 +195,9 @@ export default function OnboardingPage() {
                   Let&apos;s go! <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </div>
       </div>
     </div>
   )

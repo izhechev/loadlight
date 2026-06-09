@@ -1,8 +1,8 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client"
 
-import { motion } from "framer-motion"
-import { PhoneCall, MessageSquare, Leaf, Heart, X } from "lucide-react"
+import { Phone, MessageSquare, X } from "@/lib/icons"
+import { ClassicIcon } from "@/lib/classic-icons"
 
 interface CrisisRedirectProps {
   onDismiss: () => void
@@ -12,76 +12,62 @@ interface CrisisRedirectProps {
 // FR-4: Static crisis redirect — hardcoded, never AI-generated
 export function CrisisRedirect({ onDismiss, onExitRestMode }: CrisisRedirectProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        transition={{ type: "spring", bounce: 0.25 }}
-        className="glass-panel-strong p-8 max-w-md w-full relative overflow-hidden bg-white/90 border border-rose-200 shadow-2xl"
-      >
-        <button 
-          onClick={onDismiss}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors bg-white/50 p-2 rounded-full hover:bg-white/80"
-          aria-label="Close"
-        >
-          <X className="w-5 h-5" />
-        </button>
+    <div className="anim-overlay-in" style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(0,0,0,0.45)' }}>
+      <div className="vista-dialog anim-scale-in" style={{ maxWidth: 440, width: '100%', position: 'relative' }}>
+        {/* Title bar */}
+        <div className="vista-titlebar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px 6px 12px' }}>
+          <span style={{ fontWeight: 800, fontSize: 13 }}>Rest Mode</span>
+          <button onClick={onDismiss} className="vista-close-btn" aria-label="Close" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X style={{ width: 11, height: 11, color: '#fff' }} />
+          </button>
+        </div>
 
-        <div className="absolute inset-0 bg-gradient-to-br from-rose-100/50 to-pink-50/50 pointer-events-none" />
-        
-        <div className="relative mt-2">
-          <div className="w-16 h-16 bg-gradient-to-br from-pink-400 to-rose-500 rounded-full flex items-center justify-center mb-6 shadow-md mx-auto border border-rose-200">
-            <Heart className="w-8 h-8 text-white" />
+        <div style={{ padding: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+            <ClassicIcon name="navheart" size={40} />
           </div>
 
-          <h2 className="text-2xl font-black text-slate-800 text-center mb-2">Rest Mode Activated</h2>
-          <p className="text-slate-600 text-center mb-6 font-medium leading-relaxed">
+          <h2 className="font-black" style={{ color: '#1a1a1a', fontSize: 18, textAlign: 'center', marginBottom: 6 }}>Rest Mode Activated</h2>
+          <p style={{ color: '#3a5a7a', textAlign: 'center', marginBottom: 16, fontSize: 13, lineHeight: 1.5 }}>
             You've marked yourself as overwhelmed. We've paused non-essential tasks to help you focus on recovery. Take a deep breath.
           </p>
 
-          <div className="space-y-3 mb-8">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center mb-2">Professional Resources</p>
-            <a href="tel:988" className="flex items-center gap-4 p-4 rounded-2xl bg-white/80 border border-white/80 hover:bg-white transition-colors skeu-inset group">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                <PhoneCall className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">988 Lifeline</p>
-                <p className="text-xs text-slate-500 font-medium">Free, confidential support 24/7</p>
-              </div>
+          <p className="vista-label" style={{ textAlign: 'center', marginBottom: 8 }}>Professional Resources</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
+            <a href="tel:988" className="skeu-inset" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, textDecoration: 'none', borderRadius: 4 }}>
+              <span className="aero-info" style={{ width: 34, height: 34, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Phone style={{ width: 18, height: 18, color: '#1a6ab8' }} />
+              </span>
+              <span>
+                <p className="font-bold" style={{ color: '#1a1a1a', fontSize: 13 }}>988 Lifeline</p>
+                <p style={{ color: '#5a7a9a', fontSize: 11 }}>Free, confidential support 24/7</p>
+              </span>
             </a>
-            
-            <a href="sms:741741?body=HOME" className="flex items-center gap-4 p-4 rounded-2xl bg-white/80 border border-white/80 hover:bg-white transition-colors skeu-inset group">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                <MessageSquare className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">Crisis Text Line</p>
-                <p className="text-xs text-slate-500 font-medium">Text HOME to 741741</p>
-              </div>
+
+            <a href="sms:741741?body=HOME" className="skeu-inset" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, textDecoration: 'none', borderRadius: 4 }}>
+              <span className="aero-success" style={{ width: 34, height: 34, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <MessageSquare style={{ width: 18, height: 18, color: '#1a7a50' }} />
+              </span>
+              <span>
+                <p className="font-bold" style={{ color: '#1a1a1a', fontSize: 13 }}>Crisis Text Line</p>
+                <p style={{ color: '#5a7a9a', fontSize: 11 }}>Text HOME to 741741</p>
+              </span>
             </a>
           </div>
 
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={onExitRestMode}
-              className="bg-gradient-to-r from-emerald-400 to-teal-500 hover:brightness-110 active:brightness-90 transition-all w-full text-white font-black py-3.5 rounded-2xl text-sm flex items-center justify-center gap-2 shadow-md"
-            >
-              Exit Rest Mode & Return to Tasks
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button onClick={onExitRestMode} className="glow-button" style={{ width: '100%', padding: '10px', fontSize: 13, textAlign: 'center' }}>
+              Exit Rest Mode &amp; Return to Tasks
             </button>
-            <button
-              onClick={onDismiss}
-              className="w-full text-slate-500 hover:text-slate-700 font-bold py-2 rounded-2xl text-sm transition-colors"
-            >
+            <button onClick={onDismiss} className="vista-btn-secondary" style={{ width: '100%', padding: '8px', fontSize: 13 }}>
               Stay in Rest Mode (Close)
             </button>
-            <p className="text-[11px] text-center text-slate-400 font-bold mt-2 leading-relaxed">
+            <p style={{ textAlign: 'center', color: '#7a9ab8', fontSize: 11, fontWeight: 700, marginTop: 6, lineHeight: 1.5 }}>
               LoadLight tracks tasks, not mental health. Please reach out to a professional if you need support.
             </p>
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }

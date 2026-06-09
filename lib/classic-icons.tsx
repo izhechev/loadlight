@@ -7,6 +7,7 @@ export type IconName =
   | 'default' | 'beast' | 'balanced' | 'chill'
   | 'freelancer' | 'other' | 'warning' | 'check'
   | 'chart' | 'tasks'
+  | 'navoverview' | 'navadd' | 'navcategories' | 'navsettings' | 'navheart'
 
 // Map a category (by id or name) to a classic icon.
 const CATEGORY_ICON: Record<string, IconName> = {
@@ -39,6 +40,7 @@ const ALL_ICON_NAMES = new Set<string>([
   'work', 'study', 'personal', 'exercise', 'creative', 'admin',
   'default', 'beast', 'balanced', 'chill', 'freelancer', 'other', 'warning', 'check',
   'chart', 'tasks',
+  'navoverview', 'navadd', 'navcategories', 'navsettings', 'navheart',
 ])
 
 export function categoryIconName(cat?: { id?: string; name?: string; emoji?: string } | null): IconName {

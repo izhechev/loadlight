@@ -4,17 +4,17 @@
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, CheckSquare, Plus, Settings, Heart, Tags } from "@/lib/icons"
+import { ClassicIcon, type IconName } from "@/lib/classic-icons"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 import { RestModeOverlay } from "@/components/rest-mode-overlay"
 import { useState, useEffect } from "react"
 
-const NAV = [
-  { href: "/dashboard", label: "Overview",   icon: LayoutDashboard },
-  { href: "/tasks",     label: "Tasks",      icon: CheckSquare },
-  { href: "/tasks/new", label: "Add Task",   icon: Plus },
-  { href: "/categories",label: "Categories", icon: Tags },
-  { href: "/settings",  label: "Settings",   icon: Settings },
+const NAV: { href: string; label: string; icon: IconName }[] = [
+  { href: "/dashboard", label: "Overview",   icon: "navoverview" },
+  { href: "/tasks",     label: "Tasks",      icon: "tasks" },
+  { href: "/tasks/new", label: "Add Task",   icon: "navadd" },
+  { href: "/categories",label: "Categories", icon: "navcategories" },
+  { href: "/settings",  label: "Settings",   icon: "navsettings" },
 ]
 
 const STATE_BADGE: Record<string, { label: string; bgColor: string; textColor: string } | null> = {
@@ -148,7 +148,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             className="overwhelm-btn"
             style={{ padding: '5px 14px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
-            <Heart style={{ width: 14, height: 14, flexShrink: 0 }} />
+            <ClassicIcon name="navheart" size={14} />
             <span style={{ fontWeight: 800 }}>
               {state === 'overwhelmed' ? 'View Rest Mode' : "I'm overwhelmed"}
             </span>
@@ -200,7 +200,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 }}
                 className={active ? 'nav-item-active' : 'vista-chip-inactive'}
               >
-                <Icon style={{ width: 15, height: 15, flexShrink: 0, color: active ? '#ffffff' : '#4a6a90' }} />
+                <ClassicIcon name={Icon} size={16} alt={label} />
                 {label}
               </Link>
             )
@@ -264,7 +264,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               }}
               className={active ? 'nav-item-active' : ''}
             >
-              <Icon style={{ width: 18, height: 18, color: active ? '#ffffff' : '#7090b8' }} />
+              <ClassicIcon name={Icon} size={18} alt={label} />
               <span>{label}</span>
             </Link>
           )
