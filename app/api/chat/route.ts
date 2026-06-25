@@ -235,7 +235,10 @@ export async function POST(req: Request) {
       start_date?: string | null
     }>
     balanceMode?: string
-    state?: string       // overwhelmed-state suppression for balance-check
+    state?: string             // overwhelmed-state suppression for balance-check
+    dayLoadMinutes?: number    // total estimated minutes of today's active tasks
+    toughDayThreshold?: number // tough-day cutoff in minutes (scales with balance mode)
+    recentToughDays?: number   // consecutive tough days ending today (incl. today)
     overflowDate?: string // "YYYY-MM-DD" — schedule mode
     currentTime?: string  // "HH:MM" — current wall-clock time
     history?: { role: 'assistant' | 'user'; text: string }[] // schedule_chat conversation
@@ -848,16 +851,25 @@ Today: ${now.toISOString().split('T')[0]}`,
       `- id:"${t.id ?? ''}" name:"${t.name}" [cat:${t.category ?? 'Personal'}, type:${t.demand_type ?? 'routine'}, ~${t.estimated_minutes ?? 30}min]`
     ).join('\n')
 
+    const loadMin = Number(body.dayLoadMinutes ?? 0)
+    const threshold = Number(body.toughDayThreshold ?? 0)
+    const toughDays = Number(body.recentToughDays ?? 0)
+    const loadH = Math.round(loadMin / 60 * 10) / 10
+    const isToughDay = threshold > 0 && loadMin >= threshold
+
     return Response.json((await generateWithGemini({
       mode: 'balance-check',
       jsonSchemaText: `{ "verdict": "too_much" | "ok" | "too_little", "headline": "string", "reason": "string", "remove": [{ "id": "string", "name": "string", "reason": "string" }], "add": [{ "name": "string", "category": "string", "reason": "string" }] }`,
       system: ETHICAL_SYSTEM_PROMPT,
-      prompt: `Analyse the BALANCE of the user's activity mix — based on how many activities there are AND what they are (the task names/types), not just raw volume.
+      prompt: `Analyse the user's workload BALANCE. Weigh THREE things together:
+1. CONTENT — how many activities and what kind (over-concentration, e.g. three or more similar high-effort commitments such as multiple sports).
+2. LOAD BY TIME — total estimated time across tasks is the difficulty proxy: more tasks AND longer/harder tasks both raise the load. Today's load is ${loadMin} min (~${loadH}h)${threshold > 0 ? `; a "heavy day" for this user is ${threshold}+ min` : ''}.
+3. RECENT HEAVY DAYS — there have been ${toughDays} heavy day(s) in a row${toughDays >= 2 ? ' — mention this streak' : ''}.
 
 Decide ONE verdict:
-- "too_much": the user is over-concentrated in one kind of activity (e.g. three or more similar high-effort commitments such as multiple sports, or many demanding cognitive tasks). Populate "remove" with up to 3 candidate tasks they might drop. NEVER include health or medication tasks (pills, vitamins, therapy, doctor, medical, lamictal, lithium).
-- "too_little": the activity list is genuinely sparse or very narrow AND would benefit from variety. Populate "add" with 2-3 realistic suggested activities, each mapped to one of these categories: ${categories.join(', ')}. A small but calm and fine list (e.g. only reading and drawing) is NOT "too_little" — return "ok" for that.
-- "ok": the mix is reasonable. Leave "remove" and "add" empty.
+- "too_much": the user is over-concentrated in one kind of activity, OR today's load is heavy by time${isToughDay ? ' (today IS a heavy day)' : ''}, OR there is a heavy-day streak. Populate "remove" with up to 3 candidates they might drop — prefer the heaviest (most minutes) and lowest-priority. NEVER include health or medication tasks (pills, vitamins, therapy, doctor, medical, lamictal, lithium).
+- "too_little": the activity list is genuinely sparse or narrow AND the time load is light AND it would benefit from variety. Populate "add" with 2-3 realistic suggested activities, each mapped to one of these categories: ${categories.join(', ')}. A small but calm and fine list (e.g. only reading and drawing) is NOT "too_little" — return "ok" for that.
+- "ok": the mix and load are reasonable. Leave "remove" and "add" empty.
 
 headline: <=8 words. reason: one observational sentence. Each item "reason": <=8 words.
 Tone: "you might consider", "one option is". Never "you should". No emotional language.
