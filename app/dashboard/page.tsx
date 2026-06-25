@@ -9,7 +9,10 @@ import { ChillSuggestions } from "@/components/chill-suggestions"
 import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib/store/overwhelmedStore"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
-import { getTasks, updateTask, IS_DEMO } from "@/lib/data/tasks"
+import { getTasks, updateTask, addTask, deleteTask, IS_DEMO } from "@/lib/data/tasks"
+import { BalancePopup } from "@/components/balance-popup"
+import { shouldRequestBalanceCheck, addSuggestionToTask, type BalanceResult, type AddItem } from "@/lib/utils/balance"
+import { dayLoadMinutes, toughDayThreshold, isToughDay, countRecentToughDays, buildToughDayResult, type LoadTask } from "@/lib/utils/toughDays"
 
 type BalanceMode = 'beast' | 'average' | 'chill'
 
@@ -231,10 +234,12 @@ export default function DashboardPage() {
   const [advisory, setAdvisory] = useState<string | null>(null)
   const [sparkHistory, setSparkHistory] = useState<SparkEntry[]>([])
   const autoFetched = useRef(false)
+  const [balanceResult, setBalanceResult] = useState<BalanceResult | null>(null)
+  const [showBalance, setShowBalance] = useState(false)
+  const balanceFetched = useRef(false)
 
-  // Load tasks + balance mode
-  useEffect(() => {
-    getTasks()
+  const loadTasks = useCallback(() => {
+    return getTasks()
       .then(data => setTasks(data.map(t => ({ ...t, category: t.category || t.lifeDomain || 'Personal' })) as unknown as Task[]))
       .catch(() => {
         try {
@@ -242,6 +247,11 @@ export default function DashboardPage() {
           if (t) setTasks((JSON.parse(t) as any[]).map(tsk => ({ ...tsk, category: tsk.category || tsk.life_domain || 'Personal' })) as Task[])
         } catch { /* ignore */ }
       })
+  }, [])
+
+  // Load tasks + balance mode
+  useEffect(() => {
+    loadTasks()
     try {
       const u = localStorage.getItem('loadlight-user')
       if (u) {
@@ -253,7 +263,7 @@ export default function DashboardPage() {
       const lock = localStorage.getItem('loadlight-chill-lock')
       if (lock) setChillLockUntil(parseInt(lock, 10))
     } catch { /* ignore */ }
-  }, [])
+  }, [loadTasks])
 
   const updateState = useCallback(() => {
     if (!tasks.length) return
@@ -311,6 +321,59 @@ export default function DashboardPage() {
     fetchSummary()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks])
+
+  // Balance check — runs once per dashboard load when not overwhelmed
+  useEffect(() => {
+    if (balanceFetched.current || !tasks.length) return
+    const active = tasks.filter(t => !t.done)
+    if (!shouldRequestBalanceCheck(state, active.length)) return
+    balanceFetched.current = true
+
+    const loadMin = dayLoadMinutes(active as unknown as LoadTask[])
+    const threshold = toughDayThreshold(balanceMode)
+    const tough = isToughDay(loadMin, balanceMode)
+
+    // Streak count must include today's load (the spark-history effect may not have written it yet)
+    const today = todayStr()
+    const hist = loadSparkHistory().map(e => ({ date: e.date, minutes: e.minutes }))
+    const histWithToday = hist.some(h => h.date === today)
+      ? hist.map(h => h.date === today ? { date: today, minutes: loadMin } : h)
+      : [...hist, { date: today, minutes: loadMin }]
+    const recentToughDays = countRecentToughDays(histWithToday, balanceMode)
+
+    const showToughFallback = () => {
+      if (tough) {
+        setBalanceResult(buildToughDayResult(active as unknown as LoadTask[], balanceMode, recentToughDays))
+        setShowBalance(true)
+      }
+    }
+
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: 'balance-check',
+        tasks: active,
+        state,
+        balanceMode,
+        categories: categories.map(c => c.name),
+        dayLoadMinutes: loadMin,
+        toughDayThreshold: threshold,
+        recentToughDays,
+      }),
+    })
+      .then(r => r.json())
+      .then((data: BalanceResult) => {
+        if (data && data.verdict && data.verdict !== 'ok') {
+          setBalanceResult(data)
+          setShowBalance(true)
+        } else {
+          showToughFallback()
+        }
+      })
+      .catch(showToughFallback)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, state])
 
   const allUndone = tasks.filter(t => !t.done)
   // Deduplicate recurring tasks for all display metrics
@@ -420,14 +483,33 @@ export default function DashboardPage() {
     setPendingChillValue(null)
   }
 
-  function handleSnooze(ids: string[]) {
-    const snoozedUntil = Date.now() + 24 * 60 * 60 * 1000
+  function handleSnooze(ids: string[], days = 1) {
+    const snoozedUntil = Date.now() + days * 24 * 60 * 60 * 1000
     setTasks(prev => {
       const updated = prev.map(t => ids.includes(t.id) ? { ...t, snoozedUntil } : t)
       if (IS_DEMO) { try { localStorage.setItem('loadlight-tasks', JSON.stringify(updated)) } catch { /* ignore */ } }
       return updated
     })
     ids.forEach(id => updateTask(id, { snoozedUntil }).catch(() => {}))
+  }
+
+  function handleBalanceHide(id: string) {
+    handleSnooze([id], 7)
+  }
+
+  function handleBalanceDelete(id: string) {
+    setTasks(prev => {
+      const updated = prev.filter(t => t.id !== id)
+      if (IS_DEMO) { try { localStorage.setItem('loadlight-tasks', JSON.stringify(updated)) } catch { /* ignore */ } }
+      return updated
+    })
+    deleteTask(id).catch(() => {})
+  }
+
+  function handleBalanceAdd(item: AddItem) {
+    addTask(addSuggestionToTask({ name: item.name, category: item.category }))
+      .then(() => loadTasks())
+      .catch(() => {})
   }
 
   return (
@@ -464,6 +546,16 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {showBalance && balanceResult && (
+        <BalancePopup
+          result={balanceResult}
+          onHide={handleBalanceHide}
+          onDelete={handleBalanceDelete}
+          onAdd={handleBalanceAdd}
+          onClose={() => setShowBalance(false)}
+        />
       )}
 
       <div className="space-y-4 max-w-4xl mx-auto">
