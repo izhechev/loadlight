@@ -855,7 +855,8 @@ Today: ${now.toISOString().split('T')[0]}`,
     const threshold = Number(body.toughDayThreshold ?? 0)
     const toughDays = Number(body.recentToughDays ?? 0)
     const loadH = Math.round(loadMin / 60 * 10) / 10
-    const isToughDay = threshold > 0 && loadMin >= threshold
+    const thresholdSet = body.toughDayThreshold != null
+    const isToughDay = thresholdSet && loadMin >= threshold
 
     return Response.json((await generateWithGemini({
       mode: 'balance-check',
@@ -863,7 +864,7 @@ Today: ${now.toISOString().split('T')[0]}`,
       system: ETHICAL_SYSTEM_PROMPT,
       prompt: `Analyse the user's workload BALANCE. Weigh THREE things together:
 1. CONTENT — how many activities and what kind (over-concentration, e.g. three or more similar high-effort commitments such as multiple sports).
-2. LOAD BY TIME — total estimated time across tasks is the difficulty proxy: more tasks AND longer/harder tasks both raise the load. Today's load is ${loadMin} min (~${loadH}h)${threshold > 0 ? `; a "heavy day" for this user is ${threshold}+ min` : ''}.
+2. LOAD BY TIME — total estimated time across tasks is the difficulty proxy: more tasks AND longer/harder tasks both raise the load. Today's load is ${loadMin} min (~${loadH}h)${thresholdSet ? `; a "heavy day" for this user is ${threshold}+ min` : ''}.
 3. RECENT HEAVY DAYS — there have been ${toughDays} heavy day(s) in a row${toughDays >= 2 ? ' — mention this streak' : ''}.
 
 Decide ONE verdict:
