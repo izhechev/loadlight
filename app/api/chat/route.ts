@@ -187,6 +187,10 @@ async function generateWithGemini(options: any) {
     return { object: { canPostpone, question: null, questionTaskName: null, questionTaskId: null } } as any
   }
 
+  if (options.mode === 'balance-check') {
+    return { object: { verdict: 'ok', headline: '', reason: '', remove: [], add: [] } } as any
+  }
+
   return { object: {
     verdict: 'balanced',
     trend: 'AI is currently in offline mode.',
@@ -231,6 +235,7 @@ export async function POST(req: Request) {
       start_date?: string | null
     }>
     balanceMode?: string
+    state?: string       // overwhelmed-state suppression for balance-check
     overflowDate?: string // "YYYY-MM-DD" — schedule mode
     currentTime?: string  // "HH:MM" — current wall-clock time
     history?: { role: 'assistant' | 'user'; text: string }[] // schedule_chat conversation
@@ -819,6 +824,46 @@ Active tasks:
 ${taskSummary}
 
 Today: ${now.toISOString().split('T')[0]}`,
+    })).object)
+  }
+
+  if (mode === 'balance-check') {
+    const activeTasks = (tasks ?? []).filter(t => !t.done)
+
+    // Suppress entirely when overwhelmed or nothing to analyse
+    if (body.state === 'overwhelmed' || activeTasks.length === 0) {
+      return Response.json({ verdict: 'ok', headline: '', reason: '', remove: [], add: [] })
+    }
+
+    // Deduplicate recurring tasks by name+category so "three sports" counts once
+    const seen = new Set<string>()
+    const deduped = activeTasks.filter(t => {
+      const key = `${(t.name ?? '').trim().toLowerCase()}||${(t.category ?? '').toLowerCase()}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+
+    const taskSummary = deduped.map(t =>
+      `- id:"${t.id ?? ''}" name:"${t.name}" [cat:${t.category ?? 'Personal'}, type:${t.demand_type ?? 'routine'}, ~${t.estimated_minutes ?? 30}min]`
+    ).join('\n')
+
+    return Response.json((await generateWithGemini({
+      mode: 'balance-check',
+      jsonSchemaText: `{ "verdict": "too_much" | "ok" | "too_little", "headline": "string", "reason": "string", "remove": [{ "id": "string", "name": "string", "reason": "string" }], "add": [{ "name": "string", "category": "string", "reason": "string" }] }`,
+      system: ETHICAL_SYSTEM_PROMPT,
+      prompt: `Analyse the BALANCE of the user's activity mix — based on how many activities there are AND what they are (the task names/types), not just raw volume.
+
+Decide ONE verdict:
+- "too_much": the user is over-concentrated in one kind of activity (e.g. three or more similar high-effort commitments such as multiple sports, or many demanding cognitive tasks). Populate "remove" with up to 3 candidate tasks they might drop. NEVER include health or medication tasks (pills, vitamins, therapy, doctor, medical, lamictal, lithium).
+- "too_little": the activity list is genuinely sparse or very narrow AND would benefit from variety. Populate "add" with 2-3 realistic suggested activities, each mapped to one of these categories: ${categories.join(', ')}. A small but calm and fine list (e.g. only reading and drawing) is NOT "too_little" — return "ok" for that.
+- "ok": the mix is reasonable. Leave "remove" and "add" empty.
+
+headline: <=8 words. reason: one observational sentence. Each item "reason": <=8 words.
+Tone: "you might consider", "one option is". Never "you should". No emotional language.
+
+Active tasks:
+${taskSummary}`,
     })).object)
   }
 
