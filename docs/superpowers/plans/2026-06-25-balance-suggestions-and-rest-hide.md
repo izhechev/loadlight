@@ -156,7 +156,10 @@ git commit -m "feat(balance): pure helpers for balance-check gating and add-sugg
 In `app/api/chat/route.ts`, in the `POST` body type object (the `const body = await req.json() as { ... }` block), add this line after `balanceMode?: string`:
 
 ```typescript
-    state?: string       // overwhelmed-state suppression for balance-check
+    state?: string             // overwhelmed-state suppression for balance-check
+    dayLoadMinutes?: number    // total estimated minutes of today's active tasks
+    toughDayThreshold?: number // tough-day cutoff in minutes (scales with balance mode)
+    recentToughDays?: number   // consecutive tough days ending today (incl. today)
 ```
 
 - [ ] **Step 2: Add the mock fallback branch**
@@ -195,16 +198,25 @@ In `POST`, immediately **before** the final `return Response.json({ error: 'Unkn
       `- id:"${t.id ?? ''}" name:"${t.name}" [cat:${t.category ?? 'Personal'}, type:${t.demand_type ?? 'routine'}, ~${t.estimated_minutes ?? 30}min]`
     ).join('\n')
 
+    const loadMin = Number(body.dayLoadMinutes ?? 0)
+    const threshold = Number(body.toughDayThreshold ?? 0)
+    const toughDays = Number(body.recentToughDays ?? 0)
+    const loadH = Math.round(loadMin / 60 * 10) / 10
+    const isToughDay = threshold > 0 && loadMin >= threshold
+
     return Response.json((await generateWithGemini({
       mode: 'balance-check',
       jsonSchemaText: `{ "verdict": "too_much" | "ok" | "too_little", "headline": "string", "reason": "string", "remove": [{ "id": "string", "name": "string", "reason": "string" }], "add": [{ "name": "string", "category": "string", "reason": "string" }] }`,
       system: ETHICAL_SYSTEM_PROMPT,
-      prompt: `Analyse the BALANCE of the user's activity mix — based on how many activities there are AND what they are (the task names/types), not just raw volume.
+      prompt: `Analyse the user's workload BALANCE. Weigh THREE things together:
+1. CONTENT — how many activities and what kind (over-concentration, e.g. three or more similar high-effort commitments such as multiple sports).
+2. LOAD BY TIME — total estimated time across tasks is the difficulty proxy: more tasks AND longer/harder tasks both raise the load. Today's load is ${loadMin} min (~${loadH}h)${threshold > 0 ? `; a "heavy day" for this user is ${threshold}+ min` : ''}.
+3. RECENT HEAVY DAYS — there have been ${toughDays} heavy day(s) in a row${toughDays >= 2 ? ' — mention this streak' : ''}.
 
 Decide ONE verdict:
-- "too_much": the user is over-concentrated in one kind of activity (e.g. three or more similar high-effort commitments such as multiple sports, or many demanding cognitive tasks). Populate "remove" with up to 3 candidate tasks they might drop. NEVER include health or medication tasks (pills, vitamins, therapy, doctor, medical, lamictal, lithium).
-- "too_little": the activity list is genuinely sparse or very narrow AND would benefit from variety. Populate "add" with 2-3 realistic suggested activities, each mapped to one of these categories: ${categories.join(', ')}. A small but calm and fine list (e.g. only reading and drawing) is NOT "too_little" — return "ok" for that.
-- "ok": the mix is reasonable. Leave "remove" and "add" empty.
+- "too_much": the user is over-concentrated in one kind of activity, OR today's load is heavy by time${isToughDay ? ' (today IS a heavy day)' : ''}, OR there is a heavy-day streak. Populate "remove" with up to 3 candidates they might drop — prefer the heaviest (most minutes) and lowest-priority. NEVER include health or medication tasks (pills, vitamins, therapy, doctor, medical, lamictal, lithium).
+- "too_little": the activity list is genuinely sparse or narrow AND the time load is light AND it would benefit from variety. Populate "add" with 2-3 realistic suggested activities, each mapped to one of these categories: ${categories.join(', ')}. A small but calm and fine list (e.g. only reading and drawing) is NOT "too_little" — return "ok" for that.
+- "ok": the mix and load are reasonable. Leave "remove" and "add" empty.
 
 headline: <=8 words. reason: one observational sentence. Each item "reason": <=8 words.
 Tone: "you might consider", "one option is". Never "you should". No emotional language.
@@ -238,6 +250,178 @@ Expected output: `{"verdict":"ok","headline":"","reason":"","remove":[],"add":[]
 ```bash
 git add app/api/chat/route.ts
 git commit -m "feat(balance): add balance-check mode to chat route with overwhelmed suppression"
+```
+
+---
+
+### Task 2A: Tough-day helpers
+
+**Files:**
+- Create: `lib/utils/toughDays.ts`
+- Test: `lib/utils/toughDays.test.ts`
+
+**Interfaces:**
+- Consumes: `BalanceResult`, `RemoveItem` from `@/lib/utils/balance`
+- Produces:
+  - `toughDayThreshold(balanceMode: string): number`
+  - `dayLoadMinutes(tasks: LoadTask[]): number`
+  - `isToughDay(loadMinutes: number, balanceMode: string): boolean`
+  - `countRecentToughDays(history: DayHistoryEntry[], balanceMode: string): number`
+  - `buildToughDayResult(tasks: LoadTask[], balanceMode: string, recentToughDays: number): BalanceResult`
+  - types `LoadTask = { id: string; name: string; priority?: number; estimated_minutes?: number | null; done?: boolean }`, `DayHistoryEntry = { date: string; minutes: number }`
+
+- [ ] **Step 1: Write the failing test**
+
+```typescript
+// lib/utils/toughDays.test.ts
+import { describe, it, expect } from 'vitest'
+import {
+  toughDayThreshold, dayLoadMinutes, isToughDay, countRecentToughDays, buildToughDayResult,
+} from './toughDays'
+
+describe('toughDayThreshold', () => {
+  it('scales with balance mode', () => {
+    expect(toughDayThreshold('chill')).toBe(120)
+    expect(toughDayThreshold('average')).toBe(240)
+    expect(toughDayThreshold('beast')).toBe(360)
+  })
+  it('defaults unknown modes to the average threshold', () => {
+    expect(toughDayThreshold('whatever')).toBe(240)
+  })
+})
+
+describe('dayLoadMinutes', () => {
+  it('sums estimated minutes of active tasks, defaulting missing to 30', () => {
+    const load = dayLoadMinutes([
+      { id: 'a', name: 'x', estimated_minutes: 90 },
+      { id: 'b', name: 'y', estimated_minutes: null },
+      { id: 'c', name: 'z', estimated_minutes: 60, done: true },
+    ])
+    expect(load).toBe(120) // 90 + 30, done excluded
+  })
+})
+
+describe('isToughDay', () => {
+  it('is true when load meets the threshold', () => {
+    expect(isToughDay(240, 'average')).toBe(true)
+    expect(isToughDay(239, 'average')).toBe(false)
+  })
+})
+
+describe('countRecentToughDays', () => {
+  it('counts consecutive tough days ending at the most recent entry', () => {
+    const history = [
+      { date: '2026-06-21', minutes: 60 },
+      { date: '2026-06-22', minutes: 300 },
+      { date: '2026-06-23', minutes: 260 },
+      { date: '2026-06-24', minutes: 250 },
+    ]
+    expect(countRecentToughDays(history, 'average')).toBe(3)
+  })
+  it('is 0 when the latest day is not tough', () => {
+    expect(countRecentToughDays([{ date: '2026-06-24', minutes: 100 }], 'average')).toBe(0)
+  })
+})
+
+describe('buildToughDayResult', () => {
+  it('suggests the heaviest droppable tasks, excluding health and P1', () => {
+    const r = buildToughDayResult([
+      { id: 'a', name: 'Take vitamins', priority: 3, estimated_minutes: 120 },
+      { id: 'b', name: 'File taxes', priority: 1, estimated_minutes: 120 },
+      { id: 'c', name: 'Deep clean garage', priority: 3, estimated_minutes: 90 },
+      { id: 'd', name: 'Sort photos', priority: 3, estimated_minutes: 40 },
+    ], 'average', 2)
+    expect(r.verdict).toBe('too_much')
+    expect(r.remove.map(x => x.id)).toEqual(['c', 'd']) // heaviest non-health, non-P1, max 3
+    expect(r.add).toEqual([])
+    expect(r.reason).toContain('2')
+  })
+})
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npm run test -- toughDays`
+Expected: FAIL — `Failed to resolve import "./toughDays"`.
+
+- [ ] **Step 3: Write minimal implementation**
+
+```typescript
+// lib/utils/toughDays.ts
+import type { BalanceResult, RemoveItem } from './balance'
+
+export interface LoadTask {
+  id: string
+  name: string
+  priority?: number
+  estimated_minutes?: number | null
+  done?: boolean
+}
+export interface DayHistoryEntry { date: string; minutes: number }
+
+const HEALTH = /pill|medication|medicine|vitamin|supplement|therapy|doctor|medical|lamictal|lithium/i
+
+/** Daily "heavy day" cutoff in minutes, scaling with balance mode. */
+export function toughDayThreshold(balanceMode: string): number {
+  if (balanceMode === 'chill') return 120
+  if (balanceMode === 'beast') return 360
+  return 240 // average / default
+}
+
+/** Total estimated minutes of active tasks — combines quantity and time-difficulty. */
+export function dayLoadMinutes(tasks: LoadTask[]): number {
+  return tasks
+    .filter(t => !t.done)
+    .reduce((sum, t) => sum + (t.estimated_minutes ?? 30), 0)
+}
+
+export function isToughDay(loadMinutes: number, balanceMode: string): boolean {
+  return loadMinutes >= toughDayThreshold(balanceMode)
+}
+
+/** Consecutive tough days ending at the most recent history entry. */
+export function countRecentToughDays(history: DayHistoryEntry[], balanceMode: string): number {
+  const threshold = toughDayThreshold(balanceMode)
+  let count = 0
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].minutes >= threshold) count++
+    else break
+  }
+  return count
+}
+
+/** Deterministic tough-day advisory: drop the heaviest, lowest-priority, non-health tasks. */
+export function buildToughDayResult(tasks: LoadTask[], balanceMode: string, recentToughDays: number): BalanceResult {
+  const droppable = tasks
+    .filter(t => !t.done && (t.priority ?? 3) > 1 && !HEALTH.test(t.name ?? ''))
+    .sort((a, b) => (b.estimated_minutes ?? 30) - (a.estimated_minutes ?? 30))
+    .slice(0, 3)
+  const remove: RemoveItem[] = droppable.map(t => ({
+    id: t.id,
+    name: t.name,
+    reason: `${t.estimated_minutes ?? 30} min — one of the heaviest`,
+  }))
+  const streak = recentToughDays >= 2 ? `${recentToughDays} heavy days in a row` : 'a heavy day'
+  return {
+    verdict: 'too_much',
+    headline: 'Heavy day — you might ease off',
+    reason: `Your tasks add up to a lot of time today (${streak}). You might consider moving one of the heavier ones.`,
+    remove,
+    add: [],
+  }
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `npm run test -- toughDays`
+Expected: PASS (8 tests).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lib/utils/toughDays.ts lib/utils/toughDays.test.ts
+git commit -m "feat(balance): tough-day load helpers (time-weighted, multi-day)"
 ```
 
 ---
@@ -418,6 +602,7 @@ In `app/dashboard/page.tsx`, update the data import and add the new imports:
 import { getTasks, updateTask, addTask, deleteTask, IS_DEMO } from "@/lib/data/tasks"
 import { BalancePopup } from "@/components/balance-popup"
 import { shouldRequestBalanceCheck, addSuggestionToTask, type BalanceResult, type AddItem } from "@/lib/utils/balance"
+import { dayLoadMinutes, toughDayThreshold, isToughDay, countRecentToughDays, buildToughDayResult, type LoadTask } from "@/lib/utils/toughDays"
 ```
 
 - [ ] **Step 2: Extract a reusable `loadTasks` and add balance state**
@@ -455,6 +640,25 @@ Add this effect after the existing "Auto-fetch AI advisory" effect:
     if (!shouldRequestBalanceCheck(state, active.length)) return
     balanceFetched.current = true
 
+    const loadMin = dayLoadMinutes(active as unknown as LoadTask[])
+    const threshold = toughDayThreshold(balanceMode)
+    const tough = isToughDay(loadMin, balanceMode)
+
+    // Streak count must include today's load (the spark-history effect may not have written it yet)
+    const today = todayStr()
+    const hist = loadSparkHistory().map(e => ({ date: e.date, minutes: e.minutes }))
+    const histWithToday = hist.some(h => h.date === today)
+      ? hist.map(h => h.date === today ? { date: today, minutes: loadMin } : h)
+      : [...hist, { date: today, minutes: loadMin }]
+    const recentToughDays = countRecentToughDays(histWithToday, balanceMode)
+
+    const showToughFallback = () => {
+      if (tough) {
+        setBalanceResult(buildToughDayResult(active as unknown as LoadTask[], balanceMode, recentToughDays))
+        setShowBalance(true)
+      }
+    }
+
     fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -464,6 +668,9 @@ Add this effect after the existing "Auto-fetch AI advisory" effect:
         state,
         balanceMode,
         categories: categories.map(c => c.name),
+        dayLoadMinutes: loadMin,
+        toughDayThreshold: threshold,
+        recentToughDays,
       }),
     })
       .then(r => r.json())
@@ -471,9 +678,11 @@ Add this effect after the existing "Auto-fetch AI advisory" effect:
         if (data && data.verdict && data.verdict !== 'ok') {
           setBalanceResult(data)
           setShowBalance(true)
+        } else {
+          showToughFallback()
         }
       })
-      .catch(() => {})
+      .catch(showToughFallback)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, state])
 ```

@@ -95,6 +95,26 @@ Client component matching the existing Vista dialogs (`skeu-card`, `anim-scale-i
 - AI judgment itself is not unit-tested (non-deterministic), consistent with the
   other chat modes.
 
+## Addendum (2026-06-25): load-by-time + "tough days"
+
+The balance check also factors **workload weight**, not just activity content:
+
+- **Per quantity + difficulty (time-based):** a day's load = the total estimated
+  minutes of that day's active tasks. This combines how *many* tasks there are with
+  how *heavy* each is (longer task = harder), using estimated time as the difficulty
+  proxy. The `balance-check` prompt weighs this total load alongside content.
+- **Tough days:** a "tough day" is one whose load meets/exceeds a threshold that
+  scales with balance mode — Chill 120 min, Average 240 min, Beast 360 min. Daily
+  load is read from the existing `loadlight-sparkline-history` (per-day `minutes`).
+- **Trigger:** advice fires on **every** tough day (including the first), with no
+  escalation tier. The popup message notes the streak when it is 2+ days
+  (e.g. "2 heavy days in a row").
+- **Placement:** the tough-day advice appears in the same dashboard **Balance Check
+  popup**. When a tough day is detected, the popup shows (even if the AI's content
+  verdict is `ok`) with a "too much" message and up to 3 suggested tasks to drop —
+  the heaviest, lowest-priority, non-health tasks. This deterministic path
+  (`buildToughDayResult`) also serves as the offline fallback.
+
 ## Out of scope
 
 - Personalised activity recommendations from history.
