@@ -120,6 +120,11 @@ function lsSetProfile(updates: Partial<Profile>): void {
 // Task CRUD
 // ─────────────────────────────────────────────
 
+/** True when the error is Postgres/PostgREST rejecting the recurring_days column (migration not run). */
+function isMissingRecurringDaysColumn(error: { message?: string } | null): boolean {
+  return /recurring_days/i.test(error?.message ?? '')
+}
+
 /** Notify listeners (global balance check) that the task list changed. */
 function notifyTasksChanged(): void {
   if (typeof window !== 'undefined') {
@@ -194,11 +199,13 @@ export async function addTask(rawTask: Omit<Task, 'id' | 'createdAt'>): Promise<
 
   await ensureProfile(supabase, user.id)
 
-  const { data, error } = await supabase
-    .from('tasks')
-    .insert(taskToDbRow({ ...task, userId: user.id }))
-    .select()
-    .single()
+  const row = taskToDbRow({ ...task, userId: user.id })
+  let { data, error } = await supabase.from('tasks').insert(row).select().single()
+  if (error && isMissingRecurringDaysColumn(error)) {
+    // Database not migrated yet — save without the N-day cadence rather than losing the task
+    delete row.recurring_days
+    ;({ data, error } = await supabase.from('tasks').insert(row).select().single())
+  }
 
   if (error) throw error
   notifyTasksChanged()
@@ -225,7 +232,12 @@ export async function addTasks(rawTasks: Omit<Task, 'id' | 'createdAt'>[]): Prom
   await ensureProfile(supabase, user.id)
 
   const rows = tasks.map(t => taskToDbRow({ ...t, userId: user.id }))
-  const { data, error } = await supabase.from('tasks').insert(rows).select()
+  let { data, error } = await supabase.from('tasks').insert(rows).select()
+  if (error && isMissingRecurringDaysColumn(error)) {
+    // Database not migrated yet — save without the N-day cadence rather than losing the tasks
+    rows.forEach(r => delete r.recurring_days)
+    ;({ data, error } = await supabase.from('tasks').insert(rows).select())
+  }
   if (error) throw error
   notifyTasksChanged()
   return (data ?? []).map(dbRowToTask)
@@ -240,10 +252,12 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<vo
   }
 
   const supabase = createClient()
-  const { error } = await supabase
-    .from('tasks')
-    .update(taskToDbRow(updates as Task))
-    .eq('id', id)
+  const row = taskToDbRow(updates as Task)
+  let { error } = await supabase.from('tasks').update(row).eq('id', id)
+  if (error && isMissingRecurringDaysColumn(error)) {
+    delete row.recurring_days
+    ;({ error } = await supabase.from('tasks').update(row).eq('id', id))
+  }
 
   if (error) throw error
   notifyTasksChanged()
@@ -434,7 +448,9 @@ function taskToDbRow(task: Partial<Task>): Record<string, unknown> {
   if (task.status           !== undefined) row.status            = task.status
   if (task.recurring        !== undefined) row.recurring         = task.recurring
   if (task.recurringHours   !== undefined) row.recurring_hours   = task.recurringHours
-  if (task.recurringDays    !== undefined) row.recurring_days    = task.recurringDays
+  // Only send recurring_days when set — keeps inserts working on databases
+  // that haven't run the recurring_days migration yet
+  if (task.recurringDays != null)          row.recurring_days    = task.recurringDays
   if (task.completedAt      !== undefined) row.completed_at      = task.completedAt
   if (task.snoozedUntil     !== undefined) {
     row.snoozed_until = task.snoozedUntil ? new Date(task.snoozedUntil).toISOString() : null

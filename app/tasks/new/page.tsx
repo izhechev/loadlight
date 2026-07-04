@@ -208,7 +208,8 @@ export default function AddTaskPage() {
 
     // addTasks persists to localStorage in demo mode — no manual write here,
     // or every task would be stored twice (once raw, once mapped)
-    await addTasks(finalTasks.map(t => ({
+    try {
+      await addTasks(finalTasks.map(t => ({
       name: t.name,
       category: t.category ?? 'Personal',
       lifeDomain: t.life_domain ?? 'personal',
@@ -227,10 +228,17 @@ export default function AddTaskPage() {
       estimatedMinutes: t.estimated_minutes ?? null,
       notes: t.notes ?? '',
       status: 'active' as const,
-      recurring: t.recurring ?? 'none',
-      recurringHours: t.recurring_hours ?? null,
-      recurringDays: t.recurring_days ?? null,
-    }))).catch(() => {})
+        recurring: t.recurring ?? 'none',
+        recurringHours: t.recurring_hours ?? null,
+        recurringDays: t.recurring_days ?? null,
+      })))
+    } catch (err) {
+      // Surface the failure — pretending the save worked loses the user's tasks
+      setError(err instanceof Error && err.message === 'Not authenticated'
+        ? 'You are signed out. Log in to save tasks.'
+        : 'Could not save tasks. Check your connection and try again.')
+      return
+    }
 
     setSaved(true)
     setTimeout(() => router.push('/tasks'), 800)
