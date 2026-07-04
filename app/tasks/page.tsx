@@ -11,6 +11,7 @@ import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { getTasks, updateTask, deleteTask, addTasks, IS_DEMO } from "@/lib/data/tasks"
 import { effectiveDeadline as computeEffectiveDeadline, deadlineStatus } from "@/lib/utils/taskUtils"
 import { nextRecurrenceDeadline, recurringLabel, isPastDeadline, isRecurring } from "@/lib/utils/recurrence"
+import { selectSchedulable, orderByEnergy, WORK_START_MIN, WORK_END_MIN } from "@/lib/utils/scheduling"
 import { PastDeadlineModal } from "@/components/past-deadline-modal"
 
 interface Task {
@@ -89,9 +90,7 @@ export default function TasksPage() {
   }
   const [pendingSchedule, setPendingSchedule] = useState<PendingSchedule | null>(null)
 
-  useEffect(() => {
-    const time = Date.now()
-    setNow(time)
+  const reloadTasks = useCallback(() => {
     getTasks()
       .then(data => setTasks(data.map(t => ({
         ...t,
@@ -111,6 +110,14 @@ export default function TasksPage() {
         } catch { /* ignore */ }
       })
   }, [])
+
+  useEffect(() => {
+    setNow(Date.now())
+    reloadTasks()
+    // Live refresh: pick up tasks added elsewhere (e.g. balance-popup suggestions)
+    window.addEventListener('loadlight:tasks-changed', reloadTasks)
+    return () => window.removeEventListener('loadlight:tasks-changed', reloadTasks)
+  }, [reloadTasks])
 
   // Warn about missed deadlines: once per day, walk overdue tasks through the
   // reschedule modal (recurring tasks are excluded — they advance on their own)
@@ -239,7 +246,7 @@ export default function TasksPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'schedule', text: context, tasks, overflowDate, currentTime: nowHHMM() }),
+        body: JSON.stringify({ mode: 'schedule', text: context, tasks: selectSchedulable(tasks, Date.now()), overflowDate, currentTime: nowHHMM() }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as PendingSchedule
@@ -265,17 +272,15 @@ export default function TasksPage() {
       const min = Math.min(raw, 1439)
       return `${Math.floor(min / 60).toString().padStart(2, '0')}:${(min % 60).toString().padStart(2, '0')}`
     }
-    const now         = parseMin(nowHHMM())
-    const endOfDay    = 23 * 60 + 30
+    // Plan inside working hours only — never into the night
+    const now         = Math.max(parseMin(nowHHMM()), WORK_START_MIN)
+    const endOfDay    = WORK_END_MIN
     const schedDate   = new Date().toISOString().split('T')[0]
     const nextDate    = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0] })()
 
-    const undone = tasks.filter(t => !t.done)
-      .sort((a, b) => {
-        const pa = a.priority ?? 3, pb = b.priority ?? 3
-        if (pa !== pb) return pa - pb
-        return (a.estimated_minutes ?? 30) - (b.estimated_minutes ?? 30)
-      })
+    // Only tasks that belong in today's plan (due soon / urgent / undated),
+    // hardest work first while the brain is fresh
+    const undone = orderByEnergy(selectSchedulable(tasks.filter(t => !t.done), Date.now()))
 
     const scheduled: PendingSchedule['scheduled'] = []
     const overflow:  PendingSchedule['overflow']  = []
@@ -291,11 +296,6 @@ export default function TasksPage() {
     const pinnedTasks = undone.filter(isPinned)
       .sort((a, b) => parseMin(a.deadline!.split('T')[1]) - parseMin(b.deadline!.split('T')[1]))
     const flexTasks = undone.filter(t => !isPinned(t))
-      .sort((a, b) => {
-        const pa = a.priority ?? 3, pb = b.priority ?? 3
-        if (pa !== pb) return pa - pb
-        return (a.estimated_minutes ?? 30) - (b.estimated_minutes ?? 30)
-      })
 
     const seenIds = new Set<string>()
     let cursor = now

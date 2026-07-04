@@ -136,9 +136,9 @@ async function generateWithGemini(options: any) {
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
     const overflowDate = tomorrow.toISOString().split('T')[0]
 
-    // Start from current time; end of day is 23:30
-    const nowMin = today.getHours() * 60 + today.getMinutes()
-    const endOfDayMin = 23 * 60 + 30
+    // Start from current time clamped into working hours (08:00–23:00)
+    const nowMin = Math.max(today.getHours() * 60 + today.getMinutes(), 8 * 60)
+    const endOfDayMin = 23 * 60
     const fmt = (min: number) =>
       `${Math.floor(min / 60).toString().padStart(2, '0')}:${(min % 60).toString().padStart(2, '0')}`
 
@@ -554,13 +554,15 @@ Response ${userTurns + 1} of max 3.`}`,
       `${Math.floor(min / 60).toString().padStart(2, '0')}:${(min % 60).toString().padStart(2, '0')}`
 
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
-    const endOfDayMin     = 23 * 60 + 30  // schedule up to 23:30
+    const endOfDayMin     = 23 * 60       // working window ends 23:00
+    const workStartMin    = 8 * 60        // and never starts before 08:00
     const overflowDate    = body.overflowDate ?? tomorrow.toISOString().split('T')[0]
-    // Use current real time as the start — no manual window needed
+    // Use current real time as the start, clamped into working hours —
+    // planning at 01:17 must produce an 08:00 plan, not a night shift
     const nowMin          = body.currentTime ? parseHHMM(body.currentTime) : 9 * 60
     const windowPassed    = nowMin >= endOfDayMin
     const scheduleDate    = windowPassed ? overflowDate : todayStr
-    const effectiveStartMin = windowPassed ? 9 * 60 : nowMin
+    const effectiveStartMin = windowPassed ? workStartMin : Math.max(nowMin, workStartMin)
     const effectiveStartStr = fmt(effectiveStartMin)
     const schedulable = undoneTasks
 
