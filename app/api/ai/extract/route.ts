@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { logAiCall } from '@/lib/data/tasks'
+import { parseEveryNDays } from '@/lib/utils/recurrence'
 
 const SYSTEM_PROMPT = `You are a task extraction assistant for LoadLight, a task and wellbeing manager.
 
@@ -24,6 +25,7 @@ Extract tasks from the user's free-form input. For each task produce these field
 - notes: any extra context
 - recurring: "none" | "daily" | "weekly". Set to "daily" when user says "daily", "every day", "everyday", or gives a fixed daily time.
 - recurringHours: integer if user says "every X hours", else null
+- recurringDays: integer if user says "every X days" / "every other day" / "every second day" (e.g. "throw trash every two days" → recurring "daily", recurringDays 2), else null. When recurringDays is set, also set recurring to "daily" and deadline to today (date only if no time given).
 
 CRITICAL RULE for recurring tasks with a fixed time:
 When a task recurs daily AND has a specific time (e.g. "everyday at 10:30", "daily 22:30"), you MUST:
@@ -79,20 +81,24 @@ function offlineFallback(input: string) {
     .split('\n')
     .map(l => l.trim())
     .filter(Boolean)
-    .map(line => ({
-      name: line,
-      category: 'Personal',
-      lifeDomain: 'personal',
-      demandType: 'routine',
-      difficulty: 2,
-      priority: 3,
-      deadline: null,
-      startDate: null,
-      estimatedMinutes: null,
-      notes: '',
-      recurring: 'none',
-      recurringHours: null,
-    }))
+    .map(line => {
+      const nDays = parseEveryNDays(line)
+      return {
+        name: line,
+        category: 'Personal',
+        lifeDomain: 'personal',
+        demandType: 'routine',
+        difficulty: 2,
+        priority: 3,
+        deadline: nDays ? today : null,
+        startDate: null,
+        estimatedMinutes: null,
+        notes: '',
+        recurring: nDays ? 'daily' : 'none',
+        recurringHours: null,
+        recurringDays: nDays,
+      }
+    })
   // offline flag lets the client show a visible warning
   return NextResponse.json({ tasks, offline: true })
 }
@@ -208,8 +214,19 @@ ${text}`
     // inputTimes is consumed in order: first recurring task gets first input time, etc.
     const inputTimesForRecurring = [...inputTimes] // separate copy so non-recurring tasks aren't affected
 
+    // Safety net: if the raw input says "every N days" and the AI missed it,
+    // apply it — only for single-task input where the phrase is unambiguous
+    const everyN = parseEveryNDays(text)
+
     const patched = (parsed.tasks as Record<string, unknown>[]).map(task => {
       const name = (task.name as string) ?? ''
+
+      if (everyN && parsed.tasks.length === 1 && !task.recurringDays) {
+        task.recurringDays = everyN
+        task.recurring = 'daily'
+        if (!task.deadline) task.deadline = today
+      }
+
       const recurring = task.recurring as string | undefined
       const dl = task.deadline as string | null
       const dateStr = dl ? dl.split('T')[0] : today

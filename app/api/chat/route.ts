@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { parseEveryNDays } from '@/lib/utils/recurrence'
+
 export const runtime = 'edge'
 
 // Direct Gemini API call using simple fetch
@@ -56,8 +58,9 @@ async function generateWithGemini(options: any) {
       if (everyHoursMatch) {
         recurring_hours = parseInt(everyHoursMatch[1])
       }
+      const recurring_days = parseEveryNDays(t)
 
-      const isDaily = lowerT.includes('daily') || lowerT.includes('every day') || lowerT.includes('everyday') || lowerT.includes('a day') || lowerT.includes('per day') || times_per_day > 1 || recurring_hours !== null
+      const isDaily = lowerT.includes('daily') || lowerT.includes('every day') || lowerT.includes('everyday') || lowerT.includes('a day') || lowerT.includes('per day') || times_per_day > 1 || recurring_hours !== null || recurring_days !== null
 
       // Extract time: "10:30", "3pm", "15:00", "9am"
       let deadline: string | null = null
@@ -81,6 +84,7 @@ async function generateWithGemini(options: any) {
       name = name.replace(/\b\d{1,2}:\d{2}\b/g, '').trim()
       name = name.replace(/\b\d{1,2}\s*(am|pm)\b/gi, '').trim()
       name = name.replace(/every\s+\d+\s*h(ours?)?/gi, '').trim()
+      name = name.replace(/every\s+(other|second)\s+day|every\s+(\d+|one|two|three|four|five|six|seven)\s+days?/gi, '').trim()
       name = name.replace(/daily|every\s*day|everyday|every\s*week|weekly|every\s*(mon|tue|wed|thu|fri|sat|sun)[a-z]*|\d+\s*times\s*(a|per)\s*day|twice\s*(a|per)?\s*day/gi, '').trim()
       name = name.replace(/\b(at|by|before|after)\s*$/i, '').replace(/^(to|on|at|for)\s+/i, '').replace(/[\.,;\s]+$/, '').trim()
       name = name.charAt(0).toUpperCase() + name.slice(1)
@@ -116,7 +120,8 @@ async function generateWithGemini(options: any) {
         estimated_minutes,
         recurring: isDaily ? 'daily' : isWeekly ? 'weekly' : 'none',
         times_per_day,
-        recurring_hours
+        recurring_hours,
+        recurring_days,
       }
     })
     return { object: { tasks } } as any
@@ -306,7 +311,7 @@ export async function POST(req: Request) {
 
     return Response.json((await generateWithGemini({
       mode: 'extract',
-      jsonSchemaText: `{ "tasks": [{ "name": "string", "category": "string", "demand_type": "cognitive" | "emotional" | "creative" | "routine" | "physical", "difficulty": number (1-5), "deadline": "YYYY-MM-DDTHH:mm" or null, "start_date": "YYYY-MM-DDTHH:mm" or null, "priority": 1 | 2 | 3 | 4, "notes": "string", "estimated_minutes": number or null, "recurring": "none" | "daily" | "weekly", "times_per_day": number, "recurring_hours": number | null }], "clarification": { "question": "string", "taskName": "string", "options": [{ "label": "string", "recurring": "none" | "daily" | "weekly", "recurring_hours": number | null }] } | null }`,
+      jsonSchemaText: `{ "tasks": [{ "name": "string", "category": "string", "demand_type": "cognitive" | "emotional" | "creative" | "routine" | "physical", "difficulty": number (1-5), "deadline": "YYYY-MM-DDTHH:mm" or null, "start_date": "YYYY-MM-DDTHH:mm" or null, "priority": 1 | 2 | 3 | 4, "notes": "string", "estimated_minutes": number or null, "recurring": "none" | "daily" | "weekly", "times_per_day": number, "recurring_hours": number | null, "recurring_days": number | null }], "clarification": { "question": "string", "taskName": "string", "options": [{ "label": "string", "recurring": "none" | "daily" | "weekly", "recurring_hours": number | null }] } | null }`,
       system: ETHICAL_SYSTEM_PROMPT,
       prompt: `<system_instruction>
 You are an advanced, agentic task-extraction AI for LoadLight. Your goal is to deeply analyze the user's input, break it down logically, and map it strictly to the allowed categories and schemas.
@@ -340,7 +345,7 @@ ${categories.join(', ')}
    - **Time-of-day anchored habits**: "morning coffee", "evening walk", "bedtime routine", "wake up", "brush teeth" → "daily".
    - **Gym/workout/run/yoga/exercise** with NO day specified → set recurring: "daily" as best guess AND flag for clarification (see rule 14).
    - If truly a one-off with no recurring signal → "none".
-7. **TIMES PER DAY / EVERY N HOURS**: If the task occurs multiple times a day (e.g. "3 times a day", "twice daily"), set 'times_per_day' to that number and 'recurring_hours' to null. If the user says "every X hours" (e.g. "every 8 hours", "every 4h", "every 2 hours"), set 'recurring_hours' to X and 'recurring' to "daily", and 'times_per_day' to 1. Otherwise 'recurring_hours' is null. Clean these phrases out of the task name.
+7. **TIMES PER DAY / EVERY N HOURS**: If the task occurs multiple times a day (e.g. "3 times a day", "twice daily"), set 'times_per_day' to that number and 'recurring_hours' to null. If the user says "every X hours" (e.g. "every 8 hours", "every 4h", "every 2 hours"), set 'recurring_hours' to X and 'recurring' to "daily", and 'times_per_day' to 1. Otherwise 'recurring_hours' is null. If the user says "every X days", "every other day", or "every second day" (e.g. "throw trash every two days"), set 'recurring_days' to X (2 for "every other/second day"), 'recurring' to "daily", and deadline to today (date only if no time given). Otherwise 'recurring_days' is null. Clean these phrases out of the task name.
 8. **INVENT TASKS**: If the user explicitly asks you to "give me a random task", "invent a task", or "suggest something to do", DO NOT extract their command. Instead, invent a realistic, actionable task for them (e.g., "Read 10 pages of a book", "Organize your desk").
 9. **DEADLINE WITH TIME**: If a specific time is mentioned (e.g., "at 10:30", "by 3pm", "10:30", "3pm"), ALWAYS extract it into the deadline field using 24-hour "YYYY-MM-DDTHH:mm" format. Use today's date (${todayStr}) when only a time is given. Examples: "pills 10:30" -> deadline: "${todayStr}T10:30", "meeting 3pm" -> deadline: "${todayStr}T15:00", "call by Friday 2pm" -> deadline: "[next friday]T14:00". Remove the time expression from the task name.
 10. **START DATE**: If the user says "starting at", "from [time]", "begin at", set start_date to that datetime. For tasks with only a deadline time (no explicit start), start_date is null.

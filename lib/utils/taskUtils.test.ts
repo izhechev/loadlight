@@ -317,4 +317,31 @@ describe('effectiveDeadline', () => {
     // Time portion should contain '08:00'
     expect(result).toContain('08:00')
   })
+
+  it('advances a past weekly deadline in 7-day steps, preserving weekday and time', () => {
+    // 2026-01-01 is a Thursday; now is Thursday 2026-04-16 at noon.
+    const now = new Date('2026-04-16T12:00Z').getTime()
+    const task = { deadline: '2026-01-01T08:00Z', recurring: 'weekly' as string | null, name: 'Clean apartment' }
+    const result = effectiveDeadline(task, now)!
+    expect(result).not.toBeNull()
+    // Next Thursday 08:00 after now → 2026-04-23 (16th 08:00 already passed)
+    expect(result).toContain('2026-04-23')
+    expect(result).toContain('08:00')
+  })
+
+  it('returns a future weekly deadline unchanged', () => {
+    const now = new Date('2026-04-16T12:00Z').getTime()
+    const task = { deadline: '2026-04-20T08:00Z', recurring: 'weekly' as string | null, name: 'Clean apartment' }
+    const result = effectiveDeadline(task, now)!
+    expect(result).toContain('2026-04-20')
+  })
+
+  it('advances an every-2-days task in 2-day steps from its base date', () => {
+    // Base 2026-04-10; now 2026-04-16 12:00 → occurrences 10,12,14,16(08:00 passed),18
+    const now = new Date('2026-04-16T12:00Z').getTime()
+    const task = { deadline: '2026-04-10T08:00Z', recurring: 'daily' as string | null, recurringDays: 2, name: 'Throw trash' }
+    const result = effectiveDeadline(task, now)!
+    expect(result).toContain('2026-04-18')
+    expect(result).toContain('08:00')
+  })
 })

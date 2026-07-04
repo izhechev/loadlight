@@ -37,6 +37,7 @@ export const tasks = pgTable('tasks', {
   status:           text('status').notNull().default('active'),  // active | completed | archived
   recurring:        text('recurring').notNull().default('none'), // none | daily | weekly
   recurringHours:   integer('recurring_hours'),
+  recurringDays:    integer('recurring_days'), // every N days (e.g. 2 = every other day); null = use recurring cadence
   snoozedUntil:     timestamp('snoozed_until', { withTimezone: true }),
   createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   completedAt:      timestamp('completed_at', { withTimezone: true }),
@@ -145,6 +146,8 @@ create table tasks (
   status            text not null default 'active' check (status in ('active','completed','archived')),
   recurring         text not null default 'none' check (recurring in ('none','daily','weekly')),
   recurring_hours   integer,
+  recurring_days    integer, -- every N days (e.g. 2 = every other day)
+  -- Existing databases: alter table tasks add column recurring_days integer;
   snoozed_until     timestamptz,
   created_at        timestamptz not null default now(),
   completed_at      timestamptz

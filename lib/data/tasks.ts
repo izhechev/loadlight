@@ -6,6 +6,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import type { OverwhelmedState } from '@/lib/store/overwhelmedStore'
+import { ensureRecurringDeadline } from '@/lib/utils/recurrence'
 
 export const IS_DEMO = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
@@ -29,6 +30,7 @@ export interface Task {
   status: 'active' | 'completed' | 'archived'
   recurring: string
   recurringHours?: number | null
+  recurringDays?: number | null
   snoozedUntil?: number | null
   createdAt?: string
   completedAt?: string | null
@@ -118,8 +120,23 @@ function lsSetProfile(updates: Partial<Profile>): void {
 // Task CRUD
 // ─────────────────────────────────────────────
 
+/** Give a recurring task a concrete deadline (today, date-only) if it has none. */
+function withBackfilledDeadline<T extends Pick<Task, 'deadline' | 'recurring' | 'recurringDays' | 'status'>>(task: T): T {
+  if (task.status === 'active') {
+    const filled = ensureRecurringDeadline(task.deadline, task, Date.now())
+    if (filled !== (task.deadline ?? null)) return { ...task, deadline: filled }
+  }
+  return task
+}
+
 export async function getTasks(): Promise<Task[]> {
-  if (IS_DEMO) return lsGetTasks()
+  if (IS_DEMO) {
+    const tasks = lsGetTasks()
+    const repaired = tasks.map(withBackfilledDeadline)
+    // Persist any backfilled deadlines so they stay stable across loads
+    if (repaired.some((t, i) => t !== tasks[i])) lsSetTasks(repaired)
+    return repaired
+  }
 
   const supabase = createClient()
   const { data, error } = await supabase
@@ -129,7 +146,15 @@ export async function getTasks(): Promise<Task[]> {
 
   if (error) throw error
 
-  return (data ?? []).map(dbRowToTask)
+  const tasks = (data ?? []).map(dbRowToTask)
+  const repaired = tasks.map(withBackfilledDeadline)
+  // Persist backfilled deadlines fire-and-forget; reads shouldn't block on writes
+  repaired.forEach((t, i) => {
+    if (t !== tasks[i]) {
+      supabase.from('tasks').update({ deadline: toUtcTs(t.deadline) }).eq('id', t.id).then(() => {})
+    }
+  })
+  return repaired
 }
 
 /** Ensure the profiles row exists for the given user — required before any task insert (FK). */
@@ -143,7 +168,8 @@ async function ensureProfile(supabase: ReturnType<typeof createClient>, userId: 
   // Ignore errors — profile may already exist, FK will succeed either way
 }
 
-export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<Task> {
+export async function addTask(rawTask: Omit<Task, 'id' | 'createdAt'>): Promise<Task> {
+  const task = withBackfilledDeadline(rawTask)
   if (IS_DEMO) {
     const newTask: Task = {
       ...task,
@@ -170,7 +196,8 @@ export async function addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<Tas
   return dbRowToTask(data)
 }
 
-export async function addTasks(tasks: Omit<Task, 'id' | 'createdAt'>[]): Promise<Task[]> {
+export async function addTasks(rawTasks: Omit<Task, 'id' | 'createdAt'>[]): Promise<Task[]> {
+  const tasks = rawTasks.map(withBackfilledDeadline)
   if (IS_DEMO) {
     const newTasks = tasks.map(t => ({
       ...t,
@@ -356,6 +383,7 @@ function dbRowToTask(row: any): Task {
     status:           row.status ?? 'active',
     recurring:        row.recurring ?? 'none',
     recurringHours:   row.recurring_hours ?? null,
+    recurringDays:    row.recurring_days ?? null,
     snoozedUntil:     row.snoozed_until ? new Date(row.snoozed_until).getTime() : null,
     createdAt:        row.created_at,
     completedAt:      row.completed_at ?? null,
@@ -391,6 +419,7 @@ function taskToDbRow(task: Partial<Task>): Record<string, unknown> {
   if (task.status           !== undefined) row.status            = task.status
   if (task.recurring        !== undefined) row.recurring         = task.recurring
   if (task.recurringHours   !== undefined) row.recurring_hours   = task.recurringHours
+  if (task.recurringDays    !== undefined) row.recurring_days    = task.recurringDays
   if (task.completedAt      !== undefined) row.completed_at      = task.completedAt
   if (task.snoozedUntil     !== undefined) {
     row.snoozed_until = task.snoozedUntil ? new Date(task.snoozedUntil).toISOString() : null

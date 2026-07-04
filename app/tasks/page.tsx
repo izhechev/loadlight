@@ -9,6 +9,8 @@ import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { getTasks, updateTask, deleteTask, addTasks, IS_DEMO } from "@/lib/data/tasks"
+import { effectiveDeadline as computeEffectiveDeadline } from "@/lib/utils/taskUtils"
+import { nextRecurrenceDeadline, recurringLabel } from "@/lib/utils/recurrence"
 import { PastDeadlineModal } from "@/components/past-deadline-modal"
 
 interface Task {
@@ -26,6 +28,7 @@ interface Task {
   createdAt: number
   recurring?: 'none' | 'daily' | 'weekly'
   recurring_hours?: number | null
+  recurring_days?: number | null
   snoozedUntil?: number
 }
 
@@ -87,7 +90,16 @@ export default function TasksPage() {
     const time = Date.now()
     setNow(time)
     getTasks()
-      .then(data => setTasks(data.map(t => ({ ...t, category: t.category || t.lifeDomain || 'Personal' })) as unknown as Task[]))
+      .then(data => setTasks(data.map(t => ({
+        ...t,
+        category: t.category || t.lifeDomain || 'Personal',
+        // Alias camelCase data-layer fields to the snake_case names this page reads
+        demand_type: (t as any).demand_type ?? t.demandType ?? 'routine',
+        estimated_minutes: (t as any).estimated_minutes ?? t.estimatedMinutes ?? null,
+        recurring_hours: (t as any).recurring_hours ?? t.recurringHours ?? null,
+        recurring_days: (t as any).recurring_days ?? t.recurringDays ?? null,
+        start_date: (t as any).start_date ?? t.startDate ?? null,
+      })) as unknown as Task[]))
       .catch(() => {
         // Fallback: read localStorage directly
         try {
@@ -137,7 +149,7 @@ export default function TasksPage() {
         setTasks(updated)
         syncAndCompute(updated)
         deleteTask(id).catch(() => {})
-        addTasks(subTasks.map(s => ({ name: s.name, category: s.category, lifeDomain: 'personal', demandType: (s as any).demand_type ?? 'routine', difficulty: s.difficulty ?? 2, priority: s.priority ?? 3, deadline: s.deadline, startDate: null, estimatedMinutes: s.estimated_minutes, notes: s.notes ?? '', status: 'active' as const, recurring: s.recurring ?? 'none', recurringHours: s.recurring_hours ?? null }))).catch(() => {})
+        addTasks(subTasks.map(s => ({ name: s.name, category: s.category, lifeDomain: 'personal', demandType: (s as any).demand_type ?? 'routine', difficulty: s.difficulty ?? 2, priority: s.priority ?? 3, deadline: s.deadline, startDate: null, estimatedMinutes: s.estimated_minutes, notes: s.notes ?? '', status: 'active' as const, recurring: s.recurring ?? 'none', recurringHours: s.recurring_hours ?? null, recurringDays: (s as any).recurring_days ?? null }))).catch(() => {})
       }
     } catch { alert('Failed to break down task.') }
     finally { setBreakingDownId(null) }
@@ -305,8 +317,15 @@ export default function TasksPage() {
     if (!pendingSchedule) return
     const todayStr = new Date().toISOString().split('T')[0]
     const updates = new Map<string, Partial<Task>>()
-    // Scheduled tasks: set their new start_date and deadline
-    pendingSchedule.scheduled.forEach(s => updates.set(s.id, { start_date: s.start_date, deadline: s.deadline }))
+    // Scheduled tasks: set their new start_date and deadline.
+    // Recurring tasks with a fixed anchor time (e.g. meds at 10:00) keep their
+    // deadline — only the start slot is recorded, so the anchor never drifts.
+    pendingSchedule.scheduled.forEach(s => {
+      const existing = tasks.find(t => t.id === s.id)
+      const hasFixedAnchor = existing && existing.recurring && existing.recurring !== 'none' &&
+        existing.deadline?.includes('T') && !existing.deadline.split('T')[1].startsWith('00:00')
+      updates.set(s.id, hasFixedAnchor ? { start_date: s.start_date } : { start_date: s.start_date, deadline: s.deadline })
+    })
     // Overflow tasks: clear start_date, but only change deadline if the task has no deadline
     // or its deadline is already set to today (meaning it was scheduled for today but now moves)
     // Never overwrite deadlines that belong to a different day (e.g. medical reminders)
@@ -339,17 +358,16 @@ export default function TasksPage() {
     let updated = tasks.map(t => t.id === id ? { ...t, done: nowDone } : t)
     updateTask(id, { done: nowDone, status: nowDone ? 'completed' : 'active', completedAt: nowDone ? new Date().toISOString() : null }).catch(() => {})
     if (!task.done && (task.recurring === 'daily' || task.recurring === 'weekly')) {
-      const nextDate = task.deadline ? new Date(task.deadline) : new Date()
-      if (task.recurring === 'daily') nextDate.setDate(nextDate.getDate() + 1)
-      if (task.recurring === 'weekly') nextDate.setDate(nextDate.getDate() + 7)
-      // Preserve the original time portion so "Take lamictal at 22:30" stays at 22:30 each day
-      const timepart = task.deadline?.includes('T') ? task.deadline.split('T')[1] : null
-      const nextDeadline = timepart
-        ? `${nextDate.toISOString().split('T')[0]}T${timepart}`
-        : nextDate.toISOString().split('T')[0]
+      // Advance on the task's day grid (daily +1, weekly +7, every-N-days +N),
+      // preserving the time portion so "Take lamictal at 22:30" stays at 22:30
+      const nextDeadline = nextRecurrenceDeadline(
+        task.deadline,
+        { recurring: task.recurring, recurringDays: task.recurring_days },
+        Date.now(),
+      )
       const newTask = { ...task, id: Math.random().toString(36).slice(2), done: false, createdAt: Date.now(), deadline: nextDeadline }
       updated = [...updated, newTask]
-      addTasks([{ ...newTask, status: 'active', notes: newTask.notes ?? '', recurring: newTask.recurring ?? 'none', lifeDomain: 'personal', demandType: (newTask as any).demand_type ?? 'routine' }]).catch(() => {})
+      addTasks([{ ...newTask, status: 'active', notes: newTask.notes ?? '', recurring: newTask.recurring ?? 'none', recurringDays: newTask.recurring_days ?? null, lifeDomain: 'personal', demandType: (newTask as any).demand_type ?? 'routine' }]).catch(() => {})
     }
     setTasks(updated)
     syncAndCompute(updated)
@@ -378,6 +396,7 @@ export default function TasksPage() {
       notes: edited.notes,
       recurring: edited.recurring ?? 'none',
       recurringHours: edited.recurring_hours,
+      recurringDays: edited.recurring_days ?? null,
       snoozedUntil: edited.snoozedUntil,
     }).catch(() => {})
   }
@@ -478,41 +497,13 @@ export default function TasksPage() {
       return `${d.getUTCDate()} ${UTC_MONTHS[d.getUTCMonth()]}`
     } catch { return '' }
   }
-  // Helper: for recurring daily tasks, advance the deadline to the next future occurrence
+  // Helper: for recurring tasks, advance the deadline to the next future
+  // occurrence on the task's day grid (daily/weekly/every-N-days).
   function effectiveDeadline(task: Task): string | null {
-    const dl = task.deadline
-    if (!dl || task.recurring !== 'daily') return dl
-    const normalized = normalizeDt(dl)
-    const base = new Date(normalized)
-    if (isNaN(base.getTime())) return dl
-    const currentNow = now || Date.now()
-
-    // Determine the time-of-day to use:
-    // 1. From the stored deadline (if it has a non-midnight time)
-    // 2. From the task name (e.g. "Take Lamictal 10:30") as fallback for legacy midnight entries
-    let timeStr = normalized.includes('T') ? normalized.split('T')[1] : '00:00'
-    const isMidnight = timeStr.startsWith('00:00')
-    if (isMidnight) {
-      const nameMatch = task.name.match(/\b(\d{1,2}):(\d{2})\b/)
-      if (nameMatch) timeStr = `${nameMatch[1].padStart(2, '0')}:${nameMatch[2]}`
-    }
-
-    // Reconstruct a base date that combines original date + correct time
-    const dateOnlyStr = normalized.split('T')[0]
-    const baseWithTime = new Date(`${dateOnlyStr}T${timeStr.split('+')[0].split('Z')[0]}Z`)
-    const effectiveBase = isNaN(baseWithTime.getTime()) ? base : baseWithTime
-
-    if (effectiveBase.getTime() > currentNow) return `${dateOnlyStr}T${timeStr}`
-
-    // Advance by full days until it's in the future
-    const msPerDay = 86400000
-    const elapsed = currentNow - effectiveBase.getTime()
-    const daysAhead = Math.ceil(elapsed / msPerDay)
-    const next = new Date(effectiveBase.getTime() + daysAhead * msPerDay)
-    const yyyy = next.getUTCFullYear()
-    const mm = String(next.getUTCMonth() + 1).padStart(2, '0')
-    const dd = String(next.getUTCDate()).padStart(2, '0')
-    return `${yyyy}-${mm}-${dd}T${timeStr}`
+    return computeEffectiveDeadline(
+      { deadline: task.deadline, recurring: task.recurring, recurringDays: task.recurring_days, name: task.name },
+      now || Date.now(),
+    )
   }
 
   // Helper: format time portion — reads UTC hours (= AI's intended local time)
@@ -529,6 +520,8 @@ export default function TasksPage() {
       return `${hour12}:${String(m).padStart(2, '0')}${suffix}`
     } catch { return null }
   }
+
+  const todayKey = new Date(now || Date.now()).toISOString().split('T')[0]
 
   const tasksByDate = new Map<string, Task[]>()
   visible.filter(t => t.deadline).forEach(t => {
@@ -560,15 +553,18 @@ export default function TasksPage() {
           <div className="flex flex-wrap gap-1.5 mt-1 items-center">
             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${DEMAND_COLORS[task.demand_type]} border border-white/5 shadow-sm`}>{task.demand_type}</span>
             <span className="text-xs text-slate-400 font-mono tracking-tighter">{difficultyDots(task.difficulty)}</span>
-            {task.recurring_hours ? (
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-violet-100/90 text-violet-700 border border-violet-300/50 flex items-center gap-1">
-                <RefreshCw className="w-3 h-3" /> Every {task.recurring_hours}h
-              </span>
-            ) : task.recurring && task.recurring !== 'none' && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100/90 text-emerald-700 border border-emerald-300/50 flex items-center gap-1">
-                <RefreshCw className="w-3 h-3" /> {task.recurring}
-              </span>
-            )}
+            {(() => {
+              const lbl = recurringLabel({ recurring: task.recurring, recurringDays: task.recurring_days, recurringHours: task.recurring_hours })
+              if (!lbl) return null
+              const cls = task.recurring_hours
+                ? 'bg-violet-100/90 text-violet-700 border-violet-300/50'
+                : 'bg-emerald-100/90 text-emerald-700 border-emerald-300/50'
+              return (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border flex items-center gap-1 ${cls}`}>
+                  <RefreshCw className="w-3 h-3" /> {lbl}
+                </span>
+              )
+            })()}
             {task.snoozedUntil && task.snoozedUntil > (now || Date.now()) && (
               <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-violet-100/80 text-violet-600 border border-violet-200/60 flex items-center gap-1">
                 💤 snoozed
@@ -601,6 +597,8 @@ export default function TasksPage() {
               // Only show start badge if it's a different day than the deadline,
               // or if there is no deadline — avoids showing two dates on the same card
               if (sameDay) return null
+              // Hide stale start markers from past day plans (e.g. yesterday's schedule slot)
+              if (dateKey(task.start_date) < todayKey) return null
               return (
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border bg-emerald-50/60 text-emerald-600 border-emerald-200/60">
                   ▶ {formatDate(task.start_date!)}
