@@ -64,6 +64,10 @@ export default function TasksPage() {
   const [view, setView] = useState<'list' | 'board' | 'calendar'>('list')
   const [calMonth, setCalMonth] = useState(() => new Date())
   const [now, setNow] = useState<number>(0)
+  const [migrationNeeded, setMigrationNeeded] = useState(false)
+  useEffect(() => {
+    try { setMigrationNeeded(localStorage.getItem('loadlight-migration-needed') === '1') } catch { /* ignore */ }
+  }, [tasks])
   const [breakingDownId, setBreakingDownId] = useState<string | null>(null)
   const [scheduleText, setScheduleText]     = useState('')
   const [overflowDate, setOverflowDate]     = useState(() => localDateStr(1))
@@ -937,6 +941,18 @@ export default function TasksPage() {
             </div>
           )}
         </div>
+
+        {/* Database migration needed — repeat cadences are being dropped on save */}
+        {migrationNeeded && (
+          <div className="aero-warning rounded-2xl px-4 py-3 text-sm font-bold flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>
+              Your database needs a one-time update — repeat settings like &quot;every 2 days&quot;, monthly and yearly
+              are being saved as plain daily until it runs. Open Supabase → SQL Editor and run the statements in{' '}
+              <code className="font-mono text-xs">supabase/MIGRATIONS.sql</code>, then edit the task again.
+            </span>
+          </div>
+        )}
 
         {/* Rest mode notice */}
         {overwhelmedState !== 'normal' && (
