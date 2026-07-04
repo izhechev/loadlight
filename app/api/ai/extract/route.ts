@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { logAiCall } from '@/lib/data/tasks'
 import { parseEveryNDays } from '@/lib/utils/recurrence'
+import { correctWeekdayDeadline } from '@/lib/utils/dateWords'
 
 const SYSTEM_PROMPT = `You are a task extraction assistant for LoadLight, a task and wellbeing manager.
 
@@ -110,7 +111,16 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.GOOGLE_API_KEY
   if (!apiKey) return offlineFallback(text)
 
-  const userPrompt = `Today's date: ${new Date().toISOString().split('T')[0]}
+  // LLMs miscompute weekdays from a bare date — spell out the next week
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const nowUtc = Date.now()
+  const calendar = Array.from({ length: 8 }, (_, i) => {
+    const d = new Date(nowUtc + i * 86400000)
+    return `${DAY_NAMES[d.getUTCDay()]} = ${d.toISOString().split('T')[0]}`
+  }).join(', ')
+
+  const userPrompt = `Today's date: ${new Date().toISOString().split('T')[0]} (${DAY_NAMES[new Date().getUTCDay()]})
+Upcoming days for date resolution — use these EXACT dates when the user names a weekday: ${calendar}
 Available categories: ${(categories ?? ['Work', 'Study', 'Personal', 'Exercise', 'Creative', 'Admin']).join(', ')}
 
 User input:
@@ -244,6 +254,11 @@ ${text}`
         task.deadline = `${dateStr}T${nameMatch[1].padStart(2, '0')}:${nameMatch[2]}`
       }
 
+      return task
+    }).map(task => {
+      // Safety net: snap the date to the weekday the user actually named
+      // ("monday" must not land on a Wednesday), preserving the time portion
+      task.deadline = correctWeekdayDeadline(task.deadline as string | null, text, Date.now())
       return task
     })
     return NextResponse.json({ tasks: patched })
