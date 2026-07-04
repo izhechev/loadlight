@@ -150,6 +150,13 @@ function downgradeRowForOldSchema(row: Record<string, unknown>): void {
   try { localStorage.setItem('loadlight-migration-needed', '1') } catch { /* ignore */ }
 }
 
+/** A cadence-bearing row saved intact — the migration has run, clear the banner. */
+function clearMigrationFlagIfIntact(row: Record<string, unknown>): void {
+  if ('recurring_days' in row) {
+    try { localStorage.removeItem('loadlight-migration-needed') } catch { /* ignore */ }
+  }
+}
+
 /** Notify listeners (global balance check) that the task list changed. */
 function notifyTasksChanged(): void {
   if (typeof window !== 'undefined') {
@@ -233,6 +240,7 @@ export async function addTask(rawTask: Omit<Task, 'id' | 'createdAt'>): Promise<
   }
 
   if (error) throw error
+  clearMigrationFlagIfIntact(row)
   notifyTasksChanged()
   return dbRowToTask(data)
 }
@@ -264,6 +272,7 @@ export async function addTasks(rawTasks: Omit<Task, 'id' | 'createdAt'>[]): Prom
     ;({ data, error } = await supabase.from('tasks').insert(rows).select())
   }
   if (error) throw error
+  rows.forEach(clearMigrationFlagIfIntact)
   notifyTasksChanged()
   return (data ?? []).map(dbRowToTask)
 }
@@ -285,6 +294,7 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<vo
   }
 
   if (error) throw error
+  clearMigrationFlagIfIntact(row)
   notifyTasksChanged()
 }
 
