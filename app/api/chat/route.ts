@@ -246,6 +246,7 @@ export async function POST(req: Request) {
     recentToughDays?: number   // consecutive tough days ending today (incl. today)
     missingAreas?: string[]    // life areas with no active task (balance-check)
     overflowDate?: string // "YYYY-MM-DD" — schedule mode
+    todayStr?: string     // client's LOCAL date — server clock is UTC
     currentTime?: string  // "HH:MM" — current wall-clock time
     history?: { role: 'assistant' | 'user'; text: string }[] // schedule_chat conversation
   }
@@ -543,7 +544,9 @@ Response ${userTurns + 1} of max 3.`}`,
   if (mode === 'schedule') {
     const taskList = tasks ?? []
     const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
+    // Prefer the client's local date — the server clock is UTC, which at 1am
+    // local still says yesterday and dated whole plans one day early
+    const todayStr = body.todayStr ?? today.toISOString().split('T')[0]
     const undoneTasks = taskList.filter(t => !t.done)
 
     const parseHHMM = (hhmm: string) => {

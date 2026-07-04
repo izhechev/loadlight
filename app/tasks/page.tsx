@@ -11,7 +11,7 @@ import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { getTasks, updateTask, deleteTask, addTasks, isLocalMode } from "@/lib/data/tasks"
 import { effectiveDeadline as computeEffectiveDeadline, deadlineStatus } from "@/lib/utils/taskUtils"
 import { nextRecurrenceDeadline, recurringLabel, isPastDeadline, isRecurring } from "@/lib/utils/recurrence"
-import { selectSchedulable, orderByEnergy, WORK_START_MIN, WORK_END_MIN } from "@/lib/utils/scheduling"
+import { selectSchedulable, orderByEnergy, WORK_START_MIN, WORK_END_MIN, localDateStr } from "@/lib/utils/scheduling"
 import { PastDeadlineModal } from "@/components/past-deadline-modal"
 
 interface Task {
@@ -66,10 +66,7 @@ export default function TasksPage() {
   const [now, setNow] = useState<number>(0)
   const [breakingDownId, setBreakingDownId] = useState<string | null>(null)
   const [scheduleText, setScheduleText]     = useState('')
-  const [overflowDate, setOverflowDate]     = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 1)
-    return d.toISOString().split('T')[0]
-  })
+  const [overflowDate, setOverflowDate]     = useState(() => localDateStr(1))
   const [isScheduling, setIsScheduling]     = useState(false)
   const [scheduleMsg, setScheduleMsg]       = useState<string | null>(null)
   const [showScheduler, setShowScheduler]   = useState(false)
@@ -124,7 +121,7 @@ export default function TasksPage() {
   useEffect(() => {
     if (overdueScanned.current || !now || tasks.length === 0) return
     overdueScanned.current = true
-    const today = new Date(now).toISOString().slice(0, 10)
+    const today = localDateStr()
     try { if (localStorage.getItem('loadlight-overdue-prompted') === today) return } catch { /* ignore */ }
     const overdue = tasks.filter(t => !t.done && isPastDeadline(t.deadline, t.recurring, now))
     if (overdue.length === 0) return
@@ -246,7 +243,7 @@ export default function TasksPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'schedule', text: context, tasks: selectSchedulable(tasks, Date.now()), overflowDate, currentTime: nowHHMM() }),
+        body: JSON.stringify({ mode: 'schedule', text: context, tasks: selectSchedulable(tasks, Date.now()), overflowDate, currentTime: nowHHMM(), todayStr: localDateStr() }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as PendingSchedule
@@ -275,8 +272,8 @@ export default function TasksPage() {
     // Plan inside working hours only — never into the night
     const now         = Math.max(parseMin(nowHHMM()), WORK_START_MIN)
     const endOfDay    = WORK_END_MIN
-    const schedDate   = new Date().toISOString().split('T')[0]
-    const nextDate    = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0] })()
+    const schedDate   = localDateStr()
+    const nextDate    = localDateStr(1)
 
     // Only tasks that belong in today's plan (due soon / urgent / undated),
     // hardest work first while the brain is fresh
@@ -354,7 +351,7 @@ export default function TasksPage() {
         existing.deadline?.includes('T') && !existing.deadline.split('T')[1].startsWith('00:00')
       return hasFixedAnchor ? { start_date: item.start_date } : { start_date: item.start_date, deadline: item.deadline }
     }
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = localDateStr()
     const isFixedOnAnotherDay = existing?.deadline && !existing.deadline.startsWith(todayStr)
     return isFixedOnAnotherDay
       ? { start_date: null }
@@ -579,7 +576,7 @@ export default function TasksPage() {
     } catch { return null }
   }
 
-  const todayKey = new Date(now || Date.now()).toISOString().split('T')[0]
+  const todayKey = localDateStr()
 
   const tasksByDate = new Map<string, Task[]>()
   visible.filter(t => t.deadline).forEach(t => {

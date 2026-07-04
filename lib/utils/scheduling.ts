@@ -4,6 +4,16 @@
 export const WORK_START_MIN = 8 * 60   // 08:00 — never plan into the night
 export const WORK_END_MIN = 23 * 60    // 23:00 — wind down before midnight
 
+/**
+ * The user's LOCAL calendar date as "YYYY-MM-DD" (optionally offset by days).
+ * Never use toISOString() for "today" — that's UTC, and at 1am local it still
+ * says yesterday, which dated whole day plans one day early.
+ */
+export function localDateStr(daysFromToday = 0): string {
+  const d = new Date(Date.now() + daysFromToday * 86400_000)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export interface SchedulableTask {
   id: string
   name: string
