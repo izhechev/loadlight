@@ -10,6 +10,23 @@ import { ensureRecurringDeadline } from '@/lib/utils/recurrence'
 
 export const IS_DEMO = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
+/** Guest mode: user chose "try without an account" — everything stays on this device. */
+export function isGuestMode(): boolean {
+  if (typeof document === 'undefined') return false
+  return document.cookie.split('; ').some(c => c === 'll-guest=1')
+}
+
+export function enableGuestMode(): void {
+  if (typeof document !== 'undefined') {
+    document.cookie = 'll-guest=1; path=/; max-age=31536000; samesite=lax'
+  }
+}
+
+/** Data stays in localStorage when Supabase is absent (demo) or the user is a guest. */
+export function isLocalMode(): boolean {
+  return IS_DEMO || isGuestMode()
+}
+
 // ─────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────
@@ -148,7 +165,7 @@ function withBackfilledDeadline<T extends Pick<Task, 'deadline' | 'recurring' | 
 }
 
 export async function getTasks(): Promise<Task[]> {
-  if (IS_DEMO) {
+  if (isLocalMode()) {
     const tasks = lsGetTasks()
     const repaired = tasks.map(withBackfilledDeadline)
     // Persist any backfilled deadlines so they stay stable across loads
@@ -188,7 +205,7 @@ async function ensureProfile(supabase: ReturnType<typeof createClient>, userId: 
 
 export async function addTask(rawTask: Omit<Task, 'id' | 'createdAt'>): Promise<Task> {
   const task = withBackfilledDeadline(rawTask)
-  if (IS_DEMO) {
+  if (isLocalMode()) {
     const newTask: Task = {
       ...task,
       id: Math.random().toString(36).slice(2),
@@ -220,7 +237,7 @@ export async function addTask(rawTask: Omit<Task, 'id' | 'createdAt'>): Promise<
 
 export async function addTasks(rawTasks: Omit<Task, 'id' | 'createdAt'>[]): Promise<Task[]> {
   const tasks = rawTasks.map(withBackfilledDeadline)
-  if (IS_DEMO) {
+  if (isLocalMode()) {
     const newTasks = tasks.map(t => ({
       ...t,
       id: Math.random().toString(36).slice(2),
@@ -250,7 +267,7 @@ export async function addTasks(rawTasks: Omit<Task, 'id' | 'createdAt'>[]): Prom
 }
 
 export async function updateTask(id: string, updates: Partial<Task>): Promise<void> {
-  if (IS_DEMO) {
+  if (isLocalMode()) {
     const tasks = lsGetTasks()
     lsSetTasks(tasks.map(t => t.id === id ? { ...t, ...updates } : t))
     notifyTasksChanged()
@@ -270,7 +287,7 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<vo
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  if (IS_DEMO) {
+  if (isLocalMode()) {
     lsSetTasks(lsGetTasks().filter(t => t.id !== id))
     notifyTasksChanged()
     return
@@ -287,7 +304,7 @@ export async function deleteTask(id: string): Promise<void> {
 // ─────────────────────────────────────────────
 
 export async function getProfile(): Promise<Profile | null> {
-  if (IS_DEMO) return lsGetProfile()
+  if (isLocalMode()) return lsGetProfile()
 
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -310,7 +327,7 @@ export async function getProfile(): Promise<Profile | null> {
 }
 
 export async function upsertProfile(updates: Partial<Profile>): Promise<void> {
-  if (IS_DEMO) {
+  if (isLocalMode()) {
     lsSetProfile(updates)
     return
   }
@@ -336,7 +353,7 @@ export async function upsertProfile(updates: Partial<Profile>): Promise<void> {
 // ─────────────────────────────────────────────
 
 export async function saveStateSnapshot(snapshot: Omit<StateSnapshotInsert, 'userId'>): Promise<void> {
-  if (IS_DEMO) return // not persisted in demo mode
+  if (isLocalMode()) return // not persisted in demo mode
 
   try {
     const supabase = createClient()
@@ -361,7 +378,7 @@ export async function logOverwhelmEvent(
   previousState: OverwhelmedState,
   newState: OverwhelmedState,
 ): Promise<void> {
-  if (IS_DEMO) return
+  if (isLocalMode()) return
 
   try {
     const supabase = createClient()
@@ -378,7 +395,7 @@ export async function logOverwhelmEvent(
 }
 
 export async function logAiCall(log: AiLogInsert): Promise<void> {
-  if (IS_DEMO) return
+  if (isLocalMode()) return
 
   try {
     const supabase = createClient()

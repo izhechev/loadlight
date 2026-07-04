@@ -4,6 +4,7 @@ import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+import { enableGuestMode } from "@/lib/data/tasks"
 import { useRouter } from "next/navigation"
 import { Lock, Mail } from "@/lib/icons"
 
@@ -171,13 +172,15 @@ export default function LoginPage() {
               {tab === 'signup' ? 'Create Account' : 'Sign In'}
             </button>
 
-            {!process.env.NEXT_PUBLIC_SUPABASE_URL && (
-              <div style={{ textAlign: 'center', paddingTop: 4 }}>
-                <Link href="/dashboard" style={{ fontSize: 11, color: '#5a7a9a', textDecoration: 'underline', fontWeight: 600 }}>
-                  Continue as guest (demo mode) →
-                </Link>
-              </div>
-            )}
+            <div style={{ textAlign: 'center', paddingTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => { enableGuestMode(); router.push('/dashboard') }}
+                style={{ fontSize: 11, color: '#5a7a9a', textDecoration: 'underline', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                Try without an account — data stays on this device →
+              </button>
+            </div>
           </form>
         )}
       </div>

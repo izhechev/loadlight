@@ -8,7 +8,7 @@ import { AppLayout } from "@/components/app-layout"
 import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib/store/overwhelmedStore"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
-import { getTasks, updateTask, deleteTask, addTasks, IS_DEMO } from "@/lib/data/tasks"
+import { getTasks, updateTask, deleteTask, addTasks, isLocalMode } from "@/lib/data/tasks"
 import { effectiveDeadline as computeEffectiveDeadline, deadlineStatus } from "@/lib/utils/taskUtils"
 import { nextRecurrenceDeadline, recurringLabel, isPastDeadline, isRecurring } from "@/lib/utils/recurrence"
 import { selectSchedulable, orderByEnergy, WORK_START_MIN, WORK_END_MIN } from "@/lib/utils/scheduling"
@@ -144,7 +144,7 @@ export default function TasksPage() {
 
   const syncAndCompute = useCallback((updated: Task[]) => {
     // Demo mode: keep localStorage in sync for other pages that still read it
-    if (IS_DEMO) localStorage.setItem('loadlight-tasks', JSON.stringify(updated))
+    if (isLocalMode()) localStorage.setItem('loadlight-tasks', JSON.stringify(updated))
     const undone = updated.filter(t => !t.done)
     const sevenDaysAgo = (now || Date.now()) - 604800000
     const demandTypeCounts: Record<DemandType, number> = { cognitive: 0, emotional: 0, creative: 0, routine: 0, physical: 0 }

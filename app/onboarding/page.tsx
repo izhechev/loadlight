@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { ArrowRight, ArrowLeft } from "@/lib/icons"
 import { ClassicIcon, type IconName } from "@/lib/classic-icons"
-import { upsertProfile, IS_DEMO } from "@/lib/data/tasks"
+import { upsertProfile, isLocalMode } from "@/lib/data/tasks"
 
 type BalanceMode = 'beast' | 'average' | 'chill'
 type WorkType = 'student' | 'professional' | 'freelancer' | 'other'
@@ -52,7 +52,7 @@ export default function OnboardingPage() {
       onboardingComplete: true,
     }))
 
-    if (!IS_DEMO && balanceMode) {
+    if (!isLocalMode() && balanceMode) {
       await upsertProfile({
         balanceMode: balanceMode as 'beast' | 'average' | 'chill',
         onboardingComplete: true,

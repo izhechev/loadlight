@@ -9,7 +9,7 @@ import { ChillSuggestions } from "@/components/chill-suggestions"
 import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib/store/overwhelmedStore"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
-import { getTasks, updateTask, IS_DEMO } from "@/lib/data/tasks"
+import { getTasks, updateTask, isLocalMode } from "@/lib/data/tasks"
 
 type BalanceMode = 'beast' | 'average' | 'chill'
 
@@ -444,7 +444,7 @@ export default function DashboardPage() {
     const snoozedUntil = Date.now() + days * 24 * 60 * 60 * 1000
     setTasks(prev => {
       const updated = prev.map(t => ids.includes(t.id) ? { ...t, snoozedUntil } : t)
-      if (IS_DEMO) { try { localStorage.setItem('loadlight-tasks', JSON.stringify(updated)) } catch { /* ignore */ } }
+      if (isLocalMode()) { try { localStorage.setItem('loadlight-tasks', JSON.stringify(updated)) } catch { /* ignore */ } }
       return updated
     })
     ids.forEach(id => updateTask(id, { snoozedUntil }).catch(() => {}))
