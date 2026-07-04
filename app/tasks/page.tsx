@@ -1203,18 +1203,31 @@ export default function TasksPage() {
                         />
                         <span className="text-xs text-slate-500 font-bold">hours</span>
                       </div>
+                    ) : editingTask.recurring === 'monthly' || editingTask.recurring === 'yearly' ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-slate-500 font-bold">Every</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="24"
+                          value={editingTask.recurring_days ?? 1}
+                          onChange={e => { const v = parseInt(e.target.value) || 1; setEditingTask({ ...editingTask, recurring_days: v > 1 ? v : null }) }}
+                          className="input-skeu w-16 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none"
+                        />
+                        <span className="text-xs text-slate-500 font-bold">{editingTask.recurring === 'monthly' ? 'months' : 'years'}</span>
+                      </div>
                     ) : editingTask.recurring_days ? (
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-slate-500 font-bold">Every</span>
                         <input
                           type="number"
                           min="2"
-                          max="30"
+                          max="60"
                           value={editingTask.recurring_days}
                           onChange={e => setEditingTask({ ...editingTask, recurring_days: Math.max(2, parseInt(e.target.value) || 2) })}
                           className="input-skeu w-16 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none"
                         />
-                        <span className="text-xs text-slate-500 font-bold">days</span>
+                        <span className="text-xs text-slate-500 font-bold">days (14 = every 2 weeks)</span>
                       </div>
                     ) : null}
                   </div>
