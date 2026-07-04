@@ -1158,15 +1158,20 @@ export default function TasksPage() {
                     <label className="vista-label">Recurring</label>
                     <div className="flex gap-2 flex-wrap">
                       {(['none','daily','weekly','monthly','yearly'] as const).map(r => (
-                        <button key={r} onClick={() => setEditingTask({ ...editingTask, recurring: r, recurring_hours: null })}
-                          className={`flex-1 py-1.5 rounded-lg text-xs font-black border transition-all capitalize ${editingTask.recurring === r && !editingTask.recurring_hours ? 'bg-emerald-100 text-emerald-700 border-emerald-300 shadow-inner' : 'bg-white/70 text-slate-400 border-slate-200 hover:bg-white'}`}>
+                        <button key={r} onClick={() => setEditingTask({ ...editingTask, recurring: r, recurring_hours: null, recurring_days: null })}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-black border transition-all capitalize ${editingTask.recurring === r && !editingTask.recurring_hours && !editingTask.recurring_days ? 'bg-emerald-100 text-emerald-700 border-emerald-300 shadow-inner' : 'bg-white/70 text-slate-400 border-slate-200 hover:bg-white'}`}>
                           {r}
                         </button>
                       ))}
                       <button
-                        onClick={() => setEditingTask({ ...editingTask, recurring: 'daily', recurring_hours: editingTask.recurring_hours ?? 8 })}
+                        onClick={() => setEditingTask({ ...editingTask, recurring: 'daily', recurring_hours: editingTask.recurring_hours ?? 8, recurring_days: null })}
                         className={`flex-1 py-1.5 rounded-lg text-xs font-black border transition-all ${editingTask.recurring_hours ? 'bg-violet-100 text-violet-700 border-violet-300 shadow-inner' : 'bg-white/70 text-slate-400 border-slate-200 hover:bg-white'}`}>
                         Every Xh
+                      </button>
+                      <button
+                        onClick={() => setEditingTask({ ...editingTask, recurring: 'daily', recurring_days: editingTask.recurring_days ?? 2, recurring_hours: null })}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-black border transition-all ${editingTask.recurring_days ? 'bg-sky-100 text-sky-700 border-sky-300 shadow-inner' : 'bg-white/70 text-slate-400 border-slate-200 hover:bg-white'}`}>
+                        Every Xd
                       </button>
                     </div>
                     {editingTask.recurring_hours ? (
@@ -1181,6 +1186,19 @@ export default function TasksPage() {
                           className="input-skeu w-16 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none"
                         />
                         <span className="text-xs text-slate-500 font-bold">hours</span>
+                      </div>
+                    ) : editingTask.recurring_days ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-slate-500 font-bold">Every</span>
+                        <input
+                          type="number"
+                          min="2"
+                          max="30"
+                          value={editingTask.recurring_days}
+                          onChange={e => setEditingTask({ ...editingTask, recurring_days: Math.max(2, parseInt(e.target.value) || 2) })}
+                          className="input-skeu w-16 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none"
+                        />
+                        <span className="text-xs text-slate-500 font-bold">days</span>
                       </div>
                     ) : null}
                   </div>
