@@ -132,6 +132,7 @@ export function recurringLabel(rec: RecurrenceFields & { recurringHours?: number
   if (rec.recurringDays && rec.recurringDays > 1) {
     if (rec.recurring === 'monthly') return `Every ${rec.recurringDays} months`
     if (rec.recurring === 'yearly') return `Every ${rec.recurringDays} years`
+    if (rec.recurring === 'weekly' && rec.recurringDays % 7 === 0) return `Every ${rec.recurringDays / 7} weeks`
     return `Every ${rec.recurringDays} days`
   }
   if (isRecurring(rec)) return rec.recurring as string

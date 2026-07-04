@@ -1184,11 +1184,21 @@ export default function TasksPage() {
                         className={`flex-1 py-1.5 rounded-lg text-xs font-black border transition-all ${editingTask.recurring_hours ? 'bg-violet-100 text-violet-700 border-violet-300 shadow-inner' : 'bg-white/70 text-slate-400 border-slate-200 hover:bg-white'}`}>
                         Every Xh
                       </button>
-                      <button
-                        onClick={() => setEditingTask({ ...editingTask, recurring: 'daily', recurring_days: editingTask.recurring_days ?? 2, recurring_hours: null })}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-black border transition-all ${editingTask.recurring_days ? 'bg-sky-100 text-sky-700 border-sky-300 shadow-inner' : 'bg-white/70 text-slate-400 border-slate-200 hover:bg-white'}`}>
-                        Every Xd
-                      </button>
+                      {([
+                        { label: 'Every Xd', rec: 'daily' as const, days: 2 },
+                        { label: 'Every Xw', rec: 'weekly' as const, days: 14 },
+                        { label: 'Every Xm', rec: 'monthly' as const, days: 2 },
+                        { label: 'Every Xy', rec: 'yearly' as const, days: 2 },
+                      ]).map(opt => {
+                        const active = !editingTask.recurring_hours && !!editingTask.recurring_days && editingTask.recurring === opt.rec
+                        return (
+                          <button key={opt.label}
+                            onClick={() => setEditingTask({ ...editingTask, recurring: opt.rec, recurring_days: opt.days, recurring_hours: null })}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-black border transition-all ${active ? 'bg-sky-100 text-sky-700 border-sky-300 shadow-inner' : 'bg-white/70 text-slate-400 border-slate-200 hover:bg-white'}`}>
+                            {opt.label}
+                          </button>
+                        )
+                      })}
                     </div>
                     {editingTask.recurring_hours ? (
                       <div className="flex items-center gap-2 mt-1">
@@ -1203,33 +1213,30 @@ export default function TasksPage() {
                         />
                         <span className="text-xs text-slate-500 font-bold">hours</span>
                       </div>
-                    ) : editingTask.recurring === 'monthly' || editingTask.recurring === 'yearly' ? (
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-slate-500 font-bold">Every</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="24"
-                          value={editingTask.recurring_days ?? 1}
-                          onChange={e => { const v = parseInt(e.target.value) || 1; setEditingTask({ ...editingTask, recurring_days: v > 1 ? v : null }) }}
-                          className="input-skeu w-16 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none"
-                        />
-                        <span className="text-xs text-slate-500 font-bold">{editingTask.recurring === 'monthly' ? 'months' : 'years'}</span>
-                      </div>
-                    ) : editingTask.recurring_days ? (
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-slate-500 font-bold">Every</span>
-                        <input
-                          type="number"
-                          min="2"
-                          max="60"
-                          value={editingTask.recurring_days}
-                          onChange={e => setEditingTask({ ...editingTask, recurring_days: Math.max(2, parseInt(e.target.value) || 2) })}
-                          className="input-skeu w-16 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none"
-                        />
-                        <span className="text-xs text-slate-500 font-bold">days (14 = every 2 weeks)</span>
-                      </div>
-                    ) : null}
+                    ) : editingTask.recurring_days ? (() => {
+                      // Unit-aware interval input: weeks store days×7, months/years
+                      // reuse recurring_days as the calendar multiplier
+                      const isWeeks = editingTask.recurring === 'weekly'
+                      const unit = isWeeks ? 'weeks' : editingTask.recurring === 'monthly' ? 'months' : editingTask.recurring === 'yearly' ? 'years' : 'days'
+                      const shown = isWeeks ? Math.max(1, Math.round(editingTask.recurring_days / 7)) : editingTask.recurring_days
+                      return (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-slate-500 font-bold">Every</span>
+                          <input
+                            type="number"
+                            min="2"
+                            max="60"
+                            value={shown}
+                            onChange={e => {
+                              const v = Math.max(2, parseInt(e.target.value) || 2)
+                              setEditingTask({ ...editingTask, recurring_days: isWeeks ? v * 7 : v })
+                            }}
+                            className="input-skeu w-16 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none"
+                          />
+                          <span className="text-xs text-slate-500 font-bold">{unit}</span>
+                        </div>
+                      )
+                    })() : null}
                   </div>
 
                   {/* Notes */}
