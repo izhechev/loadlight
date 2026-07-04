@@ -146,6 +146,8 @@ function isRecurrenceSchemaMismatch(error: { message?: string } | null): boolean
 function downgradeRowForOldSchema(row: Record<string, unknown>): void {
   delete row.recurring_days
   if (row.recurring === 'monthly' || row.recurring === 'yearly') row.recurring = 'none'
+  // Make the degradation visible: pages show a "database needs migration" banner
+  try { localStorage.setItem('loadlight-migration-needed', '1') } catch { /* ignore */ }
 }
 
 /** Notify listeners (global balance check) that the task list changed. */
