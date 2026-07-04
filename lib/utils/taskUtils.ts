@@ -1,6 +1,6 @@
 // Pure utility functions shared by the tasks page and tests.
 
-import { recurrenceStepDays } from './recurrence'
+import { recurrenceStepDays, addCalendarUnits } from './recurrence'
 
 const UTC_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -111,8 +111,28 @@ export function effectiveDeadline(
   now: number,
 ): string | null {
   const dl = task.deadline
+  if (!dl) return dl
+
+  // Calendar cadences (monthly/yearly) advance by calendar units, not days —
+  // a birthday stays on its date across leap years and month lengths
+  const unit = task.recurring === 'yearly' ? 'year' as const : task.recurring === 'monthly' ? 'month' as const : null
+  if (unit) {
+    const normalized = normalizeDt(dl)
+    const datePart = normalized.split('T')[0]
+    const timePart = normalized.includes('T') ? normalized.split('T')[1] : null
+    const currentNow = now || Date.now()
+    const ts = (dateStr: string) => new Date(`${dateStr}T${(timePart ?? '23:59').split('+')[0].split('Z')[0]}Z`).getTime()
+    let dateStr = datePart
+    let guard = 0
+    while (!isNaN(ts(dateStr)) && ts(dateStr) <= currentNow && guard++ < 600) {
+      dateStr = addCalendarUnits(dateStr, unit, 1)
+    }
+    if (dateStr === datePart) return dl
+    return timePart ? `${dateStr}T${timePart}` : dateStr
+  }
+
   const step = recurrenceStepDays(task)
-  if (!dl || step === null) return dl
+  if (step === null) return dl
   const normalized = normalizeDt(dl)
   const base = new Date(normalized)
   if (isNaN(base.getTime())) return dl

@@ -35,7 +35,7 @@ export const tasks = pgTable('tasks', {
   estimatedMinutes: integer('estimated_minutes'),
   notes:            text('notes').notNull().default(''),
   status:           text('status').notNull().default('active'),  // active | completed | archived
-  recurring:        text('recurring').notNull().default('none'), // none | daily | weekly
+  recurring:        text('recurring').notNull().default('none'), // none | daily | weekly | monthly | yearly
   recurringHours:   integer('recurring_hours'),
   recurringDays:    integer('recurring_days'), // every N days (e.g. 2 = every other day); null = use recurring cadence
   snoozedUntil:     timestamp('snoozed_until', { withTimezone: true }),
@@ -144,10 +144,14 @@ create table tasks (
   estimated_minutes integer,
   notes             text not null default '',
   status            text not null default 'active' check (status in ('active','completed','archived')),
-  recurring         text not null default 'none' check (recurring in ('none','daily','weekly')),
+  recurring         text not null default 'none' check (recurring in ('none','daily','weekly','monthly','yearly')),
   recurring_hours   integer,
   recurring_days    integer, -- every N days (e.g. 2 = every other day)
-  -- Existing databases: alter table tasks add column recurring_days integer;
+  -- Existing databases:
+  --   alter table tasks add column recurring_days integer;
+  --   alter table tasks drop constraint tasks_recurring_check;
+  --   alter table tasks add constraint tasks_recurring_check
+  --     check (recurring in ('none','daily','weekly','monthly','yearly'));
   snoozed_until     timestamptz,
   created_at        timestamptz not null default now(),
   completed_at      timestamptz

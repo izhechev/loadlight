@@ -26,7 +26,7 @@ interface Task {
   estimated_minutes: number | null
   done: boolean
   createdAt: number
-  recurring?: 'none' | 'daily' | 'weekly'
+  recurring?: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
   recurring_hours?: number | null
   snoozedUntil?: number
 }
