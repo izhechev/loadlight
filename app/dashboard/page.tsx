@@ -251,6 +251,12 @@ export default function DashboardPage() {
       })
   }, [])
 
+  // Live refresh: pick up tasks added elsewhere (e.g. balance-popup suggestions)
+  useEffect(() => {
+    window.addEventListener('loadlight:tasks-changed', loadTasks)
+    return () => window.removeEventListener('loadlight:tasks-changed', loadTasks)
+  }, [loadTasks])
+
   // Load tasks + balance mode
   useEffect(() => {
     loadTasks()
