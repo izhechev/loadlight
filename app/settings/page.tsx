@@ -5,6 +5,8 @@ import { Lock, ChevronRight, Brain, RefreshCw, BarChart3, Info, Download, Upload
 import { ClassicIcon, type IconName } from "@/lib/classic-icons"
 import { AppLayout } from "@/components/app-layout"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
+import { getTasks, deleteTask, type Task } from "@/lib/data/tasks"
+import { findDuplicateGroups, type DuplicateGroup } from "@/lib/utils/duplicates"
 
 type BalanceMode = 'beast' | 'average' | 'chill'
 
@@ -32,6 +34,20 @@ export default function SettingsPage() {
   const [now, setNow] = useState<number>(0)
   const [showAnalysis, setShowAnalysis] = useState(false)
   const [notifyEnabled, setNotifyEnabled] = useState(false)
+  const [dupGroups, setDupGroups] = useState<DuplicateGroup<Task>[] | null>(null)
+  const [dupScanning, setDupScanning] = useState(false)
+
+  async function scanDuplicates() {
+    setDupScanning(true)
+    try { setDupGroups(findDuplicateGroups(await getTasks())) }
+    catch { setDupGroups([]) }
+    finally { setDupScanning(false) }
+  }
+
+  function cleanGroup(group: DuplicateGroup<Task>) {
+    group.duplicates.forEach(d => deleteTask(d.id).catch(() => {}))
+    setDupGroups(prev => (prev ?? []).filter(g => g !== group))
+  }
 
   useEffect(() => {
     try {
@@ -342,6 +358,48 @@ export default function SettingsPage() {
           >
             {notifyEnabled ? 'On' : 'Turn on'}
           </button>
+        </div>
+
+        {/* Duplicate cleanup */}
+        <div className="skeu-card p-5 space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="font-black text-sm" style={{ color: '#1a1a1a' }}>Find duplicates</p>
+              <p className="text-xs font-bold" style={{ color: '#5a7a9a' }}>
+                Groups identical active tasks (same name, category and time) so you can delete the extras.
+              </p>
+            </div>
+            <button onClick={scanDuplicates} disabled={dupScanning} className="vista-btn-secondary text-xs font-black px-4 py-2 disabled:opacity-50">
+              {dupScanning ? 'Scanning…' : 'Scan'}
+            </button>
+          </div>
+          {dupGroups !== null && (
+            dupGroups.length === 0 ? (
+              <p className="text-xs font-black" style={{ color: '#1a7a50' }}>No duplicates found — your list is clean.</p>
+            ) : (
+              <div className="space-y-2">
+                {dupGroups.map((g, i) => (
+                  <div key={`${g.label}-${i}`} className="skeu-inset flex items-center gap-3 px-3 py-2 rounded">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm truncate" style={{ color: '#1a1a1a' }}>{g.label}</p>
+                      <p className="text-[11px] font-bold" style={{ color: '#5a7a9a' }}>
+                        {g.tasks.length} copies — keeps 1, removes {g.duplicates.length}
+                      </p>
+                    </div>
+                    <button onClick={() => cleanGroup(g)} className="glow-button text-[11px] font-black px-3 py-1.5 shrink-0">
+                      Remove {g.duplicates.length}
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => { (dupGroups ?? []).forEach(cleanGroup); setDupGroups([]) }}
+                  className="vista-btn-secondary text-xs font-black px-4 py-2 w-full"
+                >
+                  Clean all ({dupGroups.reduce((n, g) => n + g.duplicates.length, 0)} tasks)
+                </button>
+              </div>
+            )
+          )}
         </div>
 
         {/* Status Toggle */}
