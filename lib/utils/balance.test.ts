@@ -17,6 +17,8 @@ describe('shouldRequestBalanceCheck', () => {
 })
 
 describe('addSuggestionToTask', () => {
+  const today = new Date().toISOString().split('T')[0]
+
   it('maps a suggestion to a sane default task insert', () => {
     const t = addSuggestionToTask({ name: 'Read a book', category: 'Personal' })
     expect(t).toMatchObject({
@@ -26,7 +28,6 @@ describe('addSuggestionToTask', () => {
       demandType: 'routine',
       difficulty: 2,
       priority: 3,
-      deadline: null,
       startDate: null,
       estimatedMinutes: 30,
       notes: '',
@@ -34,5 +35,17 @@ describe('addSuggestionToTask', () => {
       recurring: 'none',
       recurringHours: null,
     })
+  })
+
+  it('sets the deadline to today (date-only) — suggestions are for today', () => {
+    expect(addSuggestionToTask({ name: 'Go for a walk', category: 'Exercise' }).deadline).toBe(today)
+    expect(addSuggestionToTask({ name: 'Read a book', category: 'Personal' }).deadline).toBe(today)
+  })
+
+  it('infers demand type from the category', () => {
+    expect(addSuggestionToTask({ name: 'Go for a walk', category: 'Exercise' }).demandType).toBe('physical')
+    expect(addSuggestionToTask({ name: 'One focused work block', category: 'Work' }).demandType).toBe('cognitive')
+    expect(addSuggestionToTask({ name: 'Draw something', category: 'Creative' }).demandType).toBe('creative')
+    expect(addSuggestionToTask({ name: 'Read a book', category: 'Personal' }).demandType).toBe('routine')
   })
 })
