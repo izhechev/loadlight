@@ -85,6 +85,8 @@ export default function TasksPage() {
     message:   string
   }
   const [pendingSchedule, setPendingSchedule] = useState<PendingSchedule | null>(null)
+  // Per-task approval for the AI schedule: ids the user unchecked in the review
+  const [scheduleExcluded, setScheduleExcluded] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const time = Date.now()
@@ -219,6 +221,7 @@ export default function TasksPage() {
       const data = await res.json() as PendingSchedule
       if (!data.scheduled) throw new Error('Bad response')
       setChatPhase('confirming')
+      setScheduleExcluded(new Set())
       setPendingSchedule(data)
     } catch {
       // Network/API failed — fall back to local greedy, no spinner
@@ -310,6 +313,7 @@ export default function TasksPage() {
       : `Nothing fits today. All ${overflow.length} tasks moved to ${nextDate}.`
 
     setChatPhase('confirming')
+    setScheduleExcluded(new Set())
     setPendingSchedule({ scheduled, overflow, message: msg })
   }
 
@@ -320,7 +324,8 @@ export default function TasksPage() {
     // Scheduled tasks: set their new start_date and deadline.
     // Recurring tasks with a fixed anchor time (e.g. meds at 10:00) keep their
     // deadline — only the start slot is recorded, so the anchor never drifts.
-    pendingSchedule.scheduled.forEach(s => {
+    // Tasks the user unchecked in the review keep their current dates entirely.
+    pendingSchedule.scheduled.filter(s => !scheduleExcluded.has(s.id)).forEach(s => {
       const existing = tasks.find(t => t.id === s.id)
       const hasFixedAnchor = existing && existing.recurring && existing.recurring !== 'none' &&
         existing.deadline?.includes('T') && !existing.deadline.split('T')[1].startsWith('00:00')
@@ -329,7 +334,7 @@ export default function TasksPage() {
     // Overflow tasks: clear start_date, but only change deadline if the task has no deadline
     // or its deadline is already set to today (meaning it was scheduled for today but now moves)
     // Never overwrite deadlines that belong to a different day (e.g. medical reminders)
-    pendingSchedule.overflow.forEach(o => {
+    pendingSchedule.overflow.filter(o => !scheduleExcluded.has(o.id)).forEach(o => {
       const existing = tasks.find(t => t.id === o.id)
       const existingDeadline = existing?.deadline
       const isFixedOnAnotherDay = existingDeadline && !existingDeadline.startsWith(todayStr)
@@ -814,53 +819,68 @@ export default function TasksPage() {
               ) : pendingSchedule && (
                 <div className="space-y-2">
                   <p className="text-xs font-black text-slate-600 uppercase tracking-wider">Review Schedule</p>
-                  {pendingSchedule.scheduled.length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#80ffc8' }}>Today</p>
-                      {pendingSchedule.scheduled.map(s => {
-                        const startT = s.start_date.split('T')[1]
-                        const endT   = s.deadline.split('T')[1]
-                        return (
-                          <div key={s.id} className="flex items-center gap-2 text-xs aero-success rounded-lg px-2.5 py-1.5">
-                            <span className="font-mono font-black shrink-0">{startT}–{endT}</span>
-                            <span className="font-bold truncate">{s.name}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                  {pendingSchedule.overflow.length > 0 && (() => {
+                  <p className="text-[10px] font-bold text-slate-400">Uncheck any task to keep its current time.</p>
+                  {(() => {
+                    const toggleExcluded = (id: string) => setScheduleExcluded(prev => {
+                      const next = new Set(prev)
+                      if (next.has(id)) next.delete(id); else next.add(id)
+                      return next
+                    })
+                    const row = (id: string, name: string, times: string | null, tone: string) => {
+                      const excluded = scheduleExcluded.has(id)
+                      return (
+                        <button key={id} onClick={() => toggleExcluded(id)}
+                          className={`w-full flex items-center gap-2 text-xs ${tone} rounded-lg px-2.5 py-1.5 text-left transition-opacity ${excluded ? 'opacity-40' : ''}`}>
+                          {excluded
+                            ? <Circle className="w-3.5 h-3.5 shrink-0" />
+                            : <CheckCircle className="w-3.5 h-3.5 shrink-0" />}
+                          {times && <span className={`font-mono font-black shrink-0 ${excluded ? 'line-through' : ''}`}>{times}</span>}
+                          <span className={`font-bold truncate ${excluded ? 'line-through' : ''}`}>{name}</span>
+                          {excluded && <span className="ml-auto shrink-0 text-[10px] font-black opacity-80">keeps current time</span>}
+                        </button>
+                      )
+                    }
+                    const acceptedCount =
+                      pendingSchedule.scheduled.filter(s => !scheduleExcluded.has(s.id)).length +
+                      pendingSchedule.overflow.filter(o => !scheduleExcluded.has(o.id)).length
                     // Group overflow by date
                     const byDate = new Map<string, typeof pendingSchedule.overflow>()
                     pendingSchedule.overflow.forEach(o => {
                       const date = o.deadline.split('T')[0]
                       byDate.set(date, [...(byDate.get(date) ?? []), o])
                     })
-                    return Array.from(byDate.entries()).map(([date, items]) => (
-                      <div key={date} className="space-y-1">
-                        <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#ffd98a' }}>Moved to {date}</p>
-                        {items.map(o => {
-                          const startT = o.start_date?.split('T')[1]
-                          const endT   = o.deadline.split('T')[1]
-                          return (
-                            <div key={o.id} className="flex items-center gap-2 text-xs aero-warning rounded-lg px-2.5 py-1.5">
-                              {startT && endT && <span className="font-mono font-black shrink-0">{startT}–{endT}</span>}
-                              <span className="font-bold truncate">{o.name}</span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ))
+                    return (
+                      <>
+                        {pendingSchedule.scheduled.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#80ffc8' }}>Today</p>
+                            {pendingSchedule.scheduled.map(s =>
+                              row(s.id, s.name, `${s.start_date.split('T')[1]}–${s.deadline.split('T')[1]}`, 'aero-success'))}
+                          </div>
+                        )}
+                        {Array.from(byDate.entries()).map(([date, items]) => (
+                          <div key={date} className="space-y-1">
+                            <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#ffd98a' }}>Moved to {date}</p>
+                            {items.map(o => {
+                              const startT = o.start_date?.split('T')[1]
+                              const endT   = o.deadline.split('T')[1]
+                              return row(o.id, o.name, startT && endT ? `${startT}–${endT}` : null, 'aero-warning')
+                            })}
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-2 pt-1">
+                          <button onClick={applySchedule} disabled={acceptedCount === 0}
+                            className="glow-button font-bold px-4 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-50">
+                            <CheckCircle className="w-3.5 h-3.5" /> Confirm {acceptedCount > 0 ? `(${acceptedCount})` : ''}
+                          </button>
+                          <button onClick={() => { setPendingSchedule(null); setChatPhase('idle'); setChatHistory([]) }}
+                            className="vista-btn-secondary text-xs font-bold px-4 py-1.5">
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    )
                   })()}
-                  <div className="flex items-center gap-2 pt-1">
-                    <button onClick={applySchedule} className="glow-button font-bold px-4 py-1.5 text-xs flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5" /> Confirm
-                    </button>
-                    <button onClick={() => { setPendingSchedule(null); setChatPhase('idle'); setChatHistory([]) }}
-                      className="vista-btn-secondary text-xs font-bold px-4 py-1.5">
-                      Cancel
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
