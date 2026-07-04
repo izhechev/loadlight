@@ -80,6 +80,27 @@ export function parseEveryNDays(input: string): number | null {
   return n && n > 1 ? n : null
 }
 
+/**
+ * Whether a task should enter the "past deadline" flow when saved.
+ * Date-only deadlines count as end-of-day (a task "due 4 Jul" is not overdue
+ * during 4 Jul). Recurring tasks are never past at save time — their next
+ * occurrence is computed automatically.
+ */
+export function isPastDeadline(
+  deadline: string | null | undefined,
+  recurring: string | null | undefined,
+  nowMs: number,
+): boolean {
+  if (!deadline) return false
+  if (recurring === 'daily' || recurring === 'weekly') return false
+  let normalized = deadline.replace(' ', 'T')
+  if (!normalized.includes('T')) normalized += 'T23:59'
+  if (!normalized.endsWith('Z') && !normalized.includes('+')) normalized += 'Z'
+  const dl = new Date(normalized)
+  if (isNaN(dl.getTime())) return false
+  return dl.getTime() < nowMs
+}
+
 /** Human-readable recurrence badge, or null for non-recurring tasks. */
 export function recurringLabel(rec: RecurrenceFields & { recurringHours?: number | null }): string | null {
   if (rec.recurringHours) return `Every ${rec.recurringHours}h`

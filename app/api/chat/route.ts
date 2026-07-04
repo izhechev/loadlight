@@ -244,6 +244,7 @@ export async function POST(req: Request) {
     dayLoadMinutes?: number    // total estimated minutes of today's active tasks
     toughDayThreshold?: number // tough-day cutoff in minutes (scales with balance mode)
     recentToughDays?: number   // consecutive tough days ending today (incl. today)
+    missingAreas?: string[]    // life areas with no active task (balance-check)
     overflowDate?: string // "YYYY-MM-DD" — schedule mode
     currentTime?: string  // "HH:MM" — current wall-clock time
     history?: { role: 'assistant' | 'user'; text: string }[] // schedule_chat conversation
@@ -862,6 +863,7 @@ Today: ${now.toISOString().split('T')[0]}`,
     const loadH = Math.round(loadMin / 60 * 10) / 10
     const thresholdSet = body.toughDayThreshold != null
     const isToughDay = thresholdSet && loadMin >= threshold
+    const missingAreas: string[] = Array.isArray(body.missingAreas) ? body.missingAreas : []
 
     return Response.json((await generateWithGemini({
       mode: 'balance-check',
@@ -874,7 +876,7 @@ Today: ${now.toISOString().split('T')[0]}`,
 
 Decide ONE verdict:
 - "too_much": the user is over-concentrated in one kind of activity, OR today's load is heavy by time${isToughDay ? ' (today IS a heavy day)' : ''}, OR there is a heavy-day streak. Populate "remove" with up to 3 candidates they might drop — prefer the heaviest (most minutes) and lowest-priority. NEVER include health or medication tasks (pills, vitamins, therapy, doctor, medical, lamictal, lithium).
-- "too_little": the activity list is genuinely sparse or narrow AND the time load is light AND it would benefit from variety. Populate "add" with 2-3 realistic suggested activities, each mapped to one of these categories: ${categories.join(', ')}. A small but calm and fine list (e.g. only reading and drawing) is NOT "too_little" — return "ok" for that.
+- "too_little": the time load is NOT heavy AND the list is missing whole life areas. Missing areas detected for this user: ${missingAreas.length > 0 ? missingAreas.join(', ') : 'none'}. If 2 or more areas are missing and the load is below the heavy-day threshold, choose "too_little". In the headline or reason NAME the missing areas plainly (e.g. "No physical activity or social time on your list"). Populate "add" with 2-3 realistic activities that fill the MISSING areas specifically (missing physical activity → a walk, a sport session; missing social time → call a friend or family member; missing work or study → one focused work block; missing leisure → reading, music, a hobby). Map each to one of these categories: ${categories.join(', ')}.
 - "ok": the mix and load are reasonable. Leave "remove" and "add" empty.
 
 headline: <=8 words. reason: one observational sentence. Each item "reason": <=8 words.

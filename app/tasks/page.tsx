@@ -10,7 +10,7 @@ import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { getTasks, updateTask, deleteTask, addTasks, IS_DEMO } from "@/lib/data/tasks"
 import { effectiveDeadline as computeEffectiveDeadline } from "@/lib/utils/taskUtils"
-import { nextRecurrenceDeadline, recurringLabel } from "@/lib/utils/recurrence"
+import { nextRecurrenceDeadline, recurringLabel, isPastDeadline } from "@/lib/utils/recurrence"
 import { PastDeadlineModal } from "@/components/past-deadline-modal"
 
 interface Task {
@@ -402,12 +402,9 @@ export default function TasksPage() {
   }
 
   function saveEdit(edited: Task) {
-    if (edited.deadline) {
-      const dl = new Date(edited.deadline.replace(' ', 'T'))
-      if (!isNaN(dl.getTime()) && dl.getTime() < Date.now()) {
-        setPastDeadlinePending(edited)
-        return
-      }
+    if (isPastDeadline(edited.deadline, edited.recurring, Date.now())) {
+      setPastDeadlinePending(edited)
+      return
     }
     performSave(edited)
   }
