@@ -13,30 +13,18 @@ export interface SchedulableTask {
   done?: boolean
 }
 
-const MS_48H = 48 * 3600_000
-const MS_7D = 7 * 86400_000
-
-function deadlineMs(deadline: string | null | undefined): number | null {
-  if (!deadline) return null
-  let n = deadline.replace(' ', 'T')
-  if (!n.includes('T')) n += 'T23:59'
-  if (!n.endsWith('Z') && !n.includes('+')) n += 'Z'
-  const ms = new Date(n).getTime()
-  return isNaN(ms) ? null : ms
-}
-
 /**
- * Tasks that belong in TODAY's plan: due (or overdue) within 48 hours,
- * P1 tasks due within a week, or undated tasks (planning assigns them times).
- * Far-future tasks stay on their own dates.
+ * Tasks that belong in TODAY's plan: due today or tomorrow (calendar days —
+ * overdue counts too), or undated tasks (planning assigns them times).
+ * Anything dated later stays on its own date, regardless of priority.
  */
 export function selectSchedulable<T extends SchedulableTask>(tasks: T[], nowMs: number): T[] {
+  const tomorrowStr = new Date(nowMs + 86400_000).toISOString().split('T')[0]
   return tasks.filter(t => {
     if (t.done) return false
-    const dl = deadlineMs(t.deadline)
-    if (dl === null) return true
-    if (dl - nowMs <= MS_48H) return true
-    return (t.priority ?? 3) === 1 && dl - nowMs <= MS_7D
+    if (!t.deadline) return true
+    const dateStr = t.deadline.replace(' ', 'T').split('T')[0]
+    return dateStr <= tomorrowStr
   })
 }
 

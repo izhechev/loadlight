@@ -14,28 +14,29 @@ const t = (over: Partial<{ id: string; name: string; deadline: string | null; pr
 })
 
 // ─── selectSchedulable ───────────────────────────────────────────────────────
-// Which tasks belong in TODAY's plan: due within 48h, high-priority within a
-// week, or undated. Far-future tasks stay out of the day plan.
+// Which tasks belong in TODAY's plan: due today or tomorrow (calendar days,
+// overdue included), or undated. Anything dated later stays on its own date.
 
 describe('selectSchedulable', () => {
-  it('includes tasks due today or within 48 hours', () => {
-    const due = t({ name: 'Meds', deadline: '2026-07-05T10:00' })
-    expect(selectSchedulable([due], NOW)).toContain(due)
+  it('includes tasks due today or tomorrow', () => {
+    const today = t({ name: 'Meds', deadline: '2026-07-05T10:00' })
+    const tomorrow = t({ name: 'Speedy', deadline: '2026-07-06' })
+    const r = selectSchedulable([today, tomorrow], NOW)
+    expect(r).toContain(today)
+    expect(r).toContain(tomorrow)
   })
 
-  it('excludes tasks due weeks away', () => {
-    const far = t({ name: 'Photo session', deadline: '2026-07-23' })
-    expect(selectSchedulable([far], NOW)).not.toContain(far)
+  it('includes overdue tasks', () => {
+    const overdue = t({ name: 'Old thing', deadline: '2026-06-03T14:00' })
+    expect(selectSchedulable([overdue], NOW)).toContain(overdue)
   })
 
-  it('includes P1 tasks due within a week', () => {
-    const p1 = t({ name: 'Tax return', deadline: '2026-07-10', priority: 1 })
-    expect(selectSchedulable([p1], NOW)).toContain(p1)
-  })
-
-  it('excludes P1 tasks due beyond a week', () => {
-    const farP1 = t({ name: 'New debit card', deadline: '2026-07-23', priority: 1 })
-    expect(selectSchedulable([farP1], NOW)).not.toContain(farP1)
+  it('excludes anything due after tomorrow, even P1', () => {
+    const dayAfter = t({ name: 'Wash clothes', deadline: '2026-07-07' })
+    const farP1 = t({ name: 'Tax return', deadline: '2026-07-15', priority: 1 })
+    const r = selectSchedulable([dayAfter, farP1], NOW)
+    expect(r).not.toContain(dayAfter)
+    expect(r).not.toContain(farP1)
   })
 
   it('includes undated tasks (scheduling gives them times)', () => {
