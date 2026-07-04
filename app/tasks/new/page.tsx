@@ -62,6 +62,7 @@ interface ExtractedTask {
   recurring?: 'none' | 'daily' | 'weekly'
   times_per_day?: number
   recurring_hours?: number | null  // e.g. 8 → "every 8 hours"
+  recurring_days?: number | null   // e.g. 2 → "every 2 days"
 }
 
 const DEMAND_COLORS: Record<DemandType, string> = {
@@ -153,7 +154,15 @@ export default function AddTaskPage() {
       }
       if (data.tasks?.length) {
         const appendZ = (dt: string | null | undefined) => dt ? (dt.endsWith('Z') || dt.includes('+') ? dt : dt + 'Z') : null
-        setPreview(data.tasks.map(t => ({ ...t, recurring: t.recurring || 'none', recurring_hours: t.recurring_hours ?? null, deadline: appendZ(t.deadline), start_date: appendZ(t.start_date) })))
+        setPreview(data.tasks.map(t => ({
+          ...t,
+          recurring: t.recurring || 'none',
+          // The extract API returns camelCase; accept both spellings
+          recurring_hours: t.recurring_hours ?? (t as unknown as Record<string, unknown>).recurringHours as number | null ?? null,
+          recurring_days: t.recurring_days ?? (t as unknown as Record<string, unknown>).recurringDays as number | null ?? null,
+          deadline: appendZ(t.deadline),
+          start_date: appendZ(t.start_date ?? (t as unknown as Record<string, unknown>).startDate as string | null),
+        })))
         if (data.clarification?.question) setClarification(data.clarification)
       } else {
         throw new Error('No tasks extracted')
@@ -196,12 +205,8 @@ export default function AddTaskPage() {
       }
     })
 
-    // Demo: keep localStorage in sync for other pages
-    if (IS_DEMO) {
-      const existing = getStoredTasks()
-      localStorage.setItem('loadlight-tasks', JSON.stringify([...existing, ...finalTasks]))
-    }
-
+    // addTasks persists to localStorage in demo mode — no manual write here,
+    // or every task would be stored twice (once raw, once mapped)
     await addTasks(finalTasks.map(t => ({
       name: t.name,
       category: t.category ?? 'Personal',
@@ -223,6 +228,7 @@ export default function AddTaskPage() {
       status: 'active' as const,
       recurring: t.recurring ?? 'none',
       recurringHours: t.recurring_hours ?? null,
+      recurringDays: t.recurring_days ?? null,
     }))).catch(() => {})
 
     setSaved(true)

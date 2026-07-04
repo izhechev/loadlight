@@ -240,7 +240,15 @@ export default function DashboardPage() {
 
   const loadTasks = useCallback(() => {
     return getTasks()
-      .then(data => setTasks(data.map(t => ({ ...t, category: t.category || t.lifeDomain || 'Personal' })) as unknown as Task[]))
+      .then(data => setTasks(data.map(t => ({
+        ...t,
+        category: t.category || t.lifeDomain || 'Personal',
+        // Alias camelCase data-layer fields to the snake_case names this page reads
+        demand_type: (t as any).demand_type ?? t.demandType ?? 'routine',
+        estimated_minutes: (t as any).estimated_minutes ?? t.estimatedMinutes ?? null,
+        recurring_hours: (t as any).recurring_hours ?? t.recurringHours ?? null,
+        recurring_days: (t as any).recurring_days ?? t.recurringDays ?? null,
+      })) as unknown as Task[]))
       .catch(() => {
         try {
           const t = localStorage.getItem('loadlight-tasks')

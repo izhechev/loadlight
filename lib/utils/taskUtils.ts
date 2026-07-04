@@ -1,5 +1,7 @@
 // Pure utility functions shared by the tasks page and tests.
 
+import { recurrenceStepDays } from './recurrence'
+
 const UTC_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 /** Normalise Supabase "YYYY-MM-DD HH:mm:ss+00" (space) to ISO "T" separator. */
@@ -82,16 +84,18 @@ export function difficultyDots(d: number): string {
 }
 
 /**
- * For daily recurring tasks: return the next future occurrence of the stored
- * time-of-day.  For all other tasks: return the deadline unchanged.
+ * For recurring tasks: return the next future occurrence on the task's day
+ * grid (daily = 1, weekly = 7, recurringDays = N), preserving time-of-day.
+ * For all other tasks: return the deadline unchanged.
  * `now` is a Unix-ms timestamp (pass Date.now() in production; injectable for tests).
  */
 export function effectiveDeadline(
-  task: { deadline: string | null; recurring?: string | null; name: string },
+  task: { deadline: string | null; recurring?: string | null; recurringDays?: number | null; name: string },
   now: number,
 ): string | null {
   const dl = task.deadline
-  if (!dl || task.recurring !== 'daily') return dl
+  const step = recurrenceStepDays(task)
+  if (!dl || step === null) return dl
   const normalized = normalizeDt(dl)
   const base = new Date(normalized)
   if (isNaN(base.getTime())) return dl
@@ -114,10 +118,11 @@ export function effectiveDeadline(
 
   if (effectiveBase.getTime() > currentNow) return `${dateOnlyStr}T${timeStr}`
 
-  // Advance by full days until it's in the future
+  // Advance in step-day increments (1 = daily, 7 = weekly, N = every N days)
+  // until it's in the future, staying on the task's original day grid
   const msPerDay = 86400000
   const elapsed = currentNow - effectiveBase.getTime()
-  const daysAhead = Math.ceil(elapsed / msPerDay)
+  const daysAhead = Math.ceil(elapsed / (step * msPerDay)) * step
   const next = new Date(effectiveBase.getTime() + daysAhead * msPerDay)
   const yyyy = next.getUTCFullYear()
   const mm = String(next.getUTCMonth() + 1).padStart(2, '0')
