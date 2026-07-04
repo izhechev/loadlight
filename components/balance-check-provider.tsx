@@ -146,6 +146,36 @@ export function BalanceCheckProvider() {
     }
   }, [onAppPage, runCheck])
 
+  // ── Task reminders: browser notification when a fixed-time task comes due.
+  // Deadlines are stored naive-UTC meaning "intended wall-clock time", so we
+  // compare against the current wall clock, not real UTC.
+  useEffect(() => {
+    if (!onAppPage) return
+    const notified = new Set<string>()
+    const check = async () => {
+      try {
+        if (localStorage.getItem('loadlight-notify') !== '1') return
+        if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+        const nowWall = Date.now() - new Date().getTimezoneOffset() * 60000
+        const all = await getTasks()
+        for (const t of all) {
+          if (t.done || t.status === 'archived' || !t.deadline?.includes('T')) continue
+          const dl = t.deadline.replace(' ', 'T')
+          const ms = new Date(dl.endsWith('Z') || dl.includes('+') ? dl : dl + 'Z').getTime()
+          const key = `${t.id}|${t.deadline}`
+          // Fire within the 2 minutes after the deadline passes, once per task+time
+          if (!notified.has(key) && !isNaN(ms) && ms <= nowWall && nowWall - ms < 120_000) {
+            notified.add(key)
+            new Notification(t.name, { body: 'Due now · LoadLight' })
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    check()
+    const iv = setInterval(check, 60_000)
+    return () => clearInterval(iv)
+  }, [onAppPage])
+
   function close() {
     if (result && lastSig.current) {
       try {

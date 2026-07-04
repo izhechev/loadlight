@@ -31,6 +31,14 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [now, setNow] = useState<number>(0)
   const [showAnalysis, setShowAnalysis] = useState(false)
+  const [notifyEnabled, setNotifyEnabled] = useState(false)
+
+  useEffect(() => {
+    try {
+      setNotifyEnabled(localStorage.getItem('loadlight-notify') === '1' &&
+        typeof Notification !== 'undefined' && Notification.permission === 'granted')
+    } catch { /* ignore */ }
+  }, [])
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const [showOverrideModal, setShowOverrideModal] = useState(false)
   const [overridePhrase, setOverridePhrase] = useState('')
@@ -311,6 +319,29 @@ export default function SettingsPage() {
               </p>
             )}
           </div>
+        </div>
+
+        {/* Task reminders (browser notifications) */}
+        <div className="skeu-card p-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="font-black text-sm" style={{ color: '#1a1a1a' }}>Task reminders</p>
+            <p className="text-xs font-bold" style={{ color: '#5a7a9a' }}>
+              Browser notification when a task with a fixed time is due. Works while a LoadLight tab is open.
+            </p>
+          </div>
+          <button
+            onClick={async () => {
+              if (notifyEnabled) {
+                localStorage.setItem('loadlight-notify', '0'); setNotifyEnabled(false); return
+              }
+              if (typeof Notification === 'undefined') return
+              const perm = await Notification.requestPermission()
+              if (perm === 'granted') { localStorage.setItem('loadlight-notify', '1'); setNotifyEnabled(true) }
+            }}
+            className={notifyEnabled ? 'glow-button text-xs font-black px-4 py-2' : 'vista-btn-secondary text-xs font-black px-4 py-2'}
+          >
+            {notifyEnabled ? 'On' : 'Turn on'}
+          </button>
         </div>
 
         {/* Status Toggle */}

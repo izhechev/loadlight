@@ -10,6 +10,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Guest mode — user chose "try without an account"; everything runs on
+  // localStorage client-side, no auth required
+  if (request.cookies.get('ll-guest')?.value === '1') {
+    return NextResponse.next()
+  }
+
   try {
     const response = NextResponse.next({ request })
 
