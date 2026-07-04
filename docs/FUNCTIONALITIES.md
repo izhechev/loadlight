@@ -123,9 +123,16 @@ average; recalculated on every task create/complete/delete; snapshots stored.
   observation, tone adapted to state, hard ethical prompt (no clinical
   language, no emotion commentary, "consider/you might" phrasing, AI
   disclosure flag).
-- *Planned (spec committed, not yet implemented)*: global balance popup on
-  every app page, re-checking ~20s after task changes, with
-  signature-based anti-nag (`docs/superpowers/specs/2026-07-04-global-balance-popup-design.md`).
+- **Global popup** (`components/balance-check-provider.tsx`): mounted in the
+  root layout, so alerts appear on any app page (dashboard, tasks, categories,
+  settings) — on app open and ~20s after the last task add/edit/delete.
+  Anti-nag: a dismissed alert never re-shows for the same verdict and task
+  situation; unchanged situations skip the AI call entirely.
+- **Missing life-area detection** (`lib/utils/balanceTrigger.ts`): checks
+  coverage of physical activity, work/study, social time, and leisure. With
+  2+ areas missing and a light day, the popup names what is missing and
+  suggests one activity per gap — with a deterministic local fallback when
+  the AI is down.
 
 ## 8. Dashboard
 

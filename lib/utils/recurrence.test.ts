@@ -5,6 +5,7 @@ import {
   nextRecurrenceDeadline,
   recurringLabel,
   parseEveryNDays,
+  isPastDeadline,
 } from './recurrence'
 
 // Fixed "now": 2026-07-04T12:00Z (a Saturday)
@@ -118,6 +119,38 @@ describe('recurringLabel', () => {
   it('returns null for non-recurring tasks', () => {
     expect(recurringLabel({ recurring: 'none' })).toBeNull()
     expect(recurringLabel({})).toBeNull()
+  })
+})
+
+// ─── isPastDeadline ──────────────────────────────────────────────────────────
+// Decides whether a task should enter the "past deadline" flow when saved.
+// Date-only deadlines count as end-of-day; recurring tasks never count as
+// past at save time (their next occurrence is computed automatically).
+
+describe('isPastDeadline', () => {
+  it('treats a date-only deadline of today as NOT past (end of day)', () => {
+    expect(isPastDeadline('2026-07-04', 'none', NOW)).toBe(false)
+  })
+
+  it('treats a date-only deadline of yesterday as past', () => {
+    expect(isPastDeadline('2026-07-03', 'none', NOW)).toBe(true)
+  })
+
+  it('treats a timed deadline earlier today as past for one-off tasks', () => {
+    expect(isPastDeadline('2026-07-04T10:00', 'none', NOW)).toBe(true)
+  })
+
+  it('never flags recurring tasks as past at save time', () => {
+    expect(isPastDeadline('2026-07-04T10:00', 'daily', NOW)).toBe(false)
+    expect(isPastDeadline('2026-07-01', 'weekly', NOW)).toBe(false)
+  })
+
+  it('returns false for missing deadlines', () => {
+    expect(isPastDeadline(null, 'none', NOW)).toBe(false)
+  })
+
+  it('handles future timed deadlines', () => {
+    expect(isPastDeadline('2026-07-04T18:00', 'none', NOW)).toBe(false)
   })
 })
 

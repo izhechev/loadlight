@@ -9,6 +9,7 @@ import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 import { addTasks, IS_DEMO } from "@/lib/data/tasks"
+import { isPastDeadline } from "@/lib/utils/recurrence"
 import { CrisisRedirect } from "@/components/rest-mode-overlay"
 import { PastDeadlineModal } from "@/components/past-deadline-modal"
 
@@ -243,14 +244,10 @@ export default function AddTaskPage() {
     const futureTasks: ExtractedTask[] = []
 
     preview.forEach(t => {
-      if (t.deadline) {
-        const dl = new Date(t.deadline.replace(' ', 'T'))
-        if (!isNaN(dl.getTime()) && dl.getTime() < now) {
-          pastTasks.push(t)
-          return
-        }
-      }
-      futureTasks.push(t)
+      // Date-only deadlines count as end-of-day; recurring tasks roll forward
+      // on their own — neither should be diverted into the past-deadline flow
+      if (isPastDeadline(t.deadline, t.recurring, now)) pastTasks.push(t)
+      else futureTasks.push(t)
     })
 
     if (pastTasks.length > 0) {

@@ -120,6 +120,13 @@ function lsSetProfile(updates: Partial<Profile>): void {
 // Task CRUD
 // ─────────────────────────────────────────────
 
+/** Notify listeners (global balance check) that the task list changed. */
+function notifyTasksChanged(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('loadlight:tasks-changed'))
+  }
+}
+
 /** Give a recurring task a concrete deadline (today, date-only) if it has none. */
 function withBackfilledDeadline<T extends Pick<Task, 'deadline' | 'recurring' | 'recurringDays' | 'status'>>(task: T): T {
   if (task.status === 'active') {
@@ -177,6 +184,7 @@ export async function addTask(rawTask: Omit<Task, 'id' | 'createdAt'>): Promise<
       createdAt: new Date().toISOString(),
     }
     lsSetTasks([...lsGetTasks(), newTask])
+    notifyTasksChanged()
     return newTask
   }
 
@@ -193,6 +201,7 @@ export async function addTask(rawTask: Omit<Task, 'id' | 'createdAt'>): Promise<
     .single()
 
   if (error) throw error
+  notifyTasksChanged()
   return dbRowToTask(data)
 }
 
@@ -205,6 +214,7 @@ export async function addTasks(rawTasks: Omit<Task, 'id' | 'createdAt'>[]): Prom
       createdAt: new Date().toISOString(),
     }))
     lsSetTasks([...lsGetTasks(), ...newTasks])
+    notifyTasksChanged()
     return newTasks
   }
 
@@ -217,6 +227,7 @@ export async function addTasks(rawTasks: Omit<Task, 'id' | 'createdAt'>[]): Prom
   const rows = tasks.map(t => taskToDbRow({ ...t, userId: user.id }))
   const { data, error } = await supabase.from('tasks').insert(rows).select()
   if (error) throw error
+  notifyTasksChanged()
   return (data ?? []).map(dbRowToTask)
 }
 
@@ -224,6 +235,7 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<vo
   if (IS_DEMO) {
     const tasks = lsGetTasks()
     lsSetTasks(tasks.map(t => t.id === id ? { ...t, ...updates } : t))
+    notifyTasksChanged()
     return
   }
 
@@ -234,17 +246,20 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<vo
     .eq('id', id)
 
   if (error) throw error
+  notifyTasksChanged()
 }
 
 export async function deleteTask(id: string): Promise<void> {
   if (IS_DEMO) {
     lsSetTasks(lsGetTasks().filter(t => t.id !== id))
+    notifyTasksChanged()
     return
   }
 
   const supabase = createClient()
   const { error } = await supabase.from('tasks').delete().eq('id', id)
   if (error) throw error
+  notifyTasksChanged()
 }
 
 // ─────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { BalanceCheckProvider } from "@/components/balance-check-provider";
 
 export const metadata: Metadata = {
   title: "LoadLight — Balance Your Load, Lighten Your Mind",
@@ -15,6 +16,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         {children}
+        <BalanceCheckProvider />
       </body>
     </html>
   );
