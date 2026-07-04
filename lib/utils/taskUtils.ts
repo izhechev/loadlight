@@ -122,10 +122,11 @@ export function effectiveDeadline(
     const timePart = normalized.includes('T') ? normalized.split('T')[1] : null
     const currentNow = now || Date.now()
     const ts = (dateStr: string) => new Date(`${dateStr}T${(timePart ?? '23:59').split('+')[0].split('Z')[0]}Z`).getTime()
+    const calCount = task.recurringDays && task.recurringDays > 1 ? task.recurringDays : 1
     let dateStr = datePart
     let guard = 0
     while (!isNaN(ts(dateStr)) && ts(dateStr) <= currentNow && guard++ < 600) {
-      dateStr = addCalendarUnits(dateStr, unit, 1)
+      dateStr = addCalendarUnits(dateStr, unit, calCount)
     }
     if (dateStr === datePart) return dl
     return timePart ? `${dateStr}T${timePart}` : dateStr

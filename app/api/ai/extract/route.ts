@@ -26,7 +26,11 @@ Extract tasks from the user's free-form input. For each task produce these field
 - notes: any extra context
 - recurring: "none" | "daily" | "weekly" | "monthly" | "yearly". Set to "daily" when user says "daily", "every day", "everyday", or gives a fixed daily time. Set to "monthly" for "every month", "monthly", "every 1st". Set to "yearly" for "every year", "yearly", "annually", and for BIRTHDAYS, name days, and anniversaries (e.g. "Mani birthday 26 July" → recurring "yearly", deadline the NEXT occurrence of 26 July).
 - recurringHours: integer if user says "every X hours", else null
-- recurringDays: integer if user says "every X days" / "every other day" / "every second day" (e.g. "throw trash every two days" → recurring "daily", recurringDays 2), else null. When recurringDays is set, also set recurring to "daily" and deadline to today (date only if no time given).
+- recurringDays: interval multiplier, else null. Mappings (ALWAYS set a deadline — today, or the next occurrence — when any of these apply):
+    "every X days" / "every other day" / "every second day" → recurring "daily", recurringDays X (2 for other/second)
+    "every X weeks" / "biweekly" / "every other week" → recurring "daily", recurringDays X*7 (biweekly = 14)
+    "every X months" → recurring "monthly", recurringDays X (X > 1 only; plain monthly → recurringDays null)
+    "every X years" → recurring "yearly", recurringDays X (X > 1 only; plain yearly → recurringDays null)
 
 CRITICAL RULE for recurring tasks with a fixed time:
 When a task recurs daily AND has a specific time (e.g. "everyday at 10:30", "daily 22:30"), you MUST:

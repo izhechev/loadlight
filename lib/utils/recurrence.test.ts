@@ -116,6 +116,11 @@ describe('nextRecurrenceDeadline', () => {
     expect(nextRecurrenceDeadline('2026-07-15', { recurring: 'monthly' }, NOW)).toBe('2026-08-15')
     expect(nextRecurrenceDeadline('2026-01-31', { recurring: 'monthly' }, NOW)).toBe('2026-02-28')
   })
+
+  it('supports multi-unit calendar intervals: every 3 months, every 2 years', () => {
+    expect(nextRecurrenceDeadline('2026-07-15', { recurring: 'monthly', recurringDays: 3 }, NOW)).toBe('2026-10-15')
+    expect(nextRecurrenceDeadline('2026-07-15', { recurring: 'yearly', recurringDays: 2 }, NOW)).toBe('2028-07-15')
+  })
 })
 
 // ─── recurringLabel ──────────────────────────────────────────────────────────
@@ -138,6 +143,11 @@ describe('recurringLabel', () => {
   it('labels monthly and yearly', () => {
     expect(recurringLabel({ recurring: 'monthly' })).toBe('monthly')
     expect(recurringLabel({ recurring: 'yearly' })).toBe('yearly')
+  })
+
+  it('labels multi-unit calendar intervals', () => {
+    expect(recurringLabel({ recurring: 'monthly', recurringDays: 3 })).toBe('Every 3 months')
+    expect(recurringLabel({ recurring: 'yearly', recurringDays: 2 })).toBe('Every 2 years')
   })
 
   it('returns null for non-recurring tasks', () => {
