@@ -312,7 +312,7 @@ export async function POST(req: Request) {
 
     return Response.json((await generateWithGemini({
       mode: 'extract',
-      jsonSchemaText: `{ "tasks": [{ "name": "string", "category": "string", "demand_type": "cognitive" | "emotional" | "creative" | "routine" | "physical", "difficulty": number (1-5), "deadline": "YYYY-MM-DDTHH:mm" or null, "start_date": "YYYY-MM-DDTHH:mm" or null, "priority": 1 | 2 | 3 | 4, "notes": "string", "estimated_minutes": number or null, "recurring": "none" | "daily" | "weekly", "times_per_day": number, "recurring_hours": number | null, "recurring_days": number | null }], "clarification": { "question": "string", "taskName": "string", "options": [{ "label": "string", "recurring": "none" | "daily" | "weekly", "recurring_hours": number | null }] } | null }`,
+      jsonSchemaText: `{ "tasks": [{ "name": "string", "category": "string", "demand_type": "cognitive" | "emotional" | "creative" | "routine" | "physical", "difficulty": number (1-5), "deadline": "YYYY-MM-DDTHH:mm" or null, "start_date": "YYYY-MM-DDTHH:mm" or null, "priority": 1 | 2 | 3 | 4, "notes": "string", "estimated_minutes": number or null, "recurring": "none" | "daily" | "weekly" | "monthly" | "yearly", "times_per_day": number, "recurring_hours": number | null, "recurring_days": number | null }], "clarification": { "question": "string", "taskName": "string", "options": [{ "label": "string", "recurring": "none" | "daily" | "weekly", "recurring_hours": number | null }] } | null }`,
       system: ETHICAL_SYSTEM_PROMPT,
       prompt: `<system_instruction>
 You are an advanced, agentic task-extraction AI for LoadLight. Your goal is to deeply analyze the user's input, break it down logically, and map it strictly to the allowed categories and schemas.
@@ -446,7 +446,7 @@ Give a trend observation, one piece of advice, and one specific actionable sugge
   if (mode === 'breakdown') {
     return Response.json((await generateWithGemini({
       mode: 'extract', // Reuse the extract mock logic if it fails
-      jsonSchemaText: `{ "tasks": [{ "name": "string", "category": "string", "demand_type": "cognitive" | "emotional" | "creative" | "routine" | "physical", "difficulty": number (1-5), "deadline": "YYYY-MM-DDTHH:mm" or null, "start_date": "YYYY-MM-DDTHH:mm" or null, "priority": 1 | 2 | 3 | 4, "notes": "string", "estimated_minutes": number or null, "recurring": "none" | "daily" | "weekly", "times_per_day": number }] }`,
+      jsonSchemaText: `{ "tasks": [{ "name": "string", "category": "string", "demand_type": "cognitive" | "emotional" | "creative" | "routine" | "physical", "difficulty": number (1-5), "deadline": "YYYY-MM-DDTHH:mm" or null, "start_date": "YYYY-MM-DDTHH:mm" or null, "priority": 1 | 2 | 3 | 4, "notes": "string", "estimated_minutes": number or null, "recurring": "none" | "daily" | "weekly" | "monthly" | "yearly", "times_per_day": number }] }`,
       system: `You are a productivity expert for LoadLight. Your job is to break down a single, large, overwhelming task into 3 to 5 smaller, highly actionable sub-tasks.`,
       prompt: `Please break down this large task into smaller steps:
 

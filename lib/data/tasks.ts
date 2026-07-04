@@ -120,9 +120,15 @@ function lsSetProfile(updates: Partial<Profile>): void {
 // Task CRUD
 // ─────────────────────────────────────────────
 
-/** True when the error is Postgres/PostgREST rejecting the recurring_days column (migration not run). */
-function isMissingRecurringDaysColumn(error: { message?: string } | null): boolean {
-  return /recurring_days/i.test(error?.message ?? '')
+/** True when the error is Postgres/PostgREST rejecting recurrence fields an un-migrated schema lacks. */
+function isRecurrenceSchemaMismatch(error: { message?: string } | null): boolean {
+  return /recurring_days|recurring_check/i.test(error?.message ?? '')
+}
+
+/** Strip recurrence features the old schema can't store — the task still saves. */
+function downgradeRowForOldSchema(row: Record<string, unknown>): void {
+  delete row.recurring_days
+  if (row.recurring === 'monthly' || row.recurring === 'yearly') row.recurring = 'none'
 }
 
 /** Notify listeners (global balance check) that the task list changed. */
@@ -201,9 +207,9 @@ export async function addTask(rawTask: Omit<Task, 'id' | 'createdAt'>): Promise<
 
   const row = taskToDbRow({ ...task, userId: user.id })
   let { data, error } = await supabase.from('tasks').insert(row).select().single()
-  if (error && isMissingRecurringDaysColumn(error)) {
-    // Database not migrated yet — save without the N-day cadence rather than losing the task
-    delete row.recurring_days
+  if (error && isRecurrenceSchemaMismatch(error)) {
+    // Database not migrated yet — save without the new cadence rather than losing the task
+    downgradeRowForOldSchema(row)
     ;({ data, error } = await supabase.from('tasks').insert(row).select().single())
   }
 
@@ -233,9 +239,9 @@ export async function addTasks(rawTasks: Omit<Task, 'id' | 'createdAt'>[]): Prom
 
   const rows = tasks.map(t => taskToDbRow({ ...t, userId: user.id }))
   let { data, error } = await supabase.from('tasks').insert(rows).select()
-  if (error && isMissingRecurringDaysColumn(error)) {
-    // Database not migrated yet — save without the N-day cadence rather than losing the tasks
-    rows.forEach(r => delete r.recurring_days)
+  if (error && isRecurrenceSchemaMismatch(error)) {
+    // Database not migrated yet — save without the new cadence rather than losing the tasks
+    rows.forEach(downgradeRowForOldSchema)
     ;({ data, error } = await supabase.from('tasks').insert(rows).select())
   }
   if (error) throw error
@@ -254,8 +260,8 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<vo
   const supabase = createClient()
   const row = taskToDbRow(updates as Task)
   let { error } = await supabase.from('tasks').update(row).eq('id', id)
-  if (error && isMissingRecurringDaysColumn(error)) {
-    delete row.recurring_days
+  if (error && isRecurrenceSchemaMismatch(error)) {
+    downgradeRowForOldSchema(row)
     ;({ error } = await supabase.from('tasks').update(row).eq('id', id))
   }
 

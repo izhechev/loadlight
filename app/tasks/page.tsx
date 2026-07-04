@@ -10,7 +10,7 @@ import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { getTasks, updateTask, deleteTask, addTasks, IS_DEMO } from "@/lib/data/tasks"
 import { effectiveDeadline as computeEffectiveDeadline, deadlineStatus } from "@/lib/utils/taskUtils"
-import { nextRecurrenceDeadline, recurringLabel, isPastDeadline } from "@/lib/utils/recurrence"
+import { nextRecurrenceDeadline, recurringLabel, isPastDeadline, isRecurring } from "@/lib/utils/recurrence"
 import { PastDeadlineModal } from "@/components/past-deadline-modal"
 
 interface Task {
@@ -26,7 +26,7 @@ interface Task {
   estimated_minutes: number | null
   done: boolean
   createdAt: number
-  recurring?: 'none' | 'daily' | 'weekly'
+  recurring?: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
   recurring_hours?: number | null
   recurring_days?: number | null
   snoozedUntil?: number
@@ -88,8 +88,6 @@ export default function TasksPage() {
     message:   string
   }
   const [pendingSchedule, setPendingSchedule] = useState<PendingSchedule | null>(null)
-  // Per-task approval for the AI schedule: ids the user unchecked in the review
-  const [scheduleExcluded, setScheduleExcluded] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const time = Date.now()
@@ -247,7 +245,6 @@ export default function TasksPage() {
       const data = await res.json() as PendingSchedule
       if (!data.scheduled) throw new Error('Bad response')
       setChatPhase('confirming')
-      setScheduleExcluded(new Set())
       setPendingSchedule(data)
     } catch {
       // Network/API failed — fall back to local greedy, no spinner
@@ -263,7 +260,11 @@ export default function TasksPage() {
       const m = isNaN(parts[1]) ? 0 : parts[1]
       return h * 60 + m
     }
-    const fmt = (min: number) => `${Math.floor(min / 60).toString().padStart(2, '0')}:${(min % 60).toString().padStart(2, '0')}`
+    // Clamp to 23:59 — slots must never spill past midnight into invalid times like "24:04"
+    const fmt = (raw: number) => {
+      const min = Math.min(raw, 1439)
+      return `${Math.floor(min / 60).toString().padStart(2, '0')}:${(min % 60).toString().padStart(2, '0')}`
+    }
     const now         = parseMin(nowHHMM())
     const endOfDay    = 23 * 60 + 30
     const schedDate   = new Date().toISOString().split('T')[0]
@@ -339,43 +340,64 @@ export default function TasksPage() {
       : `Nothing fits today. All ${overflow.length} tasks moved to ${nextDate}.`
 
     setChatPhase('confirming')
-    setScheduleExcluded(new Set())
     setPendingSchedule({ scheduled, overflow, message: msg })
   }
 
-  function applySchedule() {
-    if (!pendingSchedule) return
-    const todayStr = new Date().toISOString().split('T')[0]
-    const updates = new Map<string, Partial<Task>>()
-    // Scheduled tasks: set their new start_date and deadline.
-    // Recurring tasks with a fixed anchor time (e.g. meds at 10:00) keep their
-    // deadline — only the start slot is recorded, so the anchor never drifts.
-    // Tasks the user unchecked in the review keep their current dates entirely.
-    pendingSchedule.scheduled.filter(s => !scheduleExcluded.has(s.id)).forEach(s => {
-      const existing = tasks.find(t => t.id === s.id)
+  // Patch a single plan item would apply to its task.
+  // Scheduled: recurring tasks with a fixed anchor time (e.g. meds at 10:00)
+  // keep their deadline — only the start slot is recorded.
+  // Overflow: never overwrite deadlines fixed on another day (e.g. medical).
+  function schedulePatchFor(item: { id: string; start_date?: string | null; deadline: string }, kind: 'scheduled' | 'overflow'): Partial<Task> {
+    const existing = tasks.find(t => t.id === item.id)
+    if (kind === 'scheduled') {
       const hasFixedAnchor = existing && existing.recurring && existing.recurring !== 'none' &&
         existing.deadline?.includes('T') && !existing.deadline.split('T')[1].startsWith('00:00')
-      updates.set(s.id, hasFixedAnchor ? { start_date: s.start_date } : { start_date: s.start_date, deadline: s.deadline })
-    })
-    // Overflow tasks: clear start_date, but only change deadline if the task has no deadline
-    // or its deadline is already set to today (meaning it was scheduled for today but now moves)
-    // Never overwrite deadlines that belong to a different day (e.g. medical reminders)
-    pendingSchedule.overflow.filter(o => !scheduleExcluded.has(o.id)).forEach(o => {
-      const existing = tasks.find(t => t.id === o.id)
-      const existingDeadline = existing?.deadline
-      const isFixedOnAnotherDay = existingDeadline && !existingDeadline.startsWith(todayStr)
-      if (isFixedOnAnotherDay) {
-        updates.set(o.id, { start_date: null }) // keep existing deadline, just clear start
-      } else {
-        updates.set(o.id, { start_date: o.start_date ?? null, deadline: o.deadline }) // move to overflow date with real time
-      }
-    })
-    if (updates.size > 0) {
-      const updated = tasks.map(t => updates.has(t.id) ? { ...t, ...updates.get(t.id)! } : t)
-      setTasks(updated)
-      syncAndCompute(updated)
-      updates.forEach((patch, id) => updateTask(id, { deadline: (patch as any).deadline ?? undefined, startDate: (patch as any).start_date ?? null }).catch(() => {}))
+      return hasFixedAnchor ? { start_date: item.start_date } : { start_date: item.start_date, deadline: item.deadline }
     }
+    const todayStr = new Date().toISOString().split('T')[0]
+    const isFixedOnAnotherDay = existing?.deadline && !existing.deadline.startsWith(todayStr)
+    return isFixedOnAnotherDay
+      ? { start_date: null }
+      : { start_date: item.start_date ?? null, deadline: item.deadline }
+  }
+
+  function applyPatches(updates: Map<string, Partial<Task>>) {
+    if (updates.size === 0) return
+    const updated = tasks.map(t => updates.has(t.id) ? { ...t, ...updates.get(t.id)! } : t)
+    setTasks(updated)
+    syncAndCompute(updated)
+    updates.forEach((patch, id) => updateTask(id, { deadline: (patch as any).deadline ?? undefined, startDate: (patch as any).start_date ?? null }).catch(() => {}))
+  }
+
+  // Apply or skip ONE plan item; the row disappears, the rest stay pending
+  function resolveScheduleItem(id: string, kind: 'scheduled' | 'overflow', apply: boolean) {
+    if (!pendingSchedule) return
+    if (apply) {
+      const item = (kind === 'scheduled' ? pendingSchedule.scheduled : pendingSchedule.overflow).find(i => i.id === id)
+      if (item) applyPatches(new Map([[id, schedulePatchFor(item, kind)]]))
+    }
+    const remaining = {
+      ...pendingSchedule,
+      scheduled: pendingSchedule.scheduled.filter(i => i.id !== id),
+      overflow: pendingSchedule.overflow.filter(i => i.id !== id),
+    }
+    if (remaining.scheduled.length === 0 && remaining.overflow.length === 0) {
+      setScheduleMsg(pendingSchedule.message)
+      setPendingSchedule(null)
+      setChatHistory([])
+      setChatPhase('done')
+    } else {
+      setPendingSchedule(remaining)
+    }
+  }
+
+  // Apply every still-pending item at once
+  function applySchedule() {
+    if (!pendingSchedule) return
+    const updates = new Map<string, Partial<Task>>()
+    pendingSchedule.scheduled.forEach(s => updates.set(s.id, schedulePatchFor(s, 'scheduled')))
+    pendingSchedule.overflow.forEach(o => updates.set(o.id, schedulePatchFor(o, 'overflow')))
+    applyPatches(updates)
     setScheduleMsg(pendingSchedule.message)
     setPendingSchedule(null)
     setChatHistory([])
@@ -388,7 +410,7 @@ export default function TasksPage() {
     const nowDone = !task.done
     let updated = tasks.map(t => t.id === id ? { ...t, done: nowDone } : t)
     updateTask(id, { done: nowDone, status: nowDone ? 'completed' : 'active', completedAt: nowDone ? new Date().toISOString() : null }).catch(() => {})
-    if (!task.done && (task.recurring === 'daily' || task.recurring === 'weekly')) {
+    if (!task.done && isRecurring({ recurring: task.recurring })) {
       // Advance on the task's day grid (daily +1, weekly +7, every-N-days +N),
       // preserving the time portion so "Take lamictal at 22:30" stays at 22:30
       const nextDeadline = nextRecurrenceDeadline(
@@ -479,16 +501,24 @@ export default function TasksPage() {
       return 0
     })
 
-  // Group by category
+  // Group by category, each group sorted by (recurrence-aware) deadline, undated last
+  const byDeadline = (a: Task, b: Task) => {
+    const da = effectiveDeadline(a)
+    const db = effectiveDeadline(b)
+    if (da && db) return new Date(normalizeDt(da)).getTime() - new Date(normalizeDt(db)).getTime()
+    if (da) return -1
+    if (db) return 1
+    return 0
+  }
   const grouped: { cat: typeof categories[0]; tasks: Task[] }[] = []
   categories.forEach(cat => {
     const catTasks = visible.filter(t =>
       (t.category || 'Personal').toLowerCase() === cat.name.toLowerCase() || t.category === cat.id
-    )
+    ).sort(byDeadline)
     if (catTasks.length > 0) grouped.push({ cat, tasks: catTasks })
   })
   const assignedIds = new Set(grouped.flatMap(g => g.tasks.map(t => t.id)))
-  const uncategorized = visible.filter(t => !assignedIds.has(t.id))
+  const uncategorized = visible.filter(t => !assignedIds.has(t.id)).sort(byDeadline)
   if (uncategorized.length > 0) grouped.push({ cat: { id: '_other', name: 'Other', emoji: '📌', color: 'sky' }, tasks: uncategorized })
 
   // Calendar data
@@ -848,30 +878,25 @@ export default function TasksPage() {
               ) : pendingSchedule && (
                 <div className="space-y-2">
                   <p className="text-xs font-black text-slate-600 uppercase tracking-wider">Review Schedule</p>
-                  <p className="text-[10px] font-bold text-slate-400">Uncheck any task to keep its current time.</p>
+                  <p className="text-[10px] font-bold text-slate-400">Apply or skip each task — skipped tasks keep their current time.</p>
                   {(() => {
-                    const toggleExcluded = (id: string) => setScheduleExcluded(prev => {
-                      const next = new Set(prev)
-                      if (next.has(id)) next.delete(id); else next.add(id)
-                      return next
-                    })
-                    const row = (id: string, name: string, times: string | null, tone: string) => {
-                      const excluded = scheduleExcluded.has(id)
-                      return (
-                        <button key={id} onClick={() => toggleExcluded(id)}
-                          className={`w-full flex items-center gap-2 text-xs ${tone} rounded-lg px-2.5 py-1.5 text-left transition-opacity ${excluded ? 'opacity-40' : ''}`}>
-                          {excluded
-                            ? <Circle className="w-3.5 h-3.5 shrink-0" />
-                            : <CheckCircle className="w-3.5 h-3.5 shrink-0" />}
-                          {times && <span className={`font-mono font-black shrink-0 ${excluded ? 'line-through' : ''}`}>{times}</span>}
-                          <span className={`font-bold truncate ${excluded ? 'line-through' : ''}`}>{name}</span>
-                          {excluded && <span className="ml-auto shrink-0 text-[10px] font-black opacity-80">keeps current time</span>}
-                        </button>
-                      )
-                    }
-                    const acceptedCount =
-                      pendingSchedule.scheduled.filter(s => !scheduleExcluded.has(s.id)).length +
-                      pendingSchedule.overflow.filter(o => !scheduleExcluded.has(o.id)).length
+                    const row = (id: string, name: string, times: string | null, tone: string, kind: 'scheduled' | 'overflow') => (
+                      <div key={id} className={`flex items-center gap-2 text-xs ${tone} rounded-lg px-2.5 py-1.5`}>
+                        {times && <span className="font-mono font-black shrink-0">{times}</span>}
+                        <span className="font-bold truncate">{name}</span>
+                        <span className="ml-auto flex items-center gap-1.5 shrink-0">
+                          <button onClick={() => resolveScheduleItem(id, kind, true)}
+                            className="glow-button font-black px-2.5 py-1 text-[10px] flex items-center gap-1" title="Apply this time">
+                            <CheckCircle className="w-3 h-3" /> Apply
+                          </button>
+                          <button onClick={() => resolveScheduleItem(id, kind, false)}
+                            className="vista-btn-secondary font-black px-2.5 py-1 text-[10px]" title="Keep current time">
+                            Skip
+                          </button>
+                        </span>
+                      </div>
+                    )
+                    const remainingCount = pendingSchedule.scheduled.length + pendingSchedule.overflow.length
                     // Group overflow by date
                     const byDate = new Map<string, typeof pendingSchedule.overflow>()
                     pendingSchedule.overflow.forEach(o => {
@@ -884,7 +909,7 @@ export default function TasksPage() {
                           <div className="space-y-1">
                             <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#80ffc8' }}>Today</p>
                             {pendingSchedule.scheduled.map(s =>
-                              row(s.id, s.name, `${s.start_date.split('T')[1]}–${s.deadline.split('T')[1]}`, 'aero-success'))}
+                              row(s.id, s.name, `${s.start_date.split('T')[1]}–${s.deadline.split('T')[1]}`, 'aero-success', 'scheduled'))}
                           </div>
                         )}
                         {Array.from(byDate.entries()).map(([date, items]) => (
@@ -893,14 +918,14 @@ export default function TasksPage() {
                             {items.map(o => {
                               const startT = o.start_date?.split('T')[1]
                               const endT   = o.deadline.split('T')[1]
-                              return row(o.id, o.name, startT && endT ? `${startT}–${endT}` : null, 'aero-warning')
+                              return row(o.id, o.name, startT && endT ? `${startT}–${endT}` : null, 'aero-warning', 'overflow')
                             })}
                           </div>
                         ))}
                         <div className="flex items-center gap-2 pt-1">
-                          <button onClick={applySchedule} disabled={acceptedCount === 0}
-                            className="glow-button font-bold px-4 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-50">
-                            <CheckCircle className="w-3.5 h-3.5" /> Confirm {acceptedCount > 0 ? `(${acceptedCount})` : ''}
+                          <button onClick={applySchedule}
+                            className="glow-button font-bold px-4 py-1.5 text-xs flex items-center gap-1.5">
+                            <CheckCircle className="w-3.5 h-3.5" /> Apply all remaining ({remainingCount})
                           </button>
                           <button onClick={() => { setPendingSchedule(null); setChatPhase('idle'); setChatHistory([]) }}
                             className="vista-btn-secondary text-xs font-bold px-4 py-1.5">
@@ -1135,7 +1160,7 @@ export default function TasksPage() {
                   <div className="space-y-1">
                     <label className="vista-label">Recurring</label>
                     <div className="flex gap-2 flex-wrap">
-                      {(['none','daily','weekly'] as const).map(r => (
+                      {(['none','daily','weekly','monthly','yearly'] as const).map(r => (
                         <button key={r} onClick={() => setEditingTask({ ...editingTask, recurring: r, recurring_hours: null })}
                           className={`flex-1 py-1.5 rounded-lg text-xs font-black border transition-all capitalize ${editingTask.recurring === r && !editingTask.recurring_hours ? 'bg-emerald-100 text-emerald-700 border-emerald-300 shadow-inner' : 'bg-white/70 text-slate-400 border-slate-200 hover:bg-white'}`}>
                           {r}

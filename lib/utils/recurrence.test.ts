@@ -51,6 +51,11 @@ describe('ensureRecurringDeadline', () => {
     expect(ensureRecurringDeadline(null, { recurring: 'weekly' }, NOW)).toBe('2026-07-04')
   })
 
+  it('backfills today for monthly and yearly tasks with no deadline', () => {
+    expect(ensureRecurringDeadline(null, { recurring: 'monthly' }, NOW)).toBe('2026-07-04')
+    expect(ensureRecurringDeadline(null, { recurring: 'yearly' }, NOW)).toBe('2026-07-04')
+  })
+
   it('backfills today for an every-2-days task with no deadline', () => {
     expect(ensureRecurringDeadline(null, { recurring: 'daily', recurringDays: 2 }, NOW)).toBe('2026-07-04')
   })
@@ -97,6 +102,20 @@ describe('nextRecurrenceDeadline', () => {
   it('crosses month boundaries correctly', () => {
     expect(nextRecurrenceDeadline('2026-07-31T09:00', { recurring: 'daily' }, NOW)).toBe('2026-08-01T09:00')
   })
+
+  it('advances yearly tasks by one calendar year (birthdays stay on their date)', () => {
+    expect(nextRecurrenceDeadline('2026-07-26', { recurring: 'yearly' }, NOW)).toBe('2027-07-26')
+    expect(nextRecurrenceDeadline('2026-07-26T09:00', { recurring: 'yearly' }, NOW)).toBe('2027-07-26T09:00')
+  })
+
+  it('clamps Feb 29 yearly to Feb 28 in non-leap years', () => {
+    expect(nextRecurrenceDeadline('2028-02-29', { recurring: 'yearly' }, NOW)).toBe('2029-02-28')
+  })
+
+  it('advances monthly tasks by one calendar month, clamping month-end overflow', () => {
+    expect(nextRecurrenceDeadline('2026-07-15', { recurring: 'monthly' }, NOW)).toBe('2026-08-15')
+    expect(nextRecurrenceDeadline('2026-01-31', { recurring: 'monthly' }, NOW)).toBe('2026-02-28')
+  })
 })
 
 // ─── recurringLabel ──────────────────────────────────────────────────────────
@@ -114,6 +133,11 @@ describe('recurringLabel', () => {
   it('labels plain daily and weekly', () => {
     expect(recurringLabel({ recurring: 'daily' })).toBe('daily')
     expect(recurringLabel({ recurring: 'weekly' })).toBe('weekly')
+  })
+
+  it('labels monthly and yearly', () => {
+    expect(recurringLabel({ recurring: 'monthly' })).toBe('monthly')
+    expect(recurringLabel({ recurring: 'yearly' })).toBe('yearly')
   })
 
   it('returns null for non-recurring tasks', () => {
@@ -143,6 +167,8 @@ describe('isPastDeadline', () => {
   it('never flags recurring tasks as past at save time', () => {
     expect(isPastDeadline('2026-07-04T10:00', 'daily', NOW)).toBe(false)
     expect(isPastDeadline('2026-07-01', 'weekly', NOW)).toBe(false)
+    expect(isPastDeadline('2026-06-01', 'monthly', NOW)).toBe(false)
+    expect(isPastDeadline('2025-07-26', 'yearly', NOW)).toBe(false)
   })
 
   it('returns false for missing deadlines', () => {

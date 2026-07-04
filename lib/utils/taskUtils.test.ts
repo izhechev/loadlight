@@ -351,6 +351,19 @@ describe('effectiveDeadline', () => {
     expect(deadlineStatus(null, now)).toBeNull()
   })
 
+  it('advances past yearly deadlines to the next year, keeping the date', () => {
+    const now = new Date('2026-07-04T12:00Z').getTime()
+    const task = { deadline: '2025-07-26', recurring: 'yearly' as string | null, name: 'Mani birthday' }
+    expect(effectiveDeadline(task, now)).toBe('2026-07-26')
+  })
+
+  it('advances past monthly deadlines to the next month', () => {
+    const now = new Date('2026-07-04T12:00Z').getTime()
+    const task = { deadline: '2026-06-01T09:00Z', recurring: 'monthly' as string | null, name: 'Pay rent' }
+    const result = effectiveDeadline(task, now)!
+    expect(result).toContain('2026-08-01')
+  })
+
   it('advances an every-2-days task in 2-day steps from its base date', () => {
     // Base 2026-04-10; now 2026-04-16 12:00 → occurrences 10,12,14,16(08:00 passed),18
     const now = new Date('2026-04-16T12:00Z').getTime()

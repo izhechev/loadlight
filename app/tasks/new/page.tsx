@@ -60,7 +60,7 @@ interface ExtractedTask {
   priority: 1 | 2 | 3 | 4      // 1=urgent, 2=high, 3=normal, 4=low
   notes: string
   estimated_minutes: number | null
-  recurring?: 'none' | 'daily' | 'weekly'
+  recurring?: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
   times_per_day?: number
   recurring_hours?: number | null  // e.g. 8 → "every 8 hours"
   recurring_days?: number | null   // e.g. 2 → "every 2 days"
@@ -89,7 +89,7 @@ function difficultyColor(d: number): string {
 interface Clarification {
   question: string
   taskName: string
-  options: { label: string; recurring: 'none' | 'daily' | 'weekly' }[]
+  options: { label: string; recurring: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly' }[]
 }
 
 export default function AddTaskPage() {
@@ -114,7 +114,7 @@ export default function AddTaskPage() {
     try { return JSON.parse(localStorage.getItem('loadlight-tasks') ?? '[]') as ExtractedTask[] } catch { return [] }
   }
 
-  function applyClarification(recurring: 'none' | 'daily' | 'weekly') {
+  function applyClarification(recurring: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly') {
     if (!clarification || !preview) return
     setPreview(prev => prev!.map(t =>
       t.name === clarification.taskName ? { ...t, recurring } : t
@@ -498,7 +498,7 @@ export default function AddTaskPage() {
                           <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Repeat:</span>
                           <div className="flex bg-sky-50/70 rounded-lg p-0.5 border border-sky-100/60">
-                            {(['none', 'daily', 'weekly'] as const).map(mode => (
+                            {(['none', 'daily', 'weekly', 'monthly', 'yearly'] as const).map(mode => (
                               <button
                                 key={mode}
                                 onClick={() => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, recurring: mode, recurring_hours: null } : t) ?? null)}

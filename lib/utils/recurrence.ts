@@ -23,12 +23,33 @@ function addDays(dateStr: string, days: number): string {
  * Interval in days implied by a task's recurrence fields, or null when the
  * task does not recur on a day grid. recurringDays > 1 overrides the base
  * cadence (e.g. recurring "daily" + recurringDays 2 = every two days).
+ * Monthly and yearly tasks recur on the calendar, not a day grid — see
+ * nextRecurrenceDeadline.
  */
 export function recurrenceStepDays(rec: RecurrenceFields): number | null {
   const r = rec.recurring
   if (r !== 'daily' && r !== 'weekly') return null
   if (rec.recurringDays && rec.recurringDays > 1) return rec.recurringDays
   return r === 'weekly' ? 7 : 1
+}
+
+/** Any cadence at all — day-grid or calendar (monthly/yearly). */
+export function isRecurring(rec: RecurrenceFields): boolean {
+  const r = rec.recurring
+  return r === 'daily' || r === 'weekly' || r === 'monthly' || r === 'yearly'
+}
+
+/**
+ * Add calendar months/years to a "YYYY-MM-DD" string, clamping overflow to
+ * the end of the target month (Jan 31 +1mo → Feb 28; Feb 29 +1y → Feb 28).
+ */
+export function addCalendarUnits(dateStr: string, unit: 'month' | 'year', count: number): string {
+  const d = new Date(`${dateStr}T00:00Z`)
+  const dayOfMonth = d.getUTCDate()
+  if (unit === 'year') d.setUTCFullYear(d.getUTCFullYear() + count)
+  else d.setUTCMonth(d.getUTCMonth() + count)
+  if (d.getUTCDate() !== dayOfMonth) d.setUTCDate(0) // rolled into next month — clamp back
+  return d.toISOString().split('T')[0]
 }
 
 /**
@@ -42,7 +63,7 @@ export function ensureRecurringDeadline(
   nowMs: number,
 ): string | null {
   if (deadline) return deadline
-  if (recurrenceStepDays(rec) === null) return null
+  if (!isRecurring(rec)) return null
   return utcDateStr(nowMs)
 }
 
@@ -56,12 +77,13 @@ export function nextRecurrenceDeadline(
   rec: RecurrenceFields,
   nowMs: number,
 ): string | null {
-  const step = recurrenceStepDays(rec)
-  if (step === null) return null
+  if (!isRecurring(rec)) return null
   const normalized = deadline ? deadline.replace(' ', 'T') : utcDateStr(nowMs)
   const datePart = normalized.split('T')[0]
   const timePart = normalized.includes('T') ? normalized.split('T')[1] : null
-  const nextDate = addDays(datePart, step)
+  const nextDate = rec.recurring === 'yearly' ? addCalendarUnits(datePart, 'year', 1)
+    : rec.recurring === 'monthly' ? addCalendarUnits(datePart, 'month', 1)
+    : addDays(datePart, recurrenceStepDays(rec)!)
   return timePart ? `${nextDate}T${timePart}` : nextDate
 }
 
@@ -92,7 +114,7 @@ export function isPastDeadline(
   nowMs: number,
 ): boolean {
   if (!deadline) return false
-  if (recurring === 'daily' || recurring === 'weekly') return false
+  if (isRecurring({ recurring })) return false
   let normalized = deadline.replace(' ', 'T')
   if (!normalized.includes('T')) normalized += 'T23:59'
   if (!normalized.endsWith('Z') && !normalized.includes('+')) normalized += 'Z'
@@ -105,6 +127,6 @@ export function isPastDeadline(
 export function recurringLabel(rec: RecurrenceFields & { recurringHours?: number | null }): string | null {
   if (rec.recurringHours) return `Every ${rec.recurringHours}h`
   if (rec.recurringDays && rec.recurringDays > 1) return `Every ${rec.recurringDays} days`
-  if (rec.recurring === 'daily' || rec.recurring === 'weekly') return rec.recurring
+  if (isRecurring(rec)) return rec.recurring as string
   return null
 }

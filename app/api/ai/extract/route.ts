@@ -24,7 +24,7 @@ Extract tasks from the user's free-form input. For each task produce these field
 - startDate: "YYYY-MM-DDTHH:mm" if mentioned, else null
 - estimatedMinutes: integer if mentioned, else null
 - notes: any extra context
-- recurring: "none" | "daily" | "weekly". Set to "daily" when user says "daily", "every day", "everyday", or gives a fixed daily time.
+- recurring: "none" | "daily" | "weekly" | "monthly" | "yearly". Set to "daily" when user says "daily", "every day", "everyday", or gives a fixed daily time. Set to "monthly" for "every month", "monthly", "every 1st". Set to "yearly" for "every year", "yearly", "annually", and for BIRTHDAYS, name days, and anniversaries (e.g. "Mani birthday 26 July" → recurring "yearly", deadline the NEXT occurrence of 26 July).
 - recurringHours: integer if user says "every X hours", else null
 - recurringDays: integer if user says "every X days" / "every other day" / "every second day" (e.g. "throw trash every two days" → recurring "daily", recurringDays 2), else null. When recurringDays is set, also set recurring to "daily" and deadline to today (date only if no time given).
 
