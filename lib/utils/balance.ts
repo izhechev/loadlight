@@ -20,16 +20,25 @@ export function shouldRequestBalanceCheck(state: string, activeTaskCount: number
   return true
 }
 
+/** Demand type implied by a suggestion's category. */
+function demandTypeFor(category: string): string {
+  if (/exercise|sport|fitness|gym/i.test(category)) return 'physical'
+  if (/work|study|admin/i.test(category)) return 'cognitive'
+  if (/creative/i.test(category)) return 'creative'
+  return 'routine'
+}
+
 /** Map an AI "add" suggestion into a real task insert with safe defaults. */
 export function addSuggestionToTask(item: { name: string; category: string }): TaskInsert {
   return {
     name: item.name,
     category: item.category || 'Personal',
     lifeDomain: 'personal',
-    demandType: 'routine',
+    demandType: demandTypeFor(item.category ?? ''),
     difficulty: 2,
     priority: 3,
-    deadline: null,
+    // Suggestions are for today — a concrete date, no invented clock time
+    deadline: new Date().toISOString().split('T')[0],
     startDate: null,
     estimatedMinutes: 30,
     notes: '',
