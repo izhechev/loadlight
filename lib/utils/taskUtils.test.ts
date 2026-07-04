@@ -6,6 +6,7 @@ import {
   toInputDt,
   parseLocal,
   isDueWithin48h,
+  deadlineStatus,
   difficultyDots,
   parseHHMM,
   fmtMinutes,
@@ -334,6 +335,20 @@ describe('effectiveDeadline', () => {
     const task = { deadline: '2026-04-20T08:00Z', recurring: 'weekly' as string | null, name: 'Clean apartment' }
     const result = effectiveDeadline(task, now)!
     expect(result).toContain('2026-04-20')
+  })
+
+  it('classifies deadlines as overdue, due-soon, or neither', () => {
+    const now = new Date('2026-07-04T12:00Z').getTime()
+    // Past timed deadline → overdue
+    expect(deadlineStatus('2026-07-04T10:00Z', now)).toBe('overdue')
+    expect(deadlineStatus('2026-07-01T09:00Z', now)).toBe('overdue')
+    // Date-only today counts as end-of-day → due today, not overdue
+    expect(deadlineStatus('2026-07-04', now)).toBe('due-soon')
+    expect(deadlineStatus('2026-07-03', now)).toBe('overdue')
+    // Within 48h ahead → due-soon; farther → null
+    expect(deadlineStatus('2026-07-05T18:00Z', now)).toBe('due-soon')
+    expect(deadlineStatus('2026-07-10T09:00Z', now)).toBeNull()
+    expect(deadlineStatus(null, now)).toBeNull()
   })
 
   it('advances an every-2-days task in 2-day steps from its base date', () => {

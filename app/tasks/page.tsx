@@ -1,15 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { CheckCircle, Circle, Trash2, Calendar, Plus, Filter, RefreshCw, Sparkles, Loader2, List, LayoutGrid, CalendarDays, ChevronLeft, ChevronRight, CalendarClock, Pencil, X } from "@/lib/icons"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { CheckCircle, Circle, Trash2, Calendar, Plus, Filter, RefreshCw, Sparkles, Loader2, List, LayoutGrid, CalendarDays, ChevronLeft, ChevronRight, CalendarClock, Pencil, X, AlertTriangle } from "@/lib/icons"
 import Link from "next/link"
 import { AppLayout } from "@/components/app-layout"
 import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib/store/overwhelmedStore"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { getTasks, updateTask, deleteTask, addTasks, IS_DEMO } from "@/lib/data/tasks"
-import { effectiveDeadline as computeEffectiveDeadline } from "@/lib/utils/taskUtils"
+import { effectiveDeadline as computeEffectiveDeadline, deadlineStatus } from "@/lib/utils/taskUtils"
 import { nextRecurrenceDeadline, recurringLabel, isPastDeadline } from "@/lib/utils/recurrence"
 import { PastDeadlineModal } from "@/components/past-deadline-modal"
 
@@ -78,6 +78,9 @@ export default function TasksPage() {
   const [chatPhase, setChatPhase]           = useState<'idle' | 'chatting' | 'confirming' | 'done'>('idle')
   const [editingTask, setEditingTask]       = useState<Task | null>(null)
   const [pastDeadlinePending, setPastDeadlinePending] = useState<Task | null>(null)
+  // Missed-deadline warning: remaining overdue tasks to walk through, one modal at a time
+  const [overdueQueue, setOverdueQueue] = useState<Task[]>([])
+  const overdueScanned = useRef(false)
 
   type PendingSchedule = {
     scheduled: { id: string; name: string; start_date: string; deadline: string }[]
@@ -110,6 +113,29 @@ export default function TasksPage() {
         } catch { /* ignore */ }
       })
   }, [])
+
+  // Warn about missed deadlines: once per day, walk overdue tasks through the
+  // reschedule modal (recurring tasks are excluded — they advance on their own)
+  useEffect(() => {
+    if (overdueScanned.current || !now || tasks.length === 0) return
+    overdueScanned.current = true
+    const today = new Date(now).toISOString().slice(0, 10)
+    try { if (localStorage.getItem('loadlight-overdue-prompted') === today) return } catch { /* ignore */ }
+    const overdue = tasks.filter(t => !t.done && isPastDeadline(t.deadline, t.recurring, now))
+    if (overdue.length === 0) return
+    try { localStorage.setItem('loadlight-overdue-prompted', today) } catch { /* ignore */ }
+    setOverdueQueue(overdue.slice(1))
+    setPastDeadlinePending(overdue[0])
+  }, [tasks, now])
+
+  // When one overdue modal closes, surface the next task in the queue
+  useEffect(() => {
+    if (pastDeadlinePending === null && overdueQueue.length > 0) {
+      const [next, ...rest] = overdueQueue
+      setOverdueQueue(rest)
+      setPastDeadlinePending(next)
+    }
+  }, [pastDeadlinePending, overdueQueue])
 
   const syncAndCompute = useCallback((updated: Task[]) => {
     // Demo mode: keep localStorage in sync for other pages that still read it
@@ -582,14 +608,17 @@ export default function TasksPage() {
             )}
             {task.deadline && (() => {
               const dl = effectiveDeadline(task)!
+              const status = deadlineStatus(dl, now)
               return (
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border ${
-                  isDueWithin48h(dl, now) ? 'bg-red-50/90 text-red-600 border-red-300/50' : 'bg-sky-50/60 text-slate-500 border-sky-100/60'
+                  status === 'overdue' ? 'bg-red-100 text-red-700 border-red-400/60'
+                  : status === 'due-soon' ? 'bg-red-50/90 text-red-600 border-red-300/50'
+                  : 'bg-sky-50/60 text-slate-500 border-sky-100/60'
                 }`}>
-                  <Calendar className="w-3 h-3" />
+                  {status === 'overdue' ? <AlertTriangle className="w-3 h-3" /> : <Calendar className="w-3 h-3" />}
                   {formatDate(dl)}
                   {formatTime(dl) && ` · ${formatTime(dl)}`}
-                  {isDueWithin48h(dl, now) && ' · Due soon'}
+                  {status === 'overdue' ? ' · Overdue' : status === 'due-soon' ? ' · Due soon' : ''}
                 </span>
               )
             })()}

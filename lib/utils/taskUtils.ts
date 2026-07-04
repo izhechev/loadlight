@@ -78,6 +78,23 @@ export function isDueWithin48h(deadline: string | null, currentTime: number): bo
   return ms <= 172_800_000
 }
 
+/**
+ * Classify a deadline for badge display: 'overdue' when missed, 'due-soon'
+ * within the next 48 hours, null otherwise. Date-only deadlines count as
+ * end-of-day — a task "due 4 Jul" is not overdue during 4 Jul.
+ */
+export function deadlineStatus(deadline: string | null, currentTime: number): 'overdue' | 'due-soon' | null {
+  if (!deadline || currentTime === 0) return null
+  let normalized = normalizeDt(deadline)
+  if (!normalized.includes('T')) normalized += 'T23:59'
+  if (!normalized.endsWith('Z') && !normalized.includes('+')) normalized += 'Z'
+  const ms = new Date(normalized).getTime() - currentTime
+  if (isNaN(ms)) return null
+  if (ms < 0) return 'overdue'
+  if (ms <= 172_800_000) return 'due-soon'
+  return null
+}
+
 /** Build the ●/○ difficulty dot string (always 5 chars). */
 export function difficultyDots(d: number): string {
   return '●'.repeat(d) + '○'.repeat(5 - d)
