@@ -81,8 +81,11 @@ export function nextRecurrenceDeadline(
   const normalized = deadline ? deadline.replace(' ', 'T') : utcDateStr(nowMs)
   const datePart = normalized.split('T')[0]
   const timePart = normalized.includes('T') ? normalized.split('T')[1] : null
-  const nextDate = rec.recurring === 'yearly' ? addCalendarUnits(datePart, 'year', 1)
-    : rec.recurring === 'monthly' ? addCalendarUnits(datePart, 'month', 1)
+  // For calendar cadences, recurringDays doubles as the interval multiplier
+  // (monthly + 3 = every 3 months) — avoids another schema column
+  const calCount = rec.recurringDays && rec.recurringDays > 1 ? rec.recurringDays : 1
+  const nextDate = rec.recurring === 'yearly' ? addCalendarUnits(datePart, 'year', calCount)
+    : rec.recurring === 'monthly' ? addCalendarUnits(datePart, 'month', calCount)
     : addDays(datePart, recurrenceStepDays(rec)!)
   return timePart ? `${nextDate}T${timePart}` : nextDate
 }
@@ -126,7 +129,11 @@ export function isPastDeadline(
 /** Human-readable recurrence badge, or null for non-recurring tasks. */
 export function recurringLabel(rec: RecurrenceFields & { recurringHours?: number | null }): string | null {
   if (rec.recurringHours) return `Every ${rec.recurringHours}h`
-  if (rec.recurringDays && rec.recurringDays > 1) return `Every ${rec.recurringDays} days`
+  if (rec.recurringDays && rec.recurringDays > 1) {
+    if (rec.recurring === 'monthly') return `Every ${rec.recurringDays} months`
+    if (rec.recurring === 'yearly') return `Every ${rec.recurringDays} years`
+    return `Every ${rec.recurringDays} days`
+  }
   if (isRecurring(rec)) return rec.recurring as string
   return null
 }
