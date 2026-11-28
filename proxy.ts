@@ -63,6 +63,6 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Exclude static assets, API routes, and auth callback (needs to run before session exists)
-    '/((?!_next/static|_next/image|favicon.ico|api/|auth/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|walkthroughs/|api/|auth/).*)',
   ],
 }

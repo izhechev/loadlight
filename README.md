@@ -6,8 +6,8 @@ LoadLight is a task planner that helps you see how much time your plans will tak
 
 Both recordings use sample tasks in guest mode.
 
-- [Create and review tasks](docs/walkthroughs/capture-tasks.mp4)
-- [Check your workload and plan your day](docs/walkthroughs/plan-your-day.mp4)
+- [Create and review tasks](https://loadlight.vercel.app/walkthroughs/capture-tasks.mp4)
+- [Check your workload and plan your day](https://loadlight.vercel.app/walkthroughs/plan-your-day.mp4)
 
 ## Try it locally
 
