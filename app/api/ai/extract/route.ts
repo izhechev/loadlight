@@ -1,6 +1,6 @@
 import { readAiRequest } from '@/lib/ai/request'
 import { extractIssueCodes, extractOutputSchema, extractRequestSchema, geminiExtractSchema, type ExtractedTask } from '@/lib/ai/schemas'
-import { fetchGemini, GEMINI_MODELS, geminiText, getGeminiAccess, readGeminiJson, recordAiCall, type GeminiResponse } from '@/lib/ai/server'
+import { aiBlocked, aiModels, fetchGemini, fetchGroq, GROQ_MODEL, geminiText, modelProvider, getGeminiAccess, readGeminiJson, recordAiCall, type GeminiResponse } from '@/lib/ai/server'
 import { extractTaskDrafts, taskPreview, type TaskDraft } from '@/lib/ai/taskExtraction'
 
 const SYSTEM_PROMPT = `Extract tasks in the order they appear. Return a JSON object with a tasks array.
@@ -76,7 +76,7 @@ function alignTasks(localTasks: TaskDraft[], modelTasks: ExtractedTask[]): TaskD
 export async function POST(request: Request) {
   const body = await readAiRequest(request, extractRequestSchema)
   if (body instanceof Response) return body
-  const { text, categories, today = new Date().toISOString().slice(0, 10) } = body
+  const { text, categories, clarifying, today = new Date().toISOString().slice(0, 10) } = body
   const localTasks = extractTaskDrafts(text, today, categories)
   if (!localTasks.length) return Response.json({ tasks: [] })
 
@@ -85,25 +85,26 @@ export async function POST(request: Request) {
   if (!access) return offline()
 
   const requestBody = JSON.stringify({
-    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    contents: [{ parts: [{ text: JSON.stringify({ today, categories, text }) }] }],
+    systemInstruction: { parts: [{ text: clarifying ? SYSTEM_PROMPT +
+      '\nThe user is explaining one existing draft. Interpret the answer as a single task and use the original title only as context. Only extract times, dates and durations stated in the answer.' : SYSTEM_PROMPT }] },
+    contents: [{ parts: [{ text: JSON.stringify({ today, categories, text, clarifying }) }] }],
     generationConfig: { maxOutputTokens: 8192, responseMimeType: 'application/json', responseJsonSchema: geminiExtractSchema },
     safetySettings: SAFETY_SETTINGS,
   })
   const start = Date.now()
 
-  for (const model of GEMINI_MODELS) {
+  for (const model of aiModels(access)) {
     try {
-      const res = await fetchGemini(model, access.apiKey, requestBody)
+      const res = model === GROQ_MODEL ? await fetchGroq(access.groqKey!, requestBody) : await fetchGemini(model, access.apiKey, requestBody)
       if (!res.ok) continue
 
       const data: GeminiResponse = await res.json()
       const candidate = data.candidates?.[0]
-      if (candidate?.finishReason === 'SAFETY') {
-        const hit = (name: string) => candidate.safetyRatings?.some(r => r.category === name && r.probability !== 'NEGLIGIBLE')
-        const category = hit('HARM_CATEGORY_DANGEROUS_CONTENT') ? 'self_harm' :
+      if (aiBlocked(data)) {
+        const hit = (name: string) => candidate?.safetyRatings?.some(r => r.category === name && r.probability !== 'NEGLIGIBLE')
+        const category = data.blockedCategory ?? (hit('HARM_CATEGORY_DANGEROUS_CONTENT') ? 'self_harm' :
           hit('HARM_CATEGORY_SEXUALLY_EXPLICIT') ? 'sexual' :
-          hit('HARM_CATEGORY_HATE_SPEECH') ? 'hate' : 'other'
+          hit('HARM_CATEGORY_HATE_SPEECH') ? 'hate' : 'other')
         return Response.json({ blocked: true, category })
       }
 
@@ -119,10 +120,13 @@ export async function POST(request: Request) {
       }
 
       const { tasks, clarification, unclearTasks } = parsed.data
-      const aligned = alignTasks(localTasks, tasks)
+      const aligned = clarifying && tasks.length === 1
+        ? [knownDetails(tasks[0], localTasks.length === 1 ? localTasks[0] : undefined)]
+        : alignTasks(localTasks, tasks)
       await recordAiCall(access, 'extraction', model, start, data.usageMetadata)
       if (!aligned) {
         console.warn('LoadLight Gemini extraction', { model, reason: 'unmatched_tasks' })
+        if (model !== GROQ_MODEL && access.groqKey) continue
         return offline()
       }
       return Response.json({
@@ -130,6 +134,7 @@ export async function POST(request: Request) {
         clarification,
         unclearTasks: aligned.filter(task => unclearTasks?.includes(task.name)).map(task => task.name),
         offline: false,
+        source: modelProvider(model),
       })
     } catch (error) {
       const reason = error instanceof SyntaxError ? 'invalid_json'

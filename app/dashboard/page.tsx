@@ -18,7 +18,7 @@ import styles from "./dashboard.module.css"
 type BalanceMode = 'beast' | 'average' | 'chill'
 
 interface AnalysisResult {
-  source: 'gemini' | 'rules'
+  source: 'gemini' | 'groq' | 'rules'
   trend: string
   advice: string
   suggestion: string
@@ -204,7 +204,7 @@ export default function DashboardPage() {
   const [pendingChillValue, setPendingChillValue] = useState<number | null>(null)
   const [weeklyAnalysis, setWeeklyAnalysis] = useState<AnalysisResult | null>(null)
   const [isAnalysing, setIsAnalysing] = useState(false)
-  const [advisory, setAdvisory] = useState<string | null>(null)
+  const [advisory, setAdvisory] = useState<{ advice: string; source?: 'gemini' | 'groq' } | null>(null)
   const [sparkHistory, setSparkHistory] = useState<SparkEntry[]>([])
   const lastSummary = useRef('')
   const summaryRequest = useRef(0)
@@ -309,11 +309,14 @@ export default function DashboardPage() {
             demandingTasks: day.demandingTasks,
             plan: { ...advicePlan, conflicts: advicePlan.conflicts?.slice(0, 5) },
           }),
-        }).then(res => res.ok ? res.json() as Promise<{ advice: string | null }> : null),
+        }).then(res => res.ok ? res.json() as Promise<{ advice: string | null; source?: 'gemini' | 'groq' }> : null),
       ])
       if (request !== summaryRequest.current) return
       if (summary.status === 'fulfilled') setWeeklyAnalysis(summary.value)
-      if (advice.status === 'fulfilled') setAdvisory(advice.value?.advice ?? null)
+      if (advice.status === 'fulfilled') {
+        const result = advice.value
+        setAdvisory(result?.advice ? { advice: result.advice, source: result.source } : null)
+      }
     } finally {
       if (request === summaryRequest.current) setIsAnalysing(false)
     }
@@ -584,8 +587,8 @@ export default function DashboardPage() {
               {/* Real-time advisory (spec: 1-2 sentence observation) */}
               {advisory && state !== 'overwhelmed' && (
                 <div className="skeu-inset rounded-2xl p-4 border-l-4" style={{ borderLeftColor: 'rgba(139,92,246,0.60)' }}>
-                  <p className="text-xs font-bold">Gemini suggestion</p>
-                  <p className="text-sm leading-relaxed font-medium" style={{ color: '#1a2a3a' }}>{advisory}</p>
+                  <p className="text-xs font-bold">{advisory.source === 'groq' ? 'Groq suggestion' : 'Gemini suggestion'}</p>
+                  <p className="text-sm leading-relaxed font-medium" style={{ color: '#1a2a3a' }}>{advisory.advice}</p>
                 </div>
               )}
 
@@ -593,9 +596,9 @@ export default function DashboardPage() {
                 <h3 className="font-bold">This week</h3>
                 <p>{week.completed} completed, {week.pending} pending, {week.minutes} min left</p>
               </div>
-              {weeklyAnalysis?.source === 'gemini' ? (
+              {weeklyAnalysis && weeklyAnalysis.source !== 'rules' ? (
                 <div className="space-y-2">
-                  <p className="text-xs font-bold">Gemini summary</p>
+                  <p className="text-xs font-bold">{weeklyAnalysis.source === 'groq' ? 'Groq summary' : 'Gemini summary'}</p>
                   <p>{weeklyAnalysis.trend}</p>
                   {weeklyAnalysis.advice && <p>{weeklyAnalysis.advice}</p>}
                   {weeklyAnalysis.suggestion && <p>{weeklyAnalysis.suggestion}</p>}
@@ -603,7 +606,7 @@ export default function DashboardPage() {
               ) : (
                 <p className="text-sm">
                   {tasks.length > 0
-                    ? 'Showing task totals. No Gemini summary is available.'
+                    ? 'Showing task totals. AI summary unavailable.'
                     : 'Add tasks to see your workload.'}
                 </p>
               )}

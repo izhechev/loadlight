@@ -55,6 +55,7 @@ export interface Task {
   deadline?: string | null
   startDate?: string | null
   estimatedMinutes?: number | null
+  actualMinutes?: number | null
   notes: string
   status: 'active' | 'completed' | 'archived'
   recurring: string
@@ -334,7 +335,7 @@ export async function completeRecurringTask(id: string, nextDeadline: string): P
     const exists = tasks.some(t => t.id !== id && t.status !== 'archived' && t.name === task.name &&
       t.category === task.category && t.recurring === task.recurring && t.deadline === nextDeadline)
     if (!exists) updated.push({
-      ...task, id: crypto.randomUUID(), deadline: nextDeadline, startDate: null, snoozedUntil: null,
+      ...task, id: crypto.randomUUID(), deadline: nextDeadline, startDate: null, snoozedUntil: null, actualMinutes: null,
       createdAt: completedAt, completedAt: null, steps: task.steps?.map(step => ({ ...step, done: false })),
     })
     lsSetTasks(updated)
@@ -497,6 +498,7 @@ function dbRowToTask(row: any): Task {
     deadline:         fromDbDeadline(row.deadline),
     startDate:        row.start_date ?? null,
     estimatedMinutes: row.estimated_minutes ?? null,
+    actualMinutes:    row.actual_minutes ?? null,
     notes:            row.notes ?? '',
     status:           row.status ?? 'active',
     recurring:        row.recurring ?? 'none',
@@ -540,6 +542,7 @@ function taskToDbRow(task: Partial<Task>): Record<string, unknown> {
   if (task.deadline         !== undefined) row.deadline          = toUtcTs(task.deadline, true)
   if (task.startDate        !== undefined) row.start_date        = toUtcTs(task.startDate)
   if (task.estimatedMinutes !== undefined) row.estimated_minutes = task.estimatedMinutes
+  if (task.actualMinutes    !== undefined) row.actual_minutes    = task.actualMinutes
   if (task.notes            !== undefined) row.notes             = task.notes
   if (task.status           !== undefined) row.status            = task.status
   if (task.recurring        !== undefined) row.recurring         = task.recurring

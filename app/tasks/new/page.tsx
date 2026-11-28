@@ -8,9 +8,9 @@ import { AppLayout } from "@/components/app-layout"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
-import { addTasks, type Task } from "@/lib/data/tasks"
+import { addTasks, getTasks, type Task } from "@/lib/data/tasks"
 import { extractTaskDrafts, LIFE_DOMAINS, needsTaskDetails, taskPreview, type TaskPreview as ExtractedTask } from "@/lib/ai/taskExtraction"
-import { inferTitleEffort } from "@/lib/utils/taskEffort"
+import { estimateFromHistory } from "@/lib/utils/taskEstimates"
 import { TaskClarificationDialog } from "@/components/task-clarification-dialog"
 import { localDateStr } from "@/lib/utils/scheduling"
 import { isPastDeadline } from "@/lib/utils/recurrence"
@@ -93,6 +93,16 @@ interface Clarification {
   options: { label: string; recurring: ExtractedTask['recurring']; recurring_hours?: number | null }[]
 }
 
+type ExtractionResponse = {
+  source?: 'gemini' | 'groq'
+  tasks?: ExtractedTask[]
+  clarification?: Clarification | null
+  unclearTasks?: string[]
+  blocked?: boolean
+  category?: string
+  offline?: boolean
+}
+
 export default function AddTaskPage() {
   const router = useRouter()
   const { state: overwhelmedState } = useOverwhelmedStore()
@@ -102,11 +112,15 @@ export default function AddTaskPage() {
   const [preview, setPreview] = useState<ExtractedTask[] | null>(null)
   const [clarification, setClarification] = useState<Clarification | null>(null)
   const [unclear, setUnclear] = useState<number[]>([])
+  const [clarifying, setClarifying] = useState(false)
+  const [clarificationError, setClarificationError] = useState('')
+  const estimateHistory = useRef<Task[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const [offlineDraft, setOfflineDraft] = useState(false)
+  const [draftSource, setDraftSource] = useState<'Gemini' | 'Groq'>('Gemini')
   const [showOverwhelmedConfirm, setShowOverwhelmedConfirm] = useState(false)
   const [showCrisisModal, setShowCrisisModal] = useState(false)
   const [showBlockedModal, setShowBlockedModal] = useState(false)
@@ -119,7 +133,9 @@ export default function AddTaskPage() {
   }
 
   function showDrafts(drafts: ExtractedTask[], modelUnclear?: string[]) {
-    setPreview(drafts)
+    setPreview(drafts.map(task => ({
+      ...task, estimated_minutes: task.estimated_minutes ?? estimateFromHistory(task, estimateHistory.current),
+    })))
     setUnclear(drafts.flatMap((draft, index) =>
       needsTaskDetails(draft.name) || modelUnclear?.includes(draft.name) ? [index] : [],
     ))
@@ -127,7 +143,62 @@ export default function AddTaskPage() {
 
   const unclearIndex = unclear[0]
   const unclearDraft = preview?.[unclearIndex]
-  const skipUnclear = () => setUnclear(current => current.slice(1))
+  const skipUnclear = () => {
+    setClarificationError('')
+    setUnclear(current => current.slice(1))
+  }
+
+  async function clarifyTask(answer: string) {
+    if (!unclearDraft || clarifying) return
+    if (containsCrisisPhrase(answer)) { skipUnclear(); setShowCrisisModal(true); return }
+    const today = localDateStr()
+    const categoryNames = categories.map(category => category.name)
+    setClarifying(true)
+    setClarificationError('')
+    try {
+      let data: ExtractionResponse
+      try {
+        const response = await fetch('/api/ai/extract', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: answer, clarifying: unclearDraft.name, today, categories: categoryNames }),
+        })
+        if (!response.ok) throw new Error('Extraction failed')
+        data = await response.json()
+      } catch {
+        data = { tasks: extractTaskDrafts(answer, today, categoryNames).map(taskPreview), offline: true }
+      }
+      if (data.blocked) {
+        skipUnclear()
+        if (data.category === 'self_harm') setShowCrisisModal(true)
+        else setShowBlockedModal(true)
+        return
+      }
+      const revised = data.tasks?.[0]
+      if (data.tasks?.length !== 1 || !revised || needsTaskDetails(revised.name) || data.unclearTasks?.includes(revised.name)) {
+        setClarificationError('Describe one action and what it applies to.')
+        return
+      }
+      updateDraft(unclearIndex, {
+        ...revised,
+        deadline: /\b(?:no deadline|remove (?:the )?deadline)\b/i.test(answer) ? null : revised.deadline ?? unclearDraft.deadline,
+        start_date: revised.start_date ?? unclearDraft.start_date,
+        estimated_minutes: revised.estimated_minutes ?? unclearDraft.estimated_minutes ?? estimateFromHistory(revised, estimateHistory.current),
+        notes: revised.notes || unclearDraft.notes,
+        ...(revised.recurring === 'none' && {
+          recurring: unclearDraft.recurring, recurring_hours: unclearDraft.recurring_hours,
+          recurring_days: unclearDraft.recurring_days, times_per_day: unclearDraft.times_per_day,
+        }),
+      })
+      if (data.offline === false) {
+        setOfflineDraft(false)
+        setDraftSource(data.source === 'groq' ? 'Groq' : 'Gemini')
+      }
+      if (data.clarification) setClarification(data.clarification)
+      skipUnclear()
+    } finally {
+      setClarifying(false)
+    }
+  }
 
   function applyClarification(option: Clarification['options'][number]) {
     if (!clarification) return
@@ -155,6 +226,7 @@ export default function AddTaskPage() {
     setError(null)
     const today = localDateStr()
     const categoryNames = categories.map(category => category.name)
+    const history = getTasks(true).catch(() => [])
     try {
       const res = await fetch('/api/ai/extract', {
         method: 'POST',
@@ -166,17 +238,20 @@ export default function AddTaskPage() {
         }),
       })
       if (!res.ok) throw new Error('API error')
-      const data = await res.json() as { tasks?: ExtractedTask[]; clarification?: Clarification | null; unclearTasks?: string[]; blocked?: boolean; category?: string; offline?: boolean }
+      const data = await res.json() as ExtractionResponse
       if (data.blocked) {
         if (data.category === 'self_harm') { setShowCrisisModal(true) } else { setShowBlockedModal(true) }
         return
       }
       if (!data.tasks?.length) throw new Error('No tasks extracted')
+      estimateHistory.current = await history
       showDrafts(data.tasks, data.unclearTasks)
       setOfflineDraft(data.offline !== false)
+      setDraftSource(data.source === 'groq' ? 'Groq' : 'Gemini')
       if (data.clarification?.question) setClarification(data.clarification)
     } catch {
       const tasks = extractTaskDrafts(input, today, categoryNames).map(taskPreview)
+      estimateHistory.current = await history
       showDrafts(tasks)
       setOfflineDraft(true)
       if (!tasks.length) setError('Enter at least one task.')
@@ -587,12 +662,12 @@ export default function AddTaskPage() {
                   </>
                 )}
               </div>
-              <p className="text-[10px] text-slate-500 font-bold mt-3 italic">{offlineDraft ? 'Drafted with local rules.' : 'Drafted with Gemini. Check the details before saving.'}</p>
+              <p className="text-[10px] text-slate-500 font-bold mt-3 italic">{offlineDraft ? 'Drafted with local rules.' : `Drafted with ${draftSource}. Check the details before saving.`}</p>
             </div>
           )}
 
         {unclearDraft ? (
-          <TaskClarificationDialog key={unclearIndex} question={`What do you need to do for “${unclearDraft.name}”?`} onSkip={skipUnclear}>
+          <TaskClarificationDialog key={unclearIndex} question={`What do you need to do for “${unclearDraft.name}”?`} onSkip={skipUnclear} busy={clarifying}>
             <form onSubmit={event => {
               event.preventDefault()
               const name = String(new FormData(event.currentTarget).get('description') ?? '').trim()
@@ -602,15 +677,14 @@ export default function AddTaskPage() {
                 input.reportValidity()
                 return
               }
-              const effort = inferTitleEffort(name)
-              updateDraft(unclearIndex, { name, ...(effort && { demand_type: effort.type, difficulty: effort.difficulty }) })
-              skipUnclear()
+              void clarifyTask(name)
             }}>
               <label className="block text-sm font-semibold" htmlFor="task-detail-description">What needs doing?</label>
               <input id="task-detail-description" name="description" required maxLength={512}
                 onInput={event => event.currentTarget.setCustomValidity('')}
                 className="input-skeu block w-full px-3 py-2 my-2 rounded-lg text-sm" />
-              <button className="glow-button px-3 py-2 text-sm font-bold" type="submit">Update task</button>
+              {clarificationError && <p role="alert" className="text-sm text-red-700 mb-2">{clarificationError}</p>}
+              <button disabled={clarifying} className="glow-button px-3 py-2 text-sm font-bold" type="submit">{clarifying ? 'Checking…' : 'Update task'}</button>
             </form>
           </TaskClarificationDialog>
         ) : preview && clarification && (

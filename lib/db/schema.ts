@@ -33,6 +33,7 @@ export const tasks = pgTable('tasks', {
   deadline:         timestamp('deadline', { withTimezone: true }),
   startDate:        timestamp('start_date', { withTimezone: true }),
   estimatedMinutes: integer('estimated_minutes'),
+  actualMinutes: integer('actual_minutes'),
   notes:            text('notes').notNull().default(''),
   steps:            jsonb('steps').$type<{ name: string; done: boolean }[]>().notNull().default([]),
   status:           text('status').notNull().default('active'),  // active | completed | archived
@@ -143,6 +144,7 @@ create table tasks (
   deadline          timestamptz,
   start_date        timestamptz,
   estimated_minutes integer,
+  actual_minutes integer check (actual_minutes between 1 and 10080),
   notes             text not null default '',
   steps             jsonb not null default '[]'::jsonb,
   status            text not null default 'active' check (status in ('active','completed','archived')),

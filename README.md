@@ -28,6 +28,14 @@ Open [localhost:3000](http://localhost:3000) and choose **Try without an account
 4. Set `GOOGLE_API_KEY` or `GEMINI_API_KEY` on the server. If both are set, LoadLight uses `GOOGLE_API_KEY`. On Vercel, set the variable for Production and redeploy after changing it. [Google’s API key guide](https://aistudio.google.com/docs/api-key) · [Vercel environment variables](https://vercel.com/docs/environment-variables/managing-environment-variables)
 5. Sign in and preview a task. The preview says which source drafted it. Each account can make up to 20 AI requests per 10 minutes.
 
+Set the optional server-only `GROQ_API_KEY` in Vercel as a **Secret** for **Production**, then redeploy. LoadLight tries the Gemini models before Groq and uses the same account quota for all attempts. Task extraction still checks blocked content and validates the draft before showing it. [Vercel environment variables](https://vercel.com/docs/environment-variables/managing-environment-variables) · [Groq model and output support](https://console.groq.com/docs/structured-outputs)
+
+## Calendar and time estimates
+
+Set `NEXT_PUBLIC_GOOGLE_CALENDAR_CLIENT_ID` to a Google OAuth web client ID and add the app’s origin to that client’s authorized JavaScript origins. Enable the Google Calendar API for the Google Cloud project. In **Settings → Planning availability**, save your work hours and break, then choose **Import busy times**. Each import refreshes the next 31 days from your primary calendar. LoadLight keeps the busy times and hours in the current browser. [Google OAuth setup](https://developers.google.com/identity/oauth2/web/guides/get-google-api-clientid) · [Google Calendar availability API](https://developers.google.com/workspace/calendar/api/v3/reference/freebusy/query)
+
+Run the `actual_minutes` migration in [`supabase/MIGRATIONS.sql`](supabase/MIGRATIONS.sql) before deploying the time-spent field for signed-in accounts. Edit a finished task to record time spent. When a new draft has no estimate, LoadLight uses the median from matching completed tasks with recorded times.
+
 ## Development
 
 ```sh

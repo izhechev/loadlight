@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { Lock, ChevronRight, RefreshCw, BarChart3, Info, Download, Upload, CheckCircle, KeyRound } from "@/lib/icons"
 import { ClassicIcon, type IconName } from "@/lib/classic-icons"
 import { AppLayout } from "@/components/app-layout"
+import { PlanningSettings } from "@/components/planning-settings"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 import { getTasks, updateTask, type Task } from "@/lib/data/tasks"
 import { findDuplicateGroups, type DuplicateGroup } from "@/lib/utils/duplicates"
@@ -225,6 +226,8 @@ export default function SettingsPage() {
             <p className="text-sm font-bold" style={{ color: '#5a7a9a' }}>Configure your balance goals and monitor workload status</p>
           </div>
         </div>
+
+        <PlanningSettings />
 
         {/* Balance mode selector */}
         <div className="skeu-card p-6 anim-fade-in-up">

@@ -1,4 +1,5 @@
 import { dateKey, effectiveDeadline } from './taskUtils'
+import type { PlanningAvailability } from './availability'
 
 export const WORK_START_MIN = 8 * 60
 export const WORK_END_MIN = 23 * 60
@@ -99,11 +100,16 @@ function firstFreeSlot(blocked: Slot[], from: number, until: number, duration: n
 
 export function buildSchedule(
   tasks: SchedulableTask[],
-  { today, currentTime, overflowDate, text = '', nowMs = Date.now() }:
-    { today: string; currentTime: string; overflowDate?: string; text?: string; nowMs?: number },
+  { today, currentTime, overflowDate, text = '', nowMs = Date.now(), availability }:
+    { today: string; currentTime: string; overflowDate?: string; text?: string; nowMs?: number; availability?: PlanningAvailability },
 ): DaySchedule {
   const now = clockMinutes(currentTime)
-  const date = now >= WORK_END_MIN ? shiftDate(today, 1) : today
+  const configuredStart = availability?.workStart ? clockMinutes(availability.workStart) : WORK_START_MIN
+  const configuredEnd = availability?.workEnd ? clockMinutes(availability.workEnd) : WORK_END_MIN
+  const validHours = configuredStart >= 0 && configuredStart < configuredEnd && configuredEnd <= 1440
+  const workStart = validHours ? configuredStart : WORK_START_MIN
+  const workEnd = validHours ? configuredEnd : WORK_END_MIN
+  const date = now >= workEnd ? shiftDate(today, 1) : today
   const earliestOverflow = shiftDate(date, 1)
   const next = overflowDate && overflowDate >= earliestOverflow ? overflowDate : earliestOverflow
 
@@ -140,10 +146,16 @@ export function buildSchedule(
       .map(({ match }) => clockMinutes(match[1]))
     const ends = consume(`(?<!not\\s)\\b(?:(?:stop|end|finish)\\s+(?:at|before|by|no later than)|(?:work|available)\\s+(?:only\\s+)?until|(?:busy|unavailable|not available|blocked|away)\\s+after)\\s+${CLOCK}`, dayDate)
       .map(({ match }) => clockMinutes(match[1]))
-    return { date: dayDate, start: Math.max(start, WORK_START_MIN, ...starts), end: Math.min(WORK_END_MIN, ...ends), blocked }
+    if (availability?.breakStart && availability.breakEnd) {
+      const start = clockMinutes(availability.breakStart)
+      const end = clockMinutes(availability.breakEnd)
+      if (start >= 0 && start < end && end <= 1440) blocked.push({ start, end })
+    }
+    blocked.push(...(availability?.busy ?? []).filter(slot => slot.date === dayDate && slot.start >= 0 && slot.start < slot.end && slot.end <= 1440))
+    return { date: dayDate, start: Math.max(start, workStart, ...starts), end: Math.min(workEnd, ...ends), blocked }
   }
-  const day = makeDay(date, date === today ? now : WORK_START_MIN)
-  const overflowDay = makeDay(next, WORK_START_MIN)
+  const day = makeDay(date, date === today ? now : workStart)
+  const overflowDay = makeDay(next, workStart)
   const plan: DaySchedule = { date, overflowDate: next, scheduled: [], overflow: [], unscheduled: [], unusedNotes: [] }
   const active = tasks.filter(task => task.id && !task.done && task.status !== 'archived' && task.status !== 'completed' &&
     !(task.snoozedUntil && task.snoozedUntil > nowMs))

@@ -10,7 +10,7 @@ export interface BalanceResult {
   reason: string
   remove: RemoveItem[]
   add: AddItem[]
-  source?: 'gemini' | 'rules'
+  source?: 'gemini' | 'groq' | 'rules'
 }
 
 export type TaskInsert = Omit<Task, 'id' | 'createdAt'>

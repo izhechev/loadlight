@@ -5,7 +5,7 @@ import { extractTaskDrafts, taskPreview } from '@/lib/ai/taskExtraction'
 import { triageTasks } from '@/lib/ai/triage'
 import { buildSchedule, localDateStr } from '@/lib/utils/scheduling'
 import { chatOutputSchemas, chatRequestSchema } from '@/lib/ai/schemas'
-import { fetchGemini, GEMINI_MODELS, geminiText, getGeminiAccess, readGeminiJson, type GeminiResponse } from '@/lib/ai/server'
+import { aiBlocked, aiModels, fetchGemini, fetchGroq, GROQ_MODEL, geminiText, modelProvider, getGeminiAccess, readGeminiJson, type GeminiResponse } from '@/lib/ai/server'
 
 type ChatGeneration = {
   mode: keyof typeof chatOutputSchemas
@@ -18,7 +18,7 @@ type ChatGeneration = {
 const triageResponseSchema = chatOutputSchemas.triage.toJSONSchema()
 delete triageResponseSchema.$schema
 
-async function generateWithGemini(options: ChatGeneration) {
+async function generateWithAi(options: ChatGeneration) {
   const access = await getGeminiAccess()
   if (access) {
     const body = JSON.stringify({
@@ -36,30 +36,39 @@ ${options.jsonSchemaText}`,
         responseJsonSchema: options.mode === 'triage' ? triageResponseSchema : undefined,
       },
     })
-    for (const model of GEMINI_MODELS) {
+    let skipGemini = false
+    for (const model of aiModels(access)) {
+      if (skipGemini && model !== GROQ_MODEL) continue
       let data: GeminiResponse
       try {
-        const response = await fetchGemini(model, access.apiKey, body)
+        const response = model === GROQ_MODEL ? await fetchGroq(access.groqKey!, body) : await fetchGemini(model, access.apiKey, body)
         if ([404, 408, 429].includes(response.status) || response.status >= 500) continue
-        if (!response.ok) break
+        if (!response.ok) {
+          if (model !== GROQ_MODEL && access.groqKey && [401, 403].includes(response.status)) {
+            skipGemini = true
+            continue
+          }
+          break
+        }
         data = await response.json()
       } catch (error) {
         console.warn('LoadLight chat could not read the Gemini response.', { model })
-        if (error instanceof SyntaxError) break
+        if (error instanceof SyntaxError) skipGemini = true
         continue
       }
       try {
         const finishReason = data.candidates?.[0]?.finishReason
-        if (finishReason && finishReason !== 'STOP') break
+        if (aiBlocked(data)) break
+        if (finishReason && finishReason !== 'STOP') continue
         const raw = geminiText(data)
         if (raw) {
           const parsed = chatOutputSchemas[options.mode].safeParse(readGeminiJson(raw))
-          if (parsed.success) return { object: parsed.data }
+          if (parsed.success) return { object: parsed.data, source: modelProvider(model) }
         }
       } catch {
         console.warn('LoadLight chat received no usable Gemini response.', { model })
       }
-      break
+      skipGemini = true
     }
   }
 
@@ -158,7 +167,7 @@ export async function POST(req: Request) {
       }
     }
 
-    return Response.json((await generateWithGemini({
+    return Response.json((await generateWithAi({
       mode: 'extract',
       extractInput: { text: extractText, today: todayStr, categories },
       jsonSchemaText: `{ "tasks": [{ "name": "string", "category": "string", "demand_type": "cognitive" | "emotional" | "creative" | "routine" | "physical", "difficulty": number (1-5), "deadline": "YYYY-MM-DDTHH:mm" or null, "start_date": "YYYY-MM-DDTHH:mm" or null, "priority": 1 | 2 | 3 | 4, "notes": "string", "estimated_minutes": number or null, "recurring": "none" | "daily" | "weekly" | "monthly" | "yearly", "times_per_day": number, "recurring_hours": number | null, "recurring_days": number | null }], "clarification": { "question": "string", "taskName": "string", "options": [{ "label": "string", "recurring": "none" | "daily" | "weekly", "recurring_hours": number | null }] } | null }`,
@@ -245,7 +254,7 @@ Analyze the <user_input> step-by-step and output the final JSON.`,
       return Response.json({ source: 'rules', verdict: null, trend: '', advice: '', suggestion: '' })
     }
 
-    const result = await generateWithGemini({
+    const result = await generateWithAi({
       mode: 'weekly',
       jsonSchemaText: `{ "verdict": "overloaded" | "balanced" | "light", "trend": "string", "advice": "string", "suggestion": "string" }`,
       system: `${ETHICAL_SYSTEM_PROMPT}
@@ -263,11 +272,11 @@ Pending task counts by category: ${JSON.stringify(week.categories)}`,
     })
     const parsed = chatOutputSchemas.weekly.safeParse(result.object)
     if (!parsed.success) return Response.json({ source: 'rules', verdict: null, trend: '', advice: '', suggestion: '' })
-    return Response.json({ source: 'gemini', verdict: parsed.data.verdict, trend: parsed.data.trend, advice: '', suggestion: '' })
+    return Response.json({ source: result.source, verdict: parsed.data.verdict, trend: parsed.data.trend, advice: '', suggestion: '' })
   }
 
   if (mode === 'breakdown') {
-    const result = await generateWithGemini({
+    const result = await generateWithAi({
       mode: 'breakdown',
       jsonSchemaText: '{ "tasks": [{ "name": "string" }] }',
       system: 'Suggest three to five short, actionable checklist steps for the named task.',
@@ -282,7 +291,7 @@ Pending task counts by category: ${JSON.stringify(week.categories)}`,
     if (history.filter(item => item.role === 'user').length >= 3) {
       return Response.json({ type: 'ready' })
     }
-    const result = await generateWithGemini({
+    const result = await generateWithAi({
       mode: 'schedule_chat',
       jsonSchemaText: `{ "type": "question" | "ready", "question": "string when asking" }`,
       system: 'Clarify ambiguous constraints in the user’s planning notes. Ask one question about a missing time only when it prevents planning. Never infer times, assign times, or ask a question about recurrence.',
@@ -305,6 +314,7 @@ Use the exact task name. If the notes already provide the needed times or have n
       today: body.todayStr ?? localDateStr(),
       currentTime: body.currentTime ?? '09:00',
       overflowDate: body.overflowDate,
+      availability: body.availability,
       text: body.text,
     }))
   }
@@ -313,8 +323,8 @@ Use the exact task name. If the notes already provide the needed times or have n
     const now = new Date()
     const today = body.todayStr ?? localDateStr(0, now.getTime())
     const clock = body.currentTime ?? now.toTimeString().slice(0, 5)
-    const { commitments, flexible, next, conflicts, resolutions } = triageTasks(tasks ?? [], today, clock)
-    const result = flexible.length || resolutions.length ? await generateWithGemini({
+    const { commitments, flexible, next, conflicts, resolutions } = triageTasks(tasks ?? [], today, clock, body.availability)
+    const result = flexible.length || resolutions.length ? await generateWithAi({
       mode: 'triage',
       jsonSchemaText: '{ "canSkip": [integer task indices], "urgent": [integer task indices], "questionTask": integer task index or null, "resolutionChoice": integer option index or null }',
       system: ETHICAL_SYSTEM_PROMPT,
@@ -350,7 +360,7 @@ ${JSON.stringify({ commitments, next: next?.index ?? null, flexible, conflicts: 
     return Response.json({
       urgent: [...commitments.map(({ name, reason }) => ({ name, reason })), ...extra],
       canSkip, question, conflicts, resolution,
-      source: extra.length || canSkip.length || question || resolution ? 'gemini' : 'rules',
+      source: extra.length || canSkip.length || question || resolution ? result.source : 'rules',
     })
   }
 
@@ -365,7 +375,7 @@ ${JSON.stringify({ commitments, next: next?.index ?? null, flexible, conflicts: 
       return Response.json({ canPostpone: [], question: null, questionTaskName: null, questionTaskId: null })
     }
 
-    const result = await generateWithGemini({
+    const result = await generateWithAi({
       mode: 'chill-snooze',
       jsonSchemaText: '{ "taskIds": ["task ID"], "questionId": "task ID or null" }',
       system: ETHICAL_SYSTEM_PROMPT,
@@ -392,7 +402,7 @@ ${JSON.stringify([...eligible.values()].map(({ id, name, category, deadline, pri
       return Response.json(unavailable)
     }
 
-    const result = await generateWithGemini({
+    const result = await generateWithAi({
       mode: 'balance-check',
       jsonSchemaText: `{ "verdict": "too_little", "headline": "string", "reason": "string", "remove": [], "add": [{ "name": "string", "category": "string", "reason": "string", "estimatedMinutes": number }] }`,
       system: ETHICAL_SYSTEM_PROMPT,
@@ -406,7 +416,7 @@ Each idea must fit in ${Math.min(spare, 180)} minutes. Choose a duration of 5–
     const valid = parsed.data.add.filter(item => categories.includes(item.category)
       && typeof item.estimatedMinutes === 'number' && item.estimatedMinutes <= spare)
     if (!valid.length) return Response.json(unavailable)
-    return Response.json({ ...parsed.data, source: 'gemini', remove: [], add: valid })
+    return Response.json({ ...parsed.data, source: result.source, remove: [], add: valid })
   }
 
   return Response.json({ error: 'Unknown mode' }, { status: 400 })

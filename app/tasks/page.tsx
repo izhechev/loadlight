@@ -11,6 +11,7 @@ import { getTasks, updateTask, completeRecurringTask, isLocalMode, type TaskStep
 import { deadlineStatus, dateKey, toInputDt, formatDate, formatTime, difficultyDots } from "@/lib/utils/taskUtils"
 import { nextRecurrenceDeadline, recurringLabel, isPastDeadline, isRecurring, localDeadlineMs } from "@/lib/utils/recurrence"
 import { buildSchedule, localDateStr, selectSchedulable, type DaySchedule } from "@/lib/utils/scheduling"
+import { readStoredAvailability } from "@/lib/utils/availability"
 import { getTaskSignals, getDailyWorkload, workloadDeadline, dueIn48Hours } from "@/lib/utils/workload"
 import { TaskSteps } from "@/components/task-steps"
 import { PastDeadlineModal } from "@/components/past-deadline-modal"
@@ -26,6 +27,7 @@ interface Task {
   priority: 1 | 2 | 3 | 4
   notes: string
   estimated_minutes: number | null
+  actualMinutes?: number | null
   done: boolean
   steps?: TaskStep[]
   completedAt?: string | null
@@ -91,9 +93,11 @@ export default function TasksPage() {
   const pendingSchedule = useMemo(() => {
     if (!preview) return null
     const at = new Date(Math.max(now, preview.openedAt))
+    const planningDates = [0, 1, 2].map(offset => localDateStr(offset, at.getTime()))
     const plan = buildSchedule(tasks, {
       today: localDateStr(0, at.getTime()), currentTime: at.toTimeString().slice(0, 5), nowMs: at.getTime(),
       overflowDate: preview.overflowDate, text: preview.text,
+      availability: readStoredAvailability(localStorage, [...planningDates, preview.overflowDate]),
     })
     return {
       ...plan,
@@ -128,9 +132,14 @@ export default function TasksPage() {
     reloadTasks()
     const clock = window.setInterval(() => setNow(Date.now()), 60_000)
     window.addEventListener('loadlight:tasks-changed', reloadTasks)
+    const refreshAvailability = () => setNow(Date.now())
+    window.addEventListener('loadlight:availability-changed', refreshAvailability)
+    window.addEventListener('storage', refreshAvailability)
     return () => {
       window.clearInterval(clock)
       window.removeEventListener('loadlight:tasks-changed', reloadTasks)
+      window.removeEventListener('loadlight:availability-changed', refreshAvailability)
+      window.removeEventListener('storage', refreshAvailability)
     }
   }, [reloadTasks])
 
@@ -302,6 +311,7 @@ export default function TasksPage() {
         name: edited.name, category: edited.category, demandType: edited.demand_type,
         deadline: edited.deadline, startDate: edited.start_date, priority: edited.priority,
         difficulty: edited.difficulty, estimatedMinutes: edited.estimated_minutes,
+        actualMinutes: tasks.find(task => task.id === edited.id)?.actualMinutes !== edited.actualMinutes ? edited.actualMinutes : undefined,
         notes: edited.notes, recurring: edited.recurring ?? 'none', recurringHours: edited.recurring_hours,
         recurringDays: edited.recurring_days ?? null, snoozedUntil: edited.snoozedUntil ?? null,
       })
@@ -1075,6 +1085,13 @@ export default function TasksPage() {
                     })() : null}
                   </div>
 
+                  <div>
+                    <label htmlFor="task-actual-duration" className="vista-label">Time spent (minutes)</label>
+                    <input id="task-actual-duration" type="number" min={1} max={10080}
+                      value={editingTask.actualMinutes ?? ''}
+                      onChange={event => setEditingTask({ ...editingTask, actualMinutes: event.target.value ? Number(event.target.value) : null })}
+                      className="input-skeu w-full rounded-lg px-3 py-2 text-sm" />
+                  </div>
                   {/* Notes */}
                   <div className="space-y-1">
                     <label htmlFor="task-notes" className="vista-label">Notes</label>
@@ -1086,7 +1103,9 @@ export default function TasksPage() {
                   {error && <p role="alert" className="text-red-800">{error}</p>}
                   {/* Actions */}
                   <div className="flex gap-2 pt-1">
-                    <button disabled={!editingTask.name.trim() || (editingTask.estimated_minutes != null && editingTask.estimated_minutes < 1)} onClick={() => saveEdit(editingTask)} className="glow-button font-bold px-5 py-2 text-sm flex-1">Save Changes</button>
+                    <button disabled={!editingTask.name.trim() || (editingTask.estimated_minutes != null && editingTask.estimated_minutes < 1) ||
+                      (editingTask.actualMinutes != null && (!Number.isInteger(editingTask.actualMinutes) || editingTask.actualMinutes < 1 || editingTask.actualMinutes > 10080))}
+                      onClick={() => saveEdit(editingTask)} className="glow-button font-bold px-5 py-2 text-sm flex-1">Save Changes</button>
                     <button onClick={() => setEditingTask(null)}
                       className="px-4 py-2 text-sm font-bold rounded-full bg-white/80 border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-white transition-colors shadow-sm">
                       Cancel

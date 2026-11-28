@@ -1,7 +1,7 @@
 import { dailyAdviceOptions } from '@/lib/ai/dailyAdvice'
 import { readAiRequest } from '@/lib/ai/request'
 import { adviseRequestSchema } from '@/lib/ai/schemas'
-import { fetchGemini, GEMINI_MODELS, geminiText, getGeminiAccess, readGeminiJson, recordAiCall, type GeminiResponse } from '@/lib/ai/server'
+import { aiBlocked, aiModels, fetchGemini, fetchGroq, GROQ_MODEL, geminiText, modelProvider, getGeminiAccess, readGeminiJson, recordAiCall, type GeminiResponse } from '@/lib/ai/server'
 
 const SYSTEM_PROMPT = `Choose the most helpful follow-up to the user's day plan from the numbered options.
 Respect fixed appointments and put work due today ahead of tomorrow's work. Use the local date and time in the plan.
@@ -36,11 +36,12 @@ export async function POST(request: Request) {
     },
   })
 
-  for (const model of GEMINI_MODELS) {
+  for (const model of aiModels(access)) {
     try {
-      const res = await fetchGemini(model, access.apiKey, requestBody)
+      const res = model === GROQ_MODEL ? await fetchGroq(access.groqKey!, requestBody) : await fetchGemini(model, access.apiKey, requestBody)
       if (!res.ok) continue
       const data: GeminiResponse = await res.json()
+      if (aiBlocked(data)) return unavailable()
       const raw = geminiText(data)
       if (!raw) continue
       const result = readGeminiJson(raw)
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
       if (typeof choice !== 'number' || !Number.isInteger(choice) || choice < 0 || choice >= options.length) continue
 
       await recordAiCall(access, 'advisory', model, start, data.usageMetadata)
-      return Response.json({ advice: options[choice], source: 'gemini', aiDisclosure: true })
+      return Response.json({ advice: options[choice], source: modelProvider(model), aiDisclosure: true })
     } catch {
       console.warn('LoadLight received no usable Gemini advisory response.')
     }

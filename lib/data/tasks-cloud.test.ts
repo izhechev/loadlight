@@ -73,6 +73,14 @@ it('writes only the start when applying a proposed plan', async () => {
   expect(await request.json()).toEqual({ start_date: '2026-11-30T09:30Z' })
 })
 
+it('persists recorded minutes and reads them back separately from the estimate', async () => {
+  fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }))
+  fetchMock.mockResolvedValueOnce(Response.json([{ id: 'essay', status: 'completed', actual_minutes: 55, estimated_minutes: 30 }]))
+  await tasks.updateTask('essay', { actualMinutes: 55 })
+  expect(await requestAt(0).json()).toEqual({ actual_minutes: 55 })
+  expect(await tasks.getTasks()).toMatchObject([{ actualMinutes: 55, estimatedMinutes: 30 }])
+})
+
 it('completes a repeat through one RPC with its next date-only deadline', async () => {
   fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }))
   await tasks.completeRecurringTask('essay', '2026-12-01')

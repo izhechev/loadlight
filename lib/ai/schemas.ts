@@ -17,6 +17,13 @@ const dateTime = z.iso.datetime({ local: true, offset: true })
 const dateOrTime = z.union([day, dateTime])
 const clockTime = z.iso.time({ precision: -1 })
 const id = z.string().max(128)
+const planningAvailability = z.object({
+  workStart: clockTime.optional(),
+  workEnd: clockTime.optional(),
+  breakStart: clockTime.optional(),
+  breakEnd: clockTime.optional(),
+  busy: z.array(z.object({ date: day, start: z.number().int().min(0).max(1439), end: z.number().int().min(1).max(1440) })).max(2160).optional(),
+})
 
 const chatRequestMode = z.enum([
   'extract', 'analyze', 'weekly', 'breakdown', 'schedule_chat', 'schedule', 'triage', 'chill-snooze', 'balance-check',
@@ -61,6 +68,7 @@ export const chatRequestSchema = z.object({
   overflowDate: day.optional(),
   todayStr: day.optional(),
   currentTime: clockTime.optional(),
+  availability: planningAvailability.optional(),
   history: z.array(z.object({
     role: z.enum(['assistant', 'user']),
     text: basicText,
@@ -73,6 +81,7 @@ export const extractRequestSchema = z.object({
   text: z.string().max(8_000),
   today: day.optional(),
   categories: z.array(category).max(100).optional(),
+  clarifying: name.optional(),
 })
 
 const adviceTask = z.object({

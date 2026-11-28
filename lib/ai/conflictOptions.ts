@@ -1,4 +1,5 @@
 import { buildSchedule, WORK_END_MIN, type DaySchedule } from '@/lib/utils/scheduling'
+import type { PlanningAvailability } from '@/lib/utils/availability'
 
 type Commitment = {
   index: number
@@ -13,7 +14,7 @@ type Commitment = {
 
 export function conflictOptions(
   tasks: Commitment[], movable: Commitment[], missed: ReadonlySet<string>, baseline: DaySchedule,
-  today: string, currentTime: string,
+  today: string, currentTime: string, availability?: PlanningAvailability,
 ): string[] {
   if (!movable.length && !missed.size) return []
   const now = today + 'T' + currentTime
@@ -29,7 +30,7 @@ export function conflictOptions(
       id: String(task.index), name: task.name, start_date: move?.task.index === task.index ? move.start : task.start,
       deadline: extensions.has(task.index) ? extensions.get(task.index) : task.start && task.start === task.deadline ? null : task.deadline,
       estimated_minutes: task.minutes, priority: task.priority, difficulty: task.difficulty,
-    })), { today, currentTime })
+    })), { today, currentTime, availability })
 
   function optionsFor(move?: { task: Commitment; start: string }) {
     const trialPlan = makePlan(move, new Map(due.map(task => [task.index, null])))

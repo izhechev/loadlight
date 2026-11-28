@@ -93,6 +93,18 @@ const at = (time: string, day = today) => `${day}T${time}`
 const task = (name: string, fields: Partial<SchedulableTask> = {}) => ({ id: name, name, ...fields })
 
 describe('buildSchedule', () => {
+  it('respects working hours, a recurring break, and imported busy blocks', () => {
+    const plan = buildSchedule([
+      task('Morning work', { estimated_minutes: 60, deadline: at('12:00') }),
+      task('Afternoon work', { estimated_minutes: 60, deadline: at('17:00') }),
+    ], { today, currentTime: '08:00', availability: {
+      workStart: '09:00', workEnd: '17:00', breakStart: '12:00', breakEnd: '13:00',
+      busy: [{ date: today, start: 9 * 60, end: 11 * 60 }],
+    } })
+    expect(plan.scheduled.map(item => [item.name, item.start_date])).toEqual([
+      ['Morning work', at('11:00')], ['Afternoon work', at('13:00')],
+    ])
+  })
   it('fills a slot before its deadline and never rewrites the task', () => {
     const tasks = [task('Essay', { deadline: at('10:00'), estimated_minutes: 60 })]
     const plan = buildSchedule(tasks, { today, currentTime: '09:00' })

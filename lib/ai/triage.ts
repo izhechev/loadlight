@@ -4,6 +4,7 @@ import { effectiveDeadline, normalizeDt } from '@/lib/utils/taskUtils'
 import { activeWorkload } from '@/lib/utils/workload'
 import type { ChatTask } from './schemas'
 import { conflictOptions } from './conflictOptions'
+import type { PlanningAvailability } from '@/lib/utils/availability'
 
 export function toTriageTask(task: Task): ChatTask {
   const cadence = task.recurring
@@ -33,7 +34,7 @@ function showTime(stamp: string, today: string) {
   return stamp.startsWith(today) ? stamp.slice(11) || 'end of today' : stamp.replace('T', ' ')
 }
 
-export function triageTasks(tasks: readonly ChatTask[], today: string, currentTime: string) {
+export function triageTasks(tasks: readonly ChatTask[], today: string, currentTime: string, availability?: PlanningAvailability) {
   const now = today + 'T' + currentTime
   const dayStart = Date.parse(today + 'T00:00Z')
   const seen = new Set<string>()
@@ -84,13 +85,22 @@ export function triageTasks(tasks: readonly ChatTask[], today: string, currentTi
       movable.set(task.index, task)
       movable.set(furthestBooking.index, furthestBooking)
     }
+    const overlapsCalendar = availability?.busy?.some(slot => {
+      const midnight = Date.parse(slot.date + 'T00:00Z')
+      return Date.parse(task.start + 'Z') < midnight + slot.end * 60_000 &&
+        Date.parse(task.end + 'Z') > midnight + slot.start * 60_000
+    })
+    if (overlapsCalendar) {
+      overlaps.push(`“${task.name}” (${showTime(task.start, today)}–${showTime(task.end, today)}) overlaps with a calendar busy block.`)
+      movable.set(task.index, task)
+    }
     if (!furthestBooking || task.end > furthestBooking.end) furthestBooking = task
   }
   const plan = buildSchedule(commitments.map(task => ({
     id: String(task.index), name: task.name, start_date: task.start,
     deadline: task.start && task.start === task.deadline ? null : task.deadline,
     estimated_minutes: task.minutes, priority: task.priority, difficulty: task.difficulty,
-  })), { today, currentTime })
+  })), { today, currentTime, availability })
   const missed = new Set(plan.unscheduled.filter(task => task.reason === DEADLINE_NO_ROOM).map(task => task.id))
   const deadlineWarnings = commitments.flatMap(task => {
     if (!task.deadline || !missed.has(String(task.index))) return []
@@ -101,8 +111,11 @@ export function triageTasks(tasks: readonly ChatTask[], today: string, currentTi
   const conflicts = [...overlaps.slice(0, 1), ...deadlineWarnings, ...overlaps.slice(1)]
   const booking = commitments.find(row => row.start && row.end && row.end > now && row.start.slice(0, 10) <= today)
   const closing = addMinutes(today + 'T00:00', WORK_END_MIN)
+  const immediate = new Set(plan.scheduled.filter(slot => slot.start_date === now).map(slot => slot.id))
   const work = commitments.find(row => {
     if (row.end || missed.has(String(row.index)) || (row.start && row.start > today)) return false
+    if ((availability?.workStart || availability?.workEnd || availability?.breakStart || availability?.busy?.length) &&
+        !immediate.has(String(row.index))) return false
     const finish = addMinutes(now, row.minutes)
     return (!booking?.start || finish <= booking.start) && finish <= row.when && finish <= closing
   })
@@ -114,7 +127,7 @@ export function triageTasks(tasks: readonly ChatTask[], today: string, currentTi
   const resolutions = conflictOptions(
     [...commitments, ...flexible.filter(task => task.end || task.deadline)],
     [...movable.values()].sort((a, b) => (b.start ?? '').localeCompare(a.start ?? '')),
-    missed, plan, today, currentTime,
+    missed, plan, today, currentTime, availability,
   )
   return { commitments, flexible, next, appointment: booking ?? null, conflicts, resolutions }
 }

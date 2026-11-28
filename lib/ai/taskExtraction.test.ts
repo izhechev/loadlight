@@ -4,6 +4,7 @@ import { extractTaskDrafts } from './taskExtraction'
 const provider = vi.hoisted(() => ({
   getGeminiAccess: vi.fn(),
   fetchGemini: vi.fn(),
+  fetchGroq: vi.fn(),
   recordAiCall: vi.fn(),
 }))
 
@@ -64,12 +65,12 @@ describe('local task extraction', () => {
 })
 
 describe('extract route', () => {
-  async function extract(text: string) {
+  async function extract(text: string, clarifying?: string) {
     const { POST } = await import('@/app/api/ai/extract/route')
     return POST(new Request('http://localhost/api/ai/extract', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, today: '2026-11-29', categories: ['Study', 'Personal'] }),
+      body: JSON.stringify({ text, clarifying, today: '2026-11-29', categories: ['Study', 'Personal'] }),
     }))
   }
 
@@ -79,6 +80,16 @@ describe('extract route', () => {
       candidates: [{ content: { parts: [{ text: JSON.stringify({ tasks }) }] } }],
     }))
   }
+
+  it('lets Gemini interpret a clarification while keeping the explicitly stated deadline', async () => {
+    respondFromGemini([{ name: 'Reconcile invoices', category: 'Personal', demandType: 'cognitive', difficulty: 4 }])
+    const response = await extract('I mean reconcile the invoices by Monday at 15:00', 'QXZ')
+    expect(await response.json()).toMatchObject({ offline: false, tasks: [{
+      name: 'Reconcile invoices', demand_type: 'cognitive', difficulty: 4, deadline: '2026-11-30T15:00',
+    }] })
+    const body = JSON.parse(provider.fetchGemini.mock.calls[0][2])
+    expect(JSON.parse(body.contents[0].parts[0].text).clarifying).toBe('QXZ')
+  })
 
   it('returns unclear task names only when they belong to the draft', async () => {
     provider.getGeminiAccess.mockResolvedValue({ apiKey: 'fixture' })
@@ -94,8 +105,29 @@ describe('extract route', () => {
   beforeEach(() => {
     provider.getGeminiAccess.mockReset()
     provider.fetchGemini.mockReset()
+    provider.fetchGroq.mockReset()
     provider.recordAiCall.mockReset()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  it('tries Groq after both Gemini attempts fail and identifies the actual provider', async () => {
+    provider.getGeminiAccess.mockResolvedValue({ apiKey: 'fixture', groqKey: 'groq-fixture' })
+    provider.fetchGemini.mockImplementation(async () => new Response(null, { status: 503 }))
+    provider.fetchGroq.mockResolvedValueOnce(Response.json({
+      candidates: [{ content: { parts: [{ text: '{"tasks":[{"name":"Review checklist","category":"Study"}]}' }] } }],
+    }))
+    expect(await (await extract('Review checklist tomorrow at 14:00 for 25 minutes')).json()).toMatchObject({
+      offline: false, source: 'groq', tasks: [{ deadline: '2026-11-30T14:00', estimated_minutes: 25 }],
+    })
+    expect(provider.fetchGemini).toHaveBeenCalledTimes(2)
+    expect(provider.fetchGroq).toHaveBeenCalledTimes(1)
+  })
+
+  it('respects a Gemini safety denial without trying a different provider', async () => {
+    provider.getGeminiAccess.mockResolvedValue({ apiKey: 'fixture', groqKey: 'groq-fixture' })
+    provider.fetchGemini.mockResolvedValueOnce(Response.json({ promptFeedback: { blockReason: 'SAFETY' } }))
+    expect(await (await extract('Review checklist')).json()).toMatchObject({ blocked: true })
+    expect(provider.fetchGroq).not.toHaveBeenCalled()
   })
 
   afterEach(() => vi.restoreAllMocks())

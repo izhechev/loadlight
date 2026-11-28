@@ -113,3 +113,6 @@ end;
 $$;
 revoke all on function public.complete_recurring_task(uuid, timestamptz) from public, anon;
 grant execute on function public.complete_recurring_task(uuid, timestamptz) to authenticated;
+
+alter table public.tasks
+  add column if not exists actual_minutes integer check (actual_minutes between 1 and 10080);

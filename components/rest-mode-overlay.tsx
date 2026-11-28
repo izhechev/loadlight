@@ -1,6 +1,7 @@
 "use client"
 
 import { getTasks } from '@/lib/data/tasks'
+import { readStoredAvailability } from '@/lib/utils/availability'
 import { ScheduleConflicts } from '@/components/schedule-conflicts'
 import { toTriageTask } from '@/lib/ai/triage'
 import { localDateStr } from '@/lib/utils/scheduling'
@@ -19,7 +20,7 @@ interface TriageResult {
   canSkip: TriageItem[]
   urgent: TriageItem[]
   question: string | null
-  source: 'gemini' | 'rules'
+  source: 'gemini' | 'groq' | 'rules'
 }
 
 const RECOVERY_CARDS = [
@@ -195,7 +196,9 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'triage', tasks, todayStr: localDateStr(0, now.getTime()), currentTime: now.toTimeString().slice(0, 5) }),
+          body: JSON.stringify({ mode: 'triage', tasks, todayStr: localDateStr(0, now.getTime()), currentTime: now.toTimeString().slice(0, 5),
+            availability: readStoredAvailability(localStorage, [0, 1, 2].map(offset => localDateStr(offset, now.getTime()))),
+          }),
         })
         if (res.ok) setTriage(await res.json() as TriageResult)
       } catch { /* silent — triage is advisory only */ }
@@ -291,7 +294,7 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
                 </div>
               )}
 
-              <p className="text-xs text-slate-400 text-right">{triage!.source === 'gemini' ? 'Task dates and Gemini suggestions' : 'Based on your task dates'}</p>
+              <p className="text-xs text-slate-400 text-right">{triage!.source === 'rules' ? 'Based on your task dates' : `Task dates and ${triage!.source === 'groq' ? 'Groq' : 'Gemini'} suggestions`}</p>
             </div>
           ) : null}
         </div>

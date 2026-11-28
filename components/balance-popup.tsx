@@ -131,7 +131,7 @@ export function BalancePopup({ result, onHide, onArchive, onAdd, onClose }: Bala
           )}
 
           <p className="text-[11px] font-bold mt-3 italic" style={{ color: '#7a9ab8' }}>
-            {result.source === 'gemini' ? 'Gemini suggestions' : 'Based on your task list'}
+            {result.source === 'groq' ? 'Groq suggestions' : result.source === 'gemini' ? 'Gemini suggestions' : 'Based on your task list'}
           </p>
 
           {error && <p role="alert" className="text-sm" style={{ color: '#a83232' }}>Couldn’t update the task. Close this and check your task list.</p>}

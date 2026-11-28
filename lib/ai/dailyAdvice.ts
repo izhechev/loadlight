@@ -1,6 +1,8 @@
 import type { DailyAdviceRequest } from './schemas'
 import type { Task } from '@/lib/data/tasks'
 import { dayKey } from '@/lib/utils/workload'
+import { readStoredAvailability } from '@/lib/utils/availability'
+import { localDateStr } from '@/lib/utils/scheduling'
 import { triageTasks, toTriageTask } from './triage'
 
 type DailyPlan = NonNullable<DailyAdviceRequest['plan']>
@@ -10,7 +12,9 @@ export function dailyAdvicePlan(tasks: readonly Task[], now: number): DailyPlan 
   const date = new Date(now)
   const today = dayKey(date)
   const currentTime = date.toTimeString().slice(0, 5)
-  const { next, appointment, commitments, flexible, conflicts, resolutions } = triageTasks(tasks.map(toTriageTask), today, currentTime)
+  const availability = typeof window === 'undefined' ? undefined
+    : readStoredAvailability(localStorage, [0, 1, 2].map(offset => localDateStr(offset, now)))
+  const { next, appointment, commitments, flexible, conflicts, resolutions } = triageTasks(tasks.map(toTriageTask), today, currentTime, availability)
   const protectedNames = new Set(commitments.map(task => task.name))
   for (const task of flexible) {
     if (task.start) protectedNames.add(task.name)

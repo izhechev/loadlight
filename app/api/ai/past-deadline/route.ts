@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { readAiRequest } from '@/lib/ai/request'
 import { pastDeadlineOutputSchema, pastDeadlineRequestSchema } from '@/lib/ai/schemas'
-import { fetchGemini, GEMINI_MODELS, geminiText, getGeminiAccess, readGeminiJson, recordAiCall, type GeminiResponse } from '@/lib/ai/server'
+import { aiBlocked, aiModels, fetchGemini, fetchGroq, GROQ_MODEL, geminiText, getGeminiAccess, readGeminiJson, recordAiCall, type GeminiResponse } from '@/lib/ai/server'
 
 const SYSTEM_PROMPT = `You are a scheduling assistant inside LoadLight, a task management app.
 
@@ -96,12 +96,13 @@ export async function POST(request: NextRequest) {
     generationConfig: { maxOutputTokens: 1024, responseMimeType: 'application/json' },
   })
 
-  for (const model of GEMINI_MODELS) {
+  for (const model of aiModels(access)) {
     try {
-      const res = await fetchGemini(model, access.apiKey, requestBody)
+      const res = model === GROQ_MODEL ? await fetchGroq(access.groqKey!, requestBody) : await fetchGemini(model, access.apiKey, requestBody)
       if (!res.ok) continue
 
       const data: GeminiResponse = await res.json()
+      if (aiBlocked(data)) return localFallback(deadlineWas, recurring, now)
       const raw = geminiText(data)
       if (!raw) continue
 
