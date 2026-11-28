@@ -14,8 +14,7 @@ const t = (over: Partial<{ id: string; name: string; deadline: string | null; pr
 })
 
 // ─── selectSchedulable ───────────────────────────────────────────────────────
-// Which tasks belong in TODAY's plan: due today or tomorrow (calendar days,
-// overdue included), or undated. Anything dated later stays on its own date.
+// Include near-term starts, near-term deadlines, overdue work and undated tasks.
 
 describe('selectSchedulable', () => {
   it('includes tasks due today or tomorrow', () => {
@@ -31,12 +30,21 @@ describe('selectSchedulable', () => {
     expect(selectSchedulable([overdue], NOW)).toContain(overdue)
   })
 
-  it('excludes anything due after tomorrow, even P1', () => {
+  it('excludes later deadlines with no nearby planned start, even P1', () => {
     const dayAfter = t({ name: 'Wash clothes', deadline: '2026-07-07' })
     const farP1 = t({ name: 'Tax return', deadline: '2026-07-15', priority: 1 })
     const r = selectSchedulable([dayAfter, farP1], NOW)
     expect(r).not.toContain(dayAfter)
     expect(r).not.toContain(farP1)
+  })
+
+  it('includes appointments starting today or tomorrow even when their deadline is later', () => {
+    const booking = { ...t({ name: 'Design review', deadline: '2026-07-15' }), start_date: '2026-07-05T13:00' }
+    const next = { ...booking, id: 'next', start_date: '2026-07-06T08:00' }
+    const later = { ...booking, id: 'later', start_date: '2026-07-07T13:00' }
+    const past = { ...booking, id: 'old', start_date: '2026-07-04T13:00' }
+    expect(selectSchedulable([booking, next, later, past, { ...booking, done: true }], NOW, '2026-07-05'))
+      .toEqual([booking, next])
   })
 
   it('includes undated tasks (scheduling gives them times)', () => {
@@ -113,6 +121,14 @@ describe('buildSchedule', () => {
     expect(plan.scheduled[0]?.start_date).toBe(at('10:00'))
   })
 
+  it('keeps an ongoing recurring slot occupied until its end', () => {
+    const plan = buildSchedule([
+      task('Daily review', { recurring: 'daily', deadline: at('09:00', '2026-11-27'), estimated_minutes: 60 }),
+      task('Proof', { deadline: at('11:00'), estimated_minutes: 30 }),
+    ], { today, currentTime: '09:15' })
+    expect(plan.scheduled.map(({ name, start_date }) => [name, start_date])).toEqual([['Proof', at('10:00')]])
+  })
+
   it('matches separate named times and honors busy windows or skips', () => {
     const plan = buildSchedule([
       task('Doctor', { estimated_minutes: 30 }), task('Shopping', { estimated_minutes: 25 }),
@@ -156,6 +172,35 @@ describe('buildSchedule', () => {
       task('Needs finishing at ten', { deadline: at('10:00'), estimated_minutes: 60 }),
     ], { today, currentTime: '09:00' })
     expect(plan.scheduled.map(({ name }) => name)).toEqual(['Needs finishing at ten', 'All-day'])
+  })
+
+  it('fits today’s deadlines around the fixed design review before starting tomorrow’s slides', () => {
+    const tasks = [
+      task('Workshop slides', { priority: 1, deadline: at('17:00', tomorrow), estimated_minutes: 100 }),
+      task('Client estimate', { priority: 1, deadline: at('16:00'), estimated_minutes: 120 }),
+      task('Travel claim', { priority: 2, deadline: today, estimated_minutes: 60 }),
+      task('Design review', { priority: 2, start_date: at('13:00'), estimated_minutes: 45 }),
+      task('Print proof', { priority: 3, deadline: at('12:30'), estimated_minutes: 25 }),
+      task('Reference files', { priority: 4, estimated_minutes: 50 }),
+    ]
+    const plan = buildSchedule(tasks, { today, currentTime: '11:20' })
+    expect(plan.scheduled.map(({ name, start_date, end_date }) => [name, start_date, end_date])).toEqual([
+      ['Print proof', at('11:20'), at('11:45')], ['Travel claim', at('11:45'), at('12:45')],
+      ['Design review', at('13:00'), at('13:45')], ['Client estimate', at('13:45'), at('15:45')],
+      ['Workshop slides', at('15:45'), at('17:25')], ['Reference files', at('17:25'), at('18:15')],
+    ])
+    expect(plan.unscheduled).toEqual([])
+  })
+
+  it('keeps tomorrow’s short task after the work due today, including across an appointment gap', () => {
+    const plan = buildSchedule([
+      task('Tomorrow', { priority: 1, deadline: tomorrow, estimated_minutes: 10 }),
+      task('Meeting', { start_date: at('09:30'), estimated_minutes: 30 }),
+      task('Today', { priority: 4, deadline: at('12:00'), estimated_minutes: 60 }),
+    ], { today, currentTime: '09:00' })
+    expect(plan.scheduled.map(({ name, start_date }) => [name, start_date])).toEqual([
+      ['Meeting', at('09:30')], ['Today', at('10:00')], ['Tomorrow', at('11:00')],
+    ])
   })
 
   it('treats date-only starts as the earliest planning day without pinning 08:00', () => {
@@ -226,6 +271,16 @@ describe('buildSchedule', () => {
     ], { today, currentTime: '08:00' })
     expect(plan.scheduled.map(({ name, start_date }) => [name, start_date])).toEqual([
       ['Today chore', at('08:00')], ['Daily call', at('09:00')],
+    ])
+  })
+
+  it('reserves the saved start of a recurring appointment even when its deadline is later', () => {
+    const plan = buildSchedule([
+      task('Weekly review', { recurring: 'weekly', start_date: at('13:00'), deadline: at('14:00'), estimated_minutes: 45 }),
+      task('Report', { deadline: at('16:00'), estimated_minutes: 60 }),
+    ], { today, currentTime: '12:30' })
+    expect(plan.scheduled.map(({ name, start_date }) => [name, start_date])).toEqual([
+      ['Weekly review', at('13:00')], ['Report', at('13:45')],
     ])
   })
 

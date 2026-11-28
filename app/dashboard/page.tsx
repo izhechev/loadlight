@@ -9,8 +9,9 @@ import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { getTasks, updateTask, type Task } from "@/lib/data/tasks"
-import { activeWorkload, dayKey, dueIn48Hours, getDailyWorkload, getTaskSignals, getWeeklyWorkload, taskMinutes, workloadDeadline } from "@/lib/utils/workload"
-import { canDeferTask } from "@/lib/utils/toughDays"
+import { dailyAdvicePlan, describeDailyPlan } from "@/lib/ai/dailyAdvice"
+import { activeWorkload, dueIn48Hours, getDailyWorkload, getTaskSignals, getWeeklyWorkload, nextCommitmentTime, taskMinutes, workloadDeadline } from "@/lib/utils/workload"
+import { canSnoozeTask } from "@/lib/utils/toughDays"
 import styles from "./dashboard.module.css"
 
 type BalanceMode = 'beast' | 'average' | 'chill'
@@ -204,7 +205,8 @@ export default function DashboardPage() {
   const [isAnalysing, setIsAnalysing] = useState(false)
   const [advisory, setAdvisory] = useState<string | null>(null)
   const [sparkHistory, setSparkHistory] = useState<SparkEntry[]>([])
-  const autoFetched = useRef(false)
+  const lastSummary = useRef('')
+  const summaryRequest = useRef(0)
   const lastSignals = useRef('')
 
   const loadTasks = useCallback(() => {
@@ -255,6 +257,8 @@ export default function DashboardPage() {
   const pending = activeWorkload(tasks, now)
   const day = getDailyWorkload(tasks, balanceMode, now)
   const week = useMemo(() => getWeeklyWorkload(tasks, now), [tasks, now])
+  const advicePlan = useMemo(() => dailyAdvicePlan(tasks, now), [tasks, now])
+  const nextStep = describeDailyPlan(advicePlan)
   const completed = tasks.filter(task => task.done || task.status === 'completed').length
   const plannedWork = day.tasks.filter(task => WORK_CATEGORIES.test(task.category))
     .reduce((sum, task) => sum + taskMinutes(task), 0)
@@ -262,12 +266,9 @@ export default function DashboardPage() {
   const workPct = day.minutes > 0 ? Math.round(plannedWork / day.minutes * 100) : 0
   const donePct = tasks.length > 0 ? Math.round(completed / tasks.length * 100) : 0
   const upcoming = pending.map(task => ({ ...task, deadline: workloadDeadline(task, now) }))
-  const pendingTasks = upcoming.slice().sort((a, b) => {
-    if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline)
-    if (a.deadline) return -1
-    if (b.deadline) return 1
-    return (a.priority ?? 3) - (b.priority ?? 3)
-  }).slice(0, 5)
+  const pendingTasks = upcoming.slice().sort((a, b) =>
+    nextCommitmentTime(a, day.today) - nextCommitmentTime(b, day.today) || (a.priority ?? 3) - (b.priority ?? 3)
+  ).slice(0, 5)
   const dueSoon = upcoming.filter(task => dueIn48Hours(task.deadline, now)).length
 
   useEffect(() => {
@@ -281,6 +282,7 @@ export default function DashboardPage() {
   }, [day.today, day.minutes, pending.length, completed, dueSoon, loaded])
 
   const fetchSummary = useCallback(async () => {
+    const request = ++summaryRequest.current
     setIsAnalysing(true)
     setAdvisory(null)
     setWeeklyAnalysis(null)
@@ -290,7 +292,7 @@ export default function DashboardPage() {
         fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'weekly', week, balanceMode }),
+          body: JSON.stringify({ mode: 'weekly', week, balanceMode, todayStr: advicePlan.today, currentTime: advicePlan.currentTime }),
         }).then(res => res.ok ? res.json() as Promise<AnalysisResult> : null),
         fetch('/api/ai/advise', {
           method: 'POST',
@@ -302,21 +304,33 @@ export default function DashboardPage() {
             urgentCount: dueSoon,
             todayMinutes: day.minutes,
             capacityMinutes: day.capacity,
+            plan: advicePlan,
           }),
         }).then(res => res.ok ? res.json() as Promise<{ advice: string | null }> : null),
       ])
+      if (request !== summaryRequest.current) return
       if (summary.status === 'fulfilled') setWeeklyAnalysis(summary.value)
       if (advice.status === 'fulfilled') setAdvisory(advice.value?.advice ?? null)
     } finally {
-      setIsAnalysing(false)
+      if (request === summaryRequest.current) setIsAnalysing(false)
     }
-  }, [week, balanceMode, pending.length, dueSoon, day.minutes, day.capacity])
+  }, [week, balanceMode, pending.length, dueSoon, day.minutes, day.capacity, advicePlan])
 
+  // Refresh when the work or the next commitment changes, including an appointment starting.
+  const summaryKey = JSON.stringify([state, balanceMode, pending.length, dueSoon, day.minutes, day.capacity, week,
+    advicePlan.today, advicePlan.next, advicePlan.appointment, advicePlan.flexible])
   useEffect(() => {
-    if (autoFetched.current || !loaded || !tasks.length) return
-    autoFetched.current = true
+    if (!loaded || lastSummary.current === summaryKey) return
+    lastSummary.current = summaryKey
+    if (!tasks.length) {
+      summaryRequest.current++
+      setAdvisory(null)
+      setWeeklyAnalysis(null)
+      setIsAnalysing(false)
+      return
+    }
     void fetchSummary()
-  }, [loaded, tasks.length, fetchSummary])
+  }, [loaded, tasks.length, summaryKey, fetchSummary])
 
   const chillLocked = !!chillLockUntil && Date.now() < chillLockUntil
 
@@ -359,9 +373,9 @@ export default function DashboardPage() {
   }
 
   async function handleSnooze(ids: string[]) {
-    const snoozedUntil = Date.now() + 24 * 60 * 60_000
-    const until = dayKey(new Date(snoozedUntil))
-    const eligible = (await getTasks()).filter(task => ids.includes(task.id) && canDeferTask(task, until))
+    const now = Date.now()
+    const snoozedUntil = now + 24 * 60 * 60_000
+    const eligible = (await getTasks()).filter(task => ids.includes(task.id) && canSnoozeTask(task, now))
     const settled = await Promise.allSettled(eligible.map(task => updateTask(task.id, { snoozedUntil })))
     await loadTasks()
     return eligible.filter((_, index) => settled[index].status === 'fulfilled').map(task => task.id)
@@ -548,6 +562,7 @@ export default function DashboardPage() {
             </button>
           </div>
 
+          {nextStep && state !== 'overwhelmed' && <p className="font-semibold mb-3">{nextStep}</p>}
           {isAnalysing && !weeklyAnalysis ? (
             <div className="skeu-inset rounded-2xl p-6 text-center">
               <Loader2 className="w-8 h-8 mx-auto mb-2 text-purple-500/50 animate-spin" />
@@ -556,8 +571,9 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-3">
               {/* Real-time advisory (spec: 1-2 sentence observation) */}
-              {advisory && (
+              {advisory && state !== 'overwhelmed' && (
                 <div className="skeu-inset rounded-2xl p-4 border-l-4" style={{ borderLeftColor: 'rgba(139,92,246,0.60)' }}>
+                  <p className="text-xs font-bold">Gemini suggestion</p>
                   <p className="text-sm leading-relaxed font-medium" style={{ color: '#1a2a3a' }}>{advisory}</p>
                 </div>
               )}

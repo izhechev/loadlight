@@ -84,6 +84,7 @@ export function BalanceCheckProvider() {
         name: task.name,
         category: task.category,
         deadline: task.deadline,
+        startDate: task.startDate,
         recurring: task.recurring,
         estimated_minutes: taskMinutes(task),
         priority: task.priority,
@@ -95,7 +96,9 @@ export function BalanceCheckProvider() {
         return
       }
 
-      const sig = `${day.today}|${balanceMode}|${taskSignature(active, day.minutes)}`
+      const deferThrough = dayKey(weekFrom(new Date(now)))
+      const deferrableIds = active.filter(task => canDeferTask(task, deferThrough)).map(task => task.id).sort()
+      const sig = `${day.today}|${balanceMode}|${taskSignature(active, day.minutes)}|${deferrableIds.join(',')}`
       if (shouldSkipCheck(sig, lastSig.current)) return
       lastSig.current = sig
       setShowIdeas(false)
@@ -110,7 +113,7 @@ export function BalanceCheckProvider() {
 
       if (day.heavy) {
         present({
-          ...buildToughDayResult(active, balanceMode, recent, dayKey(weekFrom(new Date(now)))),
+          ...buildToughDayResult(active, balanceMode, recent, deferThrough),
           source: 'rules',
         })
         return

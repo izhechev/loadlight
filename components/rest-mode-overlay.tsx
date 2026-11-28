@@ -1,6 +1,8 @@
 "use client"
 
 import { getTasks } from '@/lib/data/tasks'
+import { toTriageTask } from '@/lib/ai/triage'
+import { localDateStr } from '@/lib/utils/scheduling'
 import { useState, useEffect } from "react"
 import { Coffee, BookOpen, Music, Footprints, Phone, MessageSquare, LogOut, Loader2, CheckCircle, AlertCircle, HelpCircle, Globe } from "@/lib/icons"
 
@@ -14,6 +16,7 @@ interface TriageResult {
   canSkip: TriageItem[]
   urgent: TriageItem[]
   question: string | null
+  source: 'gemini' | 'rules'
 }
 
 const RECOVERY_CARDS = [
@@ -183,13 +186,13 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
   useEffect(() => {
     async function runTriage() {
       try {
-        const tasks = (await getTasks()).filter(t => !t.done && (t.snoozedUntil ?? 0) <= Date.now())
-          .map(t => ({ ...t, demand_type: t.demandType, estimated_minutes: t.estimatedMinutes }))
+        const tasks = (await getTasks()).filter(t => !t.done && (t.snoozedUntil ?? 0) <= Date.now()).map(toTriageTask)
         if (!tasks.length) return
+        const now = new Date()
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'triage', tasks }),
+          body: JSON.stringify({ mode: 'triage', tasks, todayStr: localDateStr(0, now.getTime()), currentTime: now.toTimeString().slice(0, 5) }),
         })
         if (res.ok) setTriage(await res.json() as TriageResult)
       } catch { /* silent — triage is advisory only */ }
@@ -198,7 +201,7 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
     runTriage()
   }, [])
 
-  const hasResults = triage && (triage.canSkip.length > 0 || triage.urgent.length > 0)
+  const hasResults = triage && (triage.canSkip.length > 0 || triage.urgent.length > 0 || triage.question)
 
   return (
     <div className="anim-overlay-in" style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.55)', padding: 16 }}>
@@ -228,6 +231,22 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
             </div>
           ) : hasResults ? (
             <div className="space-y-3">
+              {triage!.urgent.length > 0 && (
+                <div className="aero-warning rounded-2xl p-3.5">
+                  <p className="text-xs font-black uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5" /> Review first
+                  </p>
+                  <ul className="space-y-1.5">
+                    {triage!.urgent.map((item, i) => (
+                      <li key={i} className="flex items-start justify-between gap-3">
+                        <span className="text-sm font-semibold leading-snug">{item.name}</span>
+                        <span className="text-xs text-right opacity-70">{item.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {triage!.canSkip.length > 0 && (
                 <div className="aero-success rounded-2xl p-3.5">
                   <p className="text-xs font-black uppercase tracking-wide mb-2 flex items-center gap-1.5">
@@ -235,22 +254,6 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
                   </p>
                   <ul className="space-y-1.5">
                     {triage!.canSkip.map((item, i) => (
-                      <li key={i} className="flex items-start justify-between gap-3">
-                        <span className="text-sm font-semibold leading-snug">{item.name}</span>
-                        <span className="text-xs whitespace-nowrap shrink-0 opacity-70">{item.reason}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {triage!.urgent.length > 0 && (
-                <div className="aero-warning rounded-2xl p-3.5">
-                  <p className="text-xs font-black uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5" /> Worth keeping on the radar
-                  </p>
-                  <ul className="space-y-1.5">
-                    {triage!.urgent.map((item, i) => (
                       <li key={i} className="flex items-start justify-between gap-3">
                         <span className="text-sm font-semibold leading-snug">{item.name}</span>
                         <span className="text-xs whitespace-nowrap shrink-0 opacity-70">{item.reason}</span>
@@ -283,7 +286,7 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
                 </div>
               )}
 
-              <p className="text-xs text-slate-400 text-right">AI workload analysis · all suggestions optional</p>
+              <p className="text-xs text-slate-400 text-right">{triage!.source === 'gemini' ? 'Task dates and Gemini suggestions' : 'Based on your task dates'}</p>
             </div>
           ) : null}
         </div>

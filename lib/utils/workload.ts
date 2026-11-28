@@ -1,4 +1,5 @@
 import type { DemandType, TaskSignalData } from '@/lib/store/overwhelmedStore'
+import { localDeadlineMs } from './recurrence'
 import { toughDayThreshold } from './toughDays'
 import { effectiveDeadline } from './taskUtils'
 
@@ -51,14 +52,24 @@ export function workloadDeadline(task: WorkloadTask, now: number): string | null
   }, Date.parse(`${today}T00:00:00Z`) - 1)
 }
 
+function workloadTime(value?: string | null): number {
+  if (!value) return Infinity
+  const [date, clock] = value.split(/[T ]/, 2)
+  // The database can append a zone to the entered wall clock or midnight to a date-only value.
+  const time = clock?.match(/^\d{2}:\d{2}(?::\d{2})?/)?.[0]
+  const wallClock = time && !time.startsWith('00:00') ? `${date}T${time}` : date
+  const timestamp = localDeadlineMs(wallClock)
+  return Number.isFinite(timestamp) ? timestamp : Infinity
+}
+
+export function nextCommitmentTime(task: WorkloadTask, today: string): number {
+  const start = 'startDate' in task ? task.startDate : task.start_date
+  const planned = start && start.slice(0, 10) >= today ? workloadTime(start) : Infinity
+  return Math.min(planned, workloadTime(task.deadline))
+}
+
 export function dueIn48Hours(deadline: string | null | undefined, now: number): boolean {
-  if (!deadline) return false
-  // Stored deadlines use the date and clock the user entered, even when the database adds a zone.
-  const time = deadline.slice(11, 16)
-  const date = !time || time === '00:00'
-    ? `${deadline.slice(0, 10)}T23:59:59`
-    : deadline.replace(' ', 'T').slice(0, 19)
-  return new Date(date).getTime() <= now + 48 * 60 * 60_000
+  return workloadTime(deadline) <= now + 48 * 60 * 60_000
 }
 
 export function getDailyWorkload<T extends WorkloadTask>(tasks: readonly T[], mode: string, now = Date.now()) {

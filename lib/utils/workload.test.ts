@@ -1,7 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { getDailyWorkload, getTaskSignals, getWeeklyWorkload } from './workload'
+import { getDailyWorkload, getTaskSignals, getWeeklyWorkload, nextCommitmentTime } from './workload'
 
 const now = new Date(2026, 10, 28, 9).getTime()
+
+describe('nextCommitmentTime', () => {
+  const today = '2026-11-28'
+
+  it('places fixed appointments among timed deadlines, ahead of date-only and future work', () => {
+    const tasks = [
+      { name: 'Claim', deadline: '2026-11-28 00:00:00+00' },
+      { name: 'Files' },
+      { name: 'Slides', deadline: '2026-11-29T17:00' },
+      { name: 'Review', startDate: '2026-11-28T13:00:00Z', deadline: '2026-11-29' },
+      { name: 'Estimate', deadline: '2026-11-28T16:00' },
+      { name: 'Proof', deadline: '2026-11-28T12:30Z' },
+    ]
+    const ordered = tasks.sort((a, b) => nextCommitmentTime(a, today) - nextCommitmentTime(b, today))
+    expect(ordered.map(task => task.name)).toEqual(['Proof', 'Review', 'Estimate', 'Claim', 'Slides', 'Files'])
+    expect(nextCommitmentTime({ name: 'Proof', deadline: '2026-11-28T12:30Z' }, today)).toBe(new Date(2026, 10, 28, 12, 30).getTime())
+  })
+
+  it('ignores an old planned start while keeping overdue deadlines visible', () => {
+    expect(nextCommitmentTime({ name: 'Weekly review', start_date: '2026-11-21T13:00', deadline: '2026-11-28' }, today))
+      .toBe(new Date(2026, 10, 28, 23, 59, 59, 999).getTime())
+    expect(nextCommitmentTime({ name: 'Overdue proof', startDate: '2026-11-29', deadline: '2026-11-27T12:30' }, today))
+      .toBe(new Date(2026, 10, 27, 12, 30).getTime())
+  })
+})
 
 describe('getDailyWorkload', () => {
   it('uses only today’s planned tasks and open deadlines up to today, excluding hidden rows', () => {

@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Moon, EyeOff, HelpCircle, CheckCircle, Loader2, X, Eye } from "@/lib/icons"
 import { activeWorkload, dayKey, taskMinutes, type WorkloadTask } from "@/lib/utils/workload"
-import { canDeferTask } from "@/lib/utils/toughDays"
+import { canSnoozeTask } from "@/lib/utils/toughDays"
 
 interface PostponeTask {
   id: string
@@ -30,8 +30,7 @@ export function ChillSuggestions({ tasks, onSnooze }: ChillSuggestionsProps) {
   const fetched = useRef(false)
 
   const now = Date.now()
-  const until = dayKey(new Date(now + 24 * 60 * 60_000))
-  const eligible = activeWorkload(tasks, now).filter(task => canDeferTask(task, until))
+  const eligible = activeWorkload(tasks, now).filter(task => canSnoozeTask(task, now))
 
   useEffect(() => {
     if (fetched.current) return
@@ -41,7 +40,11 @@ export function ChillSuggestions({ tasks, onSnooze }: ChillSuggestionsProps) {
     fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'chill-snooze', tasks: eligible.map(task => ({ id: task.id, name: task.name, category: task.category, priority: task.priority, deadline: task.deadline, estimated_minutes: taskMinutes(task) })) }),
+      body: JSON.stringify({
+        mode: 'chill-snooze', todayStr: dayKey(new Date(now)), currentTime: new Date(now).toTimeString().slice(0, 5),
+        tasks: eligible.map(task => ({ id: task.id, name: task.name, category: task.category, priority: task.priority,
+          deadline: task.deadline, start_date: task.startDate ?? task.start_date, recurring: task.recurring, estimated_minutes: taskMinutes(task) })),
+      }),
     })
       .then(r => r.json())
       .then((data: { canPostpone?: PostponeTask[]; question?: string | null; questionTaskId?: string | null }) => {
@@ -78,10 +81,11 @@ export function ChillSuggestions({ tasks, onSnooze }: ChillSuggestionsProps) {
   }
 
   const remaining = suggestions.filter(s => !snoozed.has(s.id) && eligible.some(task => task.id === s.id))
-  const allSnoozed = remaining.length === 0 && suggestions.length > 0
+  const currentQuestion = eligible.some(task => task.id === questionTaskId) ? question : null
+  const allSnoozed = suggestions.length > 0 && suggestions.every(task => snoozed.has(task.id))
 
   if (dismissed) return null
-  if (!loading && suggestions.length === 0 && !question) return null
+  if (!loading && !remaining.length && !allSnoozed && !currentQuestion) return null
 
   return (
     <div className="skeu-card p-5 relative overflow-hidden aero-purple anim-fade-in-up">
@@ -161,11 +165,11 @@ export function ChillSuggestions({ tasks, onSnooze }: ChillSuggestionsProps) {
           )}
 
           {/* Clarifying question */}
-          {question && !questionAnswered && (
+          {currentQuestion && !questionAnswered && (
             <div className="aero-info rounded-2xl px-4 py-3 space-y-3 anim-fade-in-up">
               <div className="flex items-start gap-2">
                 <HelpCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <p className="text-sm font-black">{question}</p>
+                <p className="text-sm font-black">{currentQuestion}</p>
               </div>
               <div className="flex gap-2">
                 <button

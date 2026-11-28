@@ -1,9 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { suggestedSteps } from '@/lib/utils/taskSteps'
+import { canSnoozeTask } from '@/lib/utils/toughDays'
 import { readAiRequest } from '@/lib/ai/request'
 import { extractTaskDrafts, taskPreview } from '@/lib/ai/taskExtraction'
+import { triageTasks } from '@/lib/ai/triage'
 import { buildSchedule, localDateStr } from '@/lib/utils/scheduling'
-import { chatOutputSchemas, chatRequestSchema, type ChatTask } from '@/lib/ai/schemas'
+import { chatOutputSchemas, chatRequestSchema } from '@/lib/ai/schemas'
 import { fetchGemini, GEMINI_MODELS, geminiText, getGeminiAccess, readGeminiJson, type GeminiResponse } from '@/lib/ai/server'
 
 type ChatGeneration = {
@@ -11,9 +12,11 @@ type ChatGeneration = {
   jsonSchemaText: string
   system: string
   prompt: string
-  tasks?: ChatTask[]
   extractInput?: { text: string; today: string; categories: string[] }
 }
+
+const triageResponseSchema = chatOutputSchemas.triage.toJSONSchema()
+delete triageResponseSchema.$schema
 
 async function generateWithGemini(options: ChatGeneration) {
   const access = await getGeminiAccess()
@@ -28,7 +31,10 @@ Return a JSON object with this structure:
 ${options.jsonSchemaText}`,
         }],
       }],
-      generationConfig: { maxOutputTokens: 8_192, responseMimeType: 'application/json' },
+      generationConfig: {
+        maxOutputTokens: 8_192, responseMimeType: 'application/json',
+        responseJsonSchema: options.mode === 'triage' ? triageResponseSchema : undefined,
+      },
     })
     for (const model of GEMINI_MODELS) {
       let data: GeminiResponse
@@ -62,22 +68,6 @@ ${options.jsonSchemaText}`,
   if (options.mode === 'extract' && options.extractInput) {
     const { text, today, categories } = options.extractInput
     return { object: { tasks: extractTaskDrafts(text, today, categories).map(taskPreview), offline: true } }
-  }
-
-  if (options.mode === 'triage') {
-    return { object: { canSkip: [], urgent: [], question: null } } as any
-  }
-
-  if (options.mode === 'chill-snooze') {
-    const taskList = options.tasks ?? []
-    const now = Date.now()
-    const in48h = now + 172800000
-    const HEALTH = /pill|medication|medicine|vitamin|supplement|therapy|doctor|medical|lamictal|lithium/i
-    const canPostpone = taskList
-      .filter(t => !t.done && !HEALTH.test(t.name ?? '') && (t.priority ?? 3) > 1 && (!t.deadline || new Date(t.deadline).getTime() > in48h))
-      .slice(0, 4)
-      .map(t => ({ id: t.id ?? '', name: t.name, reason: 'No urgent deadline this week' }))
-    return { object: { canPostpone, question: null, questionTaskName: null, questionTaskId: null } } as any
   }
 
   if (options.mode === 'balance-check' || options.mode === 'weekly' || options.mode === 'analyze') return { object: null }
@@ -258,20 +248,22 @@ Analyze the <user_input> step-by-step and output the final JSON.`,
     const result = await generateWithGemini({
       mode: 'weekly',
       jsonSchemaText: `{ "verdict": "overloaded" | "balanced" | "light", "trend": "string", "advice": "string", "suggestion": "string" }`,
-      system: ETHICAL_SYSTEM_PROMPT,
-      prompt: `Summarize only the workload shown. This snapshot cannot establish a trend across weeks.
+      system: `${ETHICAL_SYSTEM_PROMPT}
+Describe one pattern in the weekly totals in the trend field. Return empty strings for advice and suggestion.
+These totals do not show fixed appointments, deadlines, or availability. Do not propose a task order, new times, or moving work to another day.`,
+      prompt: `This snapshot covers one week. Describe its distribution in one or two sentences.
+User's local date and time: ${[body.todayStr, body.currentTime].filter(Boolean).join(' ') || 'unknown'}
 Week: ${week.startDay} through ${week.endDay}
 Mode: ${balanceMode ?? 'average'}
 Completed this week: ${week.completed}
 Pending tasks planned or due this week: ${week.pending}
 Pending estimated minutes: ${week.minutes}
 Estimated minutes by weekday (Monday first): ${week.dailyMinutes.join(', ')}
-Pending task counts by category: ${JSON.stringify(week.categories)}
-Point out a pattern supported by these totals and give one optional action. Never infer how much free time the user has.`,
+Pending task counts by category: ${JSON.stringify(week.categories)}`,
     })
     const parsed = chatOutputSchemas.weekly.safeParse(result.object)
     if (!parsed.success) return Response.json({ source: 'rules', verdict: null, trend: '', advice: '', suggestion: '' })
-    return Response.json({ ...parsed.data, source: 'gemini' })
+    return Response.json({ source: 'gemini', verdict: parsed.data.verdict, trend: parsed.data.trend, advice: '', suggestion: '' })
   }
 
   if (mode === 'breakdown') {
@@ -318,72 +310,75 @@ Use the exact task name. If the notes already provide the needed times or have n
   }
 
   if (mode === 'triage') {
-    const taskList = tasks ?? []
-    const undoneTasks = taskList.filter(t => !t.done)
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
-
-    if (undoneTasks.length === 0) {
-      return Response.json({ canSkip: [], urgent: [], question: null })
-    }
-
-    return Response.json((await generateWithGemini({
+    const now = new Date()
+    const today = body.todayStr ?? localDateStr(0, now.getTime())
+    const clock = body.currentTime ?? now.toTimeString().slice(0, 5)
+    const { commitments, flexible, next } = triageTasks(tasks ?? [], today, clock)
+    const result = flexible.length ? await generateWithGemini({
       mode: 'triage',
-      jsonSchemaText: `{ "canSkip": [{ "name": "string", "reason": "string" }], "urgent": [{ "name": "string", "reason": "string" }], "question": "string or null" }`,
+      jsonSchemaText: '{ "canSkip": [integer task indices], "urgent": [integer task indices], "questionTask": integer task index or null }',
       system: ETHICAL_SYSTEM_PROMPT,
-      prompt: `The user has flagged feeling overwhelmed. Analyze their active task list to identify which tasks could be deferred today, and which are genuinely time-sensitive.
-
-Today: ${todayStr}
-
-Tasks:
-${undoneTasks.map((t, i) => `[${i}] "${t.name}" | priority ${t.priority ?? 3}/4 | difficulty ${t.difficulty ?? 2}/5 | ~${t.estimated_minutes ?? 30}min | deadline: ${t.deadline ?? 'none'} | type: ${t.demand_type ?? 'routine'}`).join('\n')}
-
-Instructions:
-1. canSkip: tasks with no deadline, priority 3-4, or routine tasks with no time constraint. These can wait until tomorrow or later. Limit to the 3 best candidates.
-2. urgent: tasks with a deadline today or within 24h, or priority 1 tasks. Limit to the 3 most pressing.
-3. question: if ONE task's importance is genuinely ambiguous and a single yes/no question would clarify it, include that question. Otherwise null. Example: "Is the gym session fixed for today, or can it move to tomorrow?"
-4. Reasons must be under 6 words. Use phrases like "no deadline", "due today", "can wait", "priority 1", "low effort".
-5. Do not put the same task in both lists.
-6. Tasks not in either list are implicitly medium — the user can judge those themselves.`,
-    })).object)
+      prompt: `At ${today} ${clock} local time, the app has already reserved fixed appointments and ranked today's deadlines.
+Keep those commitments ahead of tomorrow's work. Consider the listed durations and remaining time.
+Choose up to three flexible task indices for each list. Only use urgent for other important work worth reviewing after the commitments.
+Only use canSkip for work that can wait today. Keep fixed bookings out of canSkip.
+For one ambiguous flexible task, return its index as questionTask, otherwise null.
+${JSON.stringify({ commitments, next: next?.index ?? null, flexible })}`,
+    }) : { object: null }
+    const choice = chatOutputSchemas.triage.safeParse(result.object)
+    const suggested = choice.success ? choice.data : null
+    const usedNames = new Set(commitments.map(task => task.name))
+    const flexibleNames = new Set<string>()
+    for (const task of flexible) {
+      if (flexibleNames.has(task.name)) usedNames.add(task.name)
+      flexibleNames.add(task.name)
+    }
+    const remaining = new Map(flexible.map(task => [task.index, task]))
+    const choose = (indices: number[], canWait: boolean) => indices.flatMap(index => {
+      const task = remaining.get(index)
+      if (!task || usedNames.has(task.name) || (canWait && task.end)) return []
+      usedNames.add(task.name)
+      return [{ name: task.name, reason: task.reason }]
+    })
+    const extra = choose(suggested?.urgent ?? [], false)
+    const canSkip = choose(suggested?.canSkip ?? [], true)
+    const clarify = suggested?.questionTask == null ? null : remaining.get(suggested.questionTask)
+    const question = clarify && !clarify.end && !usedNames.has(clarify.name) ? `Does ${clarify.name} need attention today?` : null
+    return Response.json({
+      urgent: [...commitments.map(({ name, reason }) => ({ name, reason })), ...extra],
+      canSkip, question,
+      source: extra.length || canSkip.length || question ? 'gemini' : 'rules',
+    })
   }
 
   if (mode === 'chill-snooze') {
-    const taskList = tasks ?? []
-    const activeTasks = taskList.filter(t => !t.done)
     const now = new Date()
-    const taskSummary = activeTasks.map(t =>
-      `- id:"${t.id ?? ''}" name:"${t.name}" [cat:${t.category ?? 'Unknown'}, priority:${t.priority ?? 3}/4, deadline:${t.deadline ?? 'none'}]`
-    ).join('\n')
-
-    if (activeTasks.length === 0) {
+    const today = body.todayStr ?? localDateStr()
+    const clock = body.currentTime ?? now.toTimeString().slice(0, 5)
+    const localNow = new Date(`${today}T${clock}`).getTime()
+    const eligible = new Map((tasks ?? []).filter(task => task.id && task.status !== 'archived' && task.status !== 'completed' &&
+      (task.snoozedUntil ?? 0) <= now.getTime() && canSnoozeTask(task, localNow)).map(task => [task.id!, task]))
+    if (!eligible.size) {
       return Response.json({ canPostpone: [], question: null, questionTaskName: null, questionTaskId: null })
     }
 
-    return Response.json((await generateWithGemini({
+    const result = await generateWithGemini({
       mode: 'chill-snooze',
-      tasks: activeTasks,
-      jsonSchemaText: `{ "canPostpone": [{ "id": "string", "name": "string", "reason": "string" }], "question": "string | null", "questionTaskName": "string | null", "questionTaskId": "string | null" }`,
+      jsonSchemaText: '{ "taskIds": ["task ID"], "questionId": "task ID or null" }',
       system: ETHICAL_SYSTEM_PROMPT,
-      prompt: `The user is in Chill Guy mode (recovery-first, low-effort focus). Identify which tasks can safely be hidden for 24 hours.
-
-CRITERIA for canPostpone — a task qualifies if ALL are true:
-- No deadline within the next 48 hours (or no deadline at all)
-- Not a health or safety task (no medications, medical appointments, emergencies)
-- Priority 2, 3 or 4 (not priority 1 "must do today")
-- Not already overdue
-
-reason must be ≤ 8 casual words (e.g. "No deadline this week", "Can move to tomorrow easily", "Low priority — no rush", "Flexible deadline").
-
-If ONE task's urgency is genuinely unclear (e.g. gym — is today's session mandatory?), set a short yes/no question and the matching questionTaskName/questionTaskId. Otherwise all three are null.
-
-Limit canPostpone to the 4 best candidates. Do NOT include health/medication tasks.
-
-Active tasks:
-${taskSummary}
-
-Today: ${now.toISOString().split('T')[0]}`,
-    })).object)
+      prompt: `Choose up to four flexible tasks to hide for 24 hours starting ${today} ${clock}. Use only IDs in the list.
+If one task needs the user's confirmation, put its ID in questionId. Otherwise use null.
+${JSON.stringify([...eligible.values()].map(({ id, name, category, deadline, priority }) => ({ id, name, category, deadline, priority })))}`,
+    })
+    const parsed = chatOutputSchemas['chill-snooze'].safeParse(result.object)
+    const selected = parsed.success ? parsed.data.taskIds : [...eligible.keys()].slice(0, 4)
+    const canPostpone = [...new Set(selected)].flatMap(id => {
+      const task = eligible.get(id)
+      return task ? [{ id, name: task.name, reason: task.deadline ? 'Deadline beyond 48 hours' : 'No deadline' }] : []
+    })
+    const questionTask = parsed.success && parsed.data.questionId ? eligible.get(parsed.data.questionId) : null
+    return Response.json({ canPostpone, question: questionTask ? `Do you need ${questionTask.name} today?` : null,
+      questionTaskName: questionTask?.name ?? null, questionTaskId: questionTask?.id ?? null })
   }
 
   if (mode === 'balance-check') {

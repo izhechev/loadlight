@@ -32,11 +32,11 @@ export interface SchedulableTask {
 
 export function selectSchedulable<T extends SchedulableTask>(tasks: T[], nowMs: number, today = localDateStr(0, nowMs)): T[] {
   const tomorrow = shiftDate(today, 1)
-  return tasks.filter(task =>
-    !task.done && task.status !== 'archived' && task.status !== 'completed' &&
-    !(task.snoozedUntil && task.snoozedUntil > nowMs) &&
-    (!task.deadline || dateKey(task.deadline) <= tomorrow),
-  )
+  return tasks.filter(task => {
+    if (task.done || task.status === 'archived' || task.status === 'completed' || (task.snoozedUntil ?? 0) > nowMs) return false
+    const start = task.start_date && dateKey(task.start_date)
+    return !task.deadline || dateKey(task.deadline) <= tomorrow || start === today || start === tomorrow
+  })
 }
 
 export function orderByEnergy<T extends SchedulableTask>(tasks: T[]): T[] {
@@ -74,6 +74,13 @@ function dueKey(deadline?: string | null): string {
   if (!deadline) return '9999'
   const time = timestampTime(deadline)
   return `${dateKey(deadline)}T${time && time !== '00:00' ? time : '23:59'}`
+}
+
+export function resolveFixedStart(start: string | null | undefined, recurringSlot: string | null | undefined, today: string): string | null {
+  const time = timestampTime(start)
+  const saved = time && time !== '00:00' ? start : null
+  if (saved && dateKey(saved) >= today) return saved
+  return recurringSlot || saved || null
 }
 
 function clockLabel(minutes: number): string {
@@ -147,17 +154,17 @@ export function buildSchedule(
     if (seen.has(id)) return []
     seen.add(id)
     const recurring = task.recurring && task.recurring !== 'none'
+    const duration = Math.max(1, task.estimated_minutes ?? 30)
     const deadlineTime = timestampTime(task.deadline)
     // Legacy date-only deadlines were stored at midnight.
     const hasDeadlineTime = Boolean(deadlineTime && deadlineTime !== '00:00')
     const recurringDeadline = recurring && task.deadline
       ? effectiveDeadline(
         { name: task.name, deadline: task.deadline, recurring: task.recurring, recurringDays: task.recurring_days },
-        (hasDeadlineTime ? planningNow : Date.parse(`${today}T00:00:00Z`)) - 1,
+        hasDeadlineTime ? planningNow - duration * 60_000 + 1 : Date.parse(`${today}T00:00:00Z`) - 1,
       )
       : task.deadline
     const savedStart = task.start_date
-    const savedTime = timestampTime(savedStart)
     const earliestDate = savedStart ? dateKey(savedStart) : null
     const escapedName = task.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const namedTime = (phrase: string) => {
@@ -172,13 +179,12 @@ export function buildSchedule(
     const hintedDeadline = dueHint ? `${dueHint.date}T${dueHint.match[1].padStart(5, '0')}` : null
     const deadline = hintedDeadline && dueKey(hintedDeadline) < dueKey(recurringDeadline) ? hintedDeadline : recurringDeadline
     const skip = consume(`\\bskip\\s+${escapedName}(?=$|[,.!?;\\n]|\\s+and\\b)`, date).length > 0
-    const recurringAnchor = recurring && hasDeadlineTime ? recurringDeadline : null
-    const savedAnchor = savedTime && savedTime !== '00:00' ? savedStart : null
-    const anchor = recurringAnchor || savedAnchor || (fixedHint ? `${fixedHint.date}T${fixedHint.match[1].padStart(5, '0')}` : null)
+    const recurringSlot = recurring && hasDeadlineTime ? recurringDeadline : null
+    const anchor = resolveFixedStart(savedStart, recurringSlot, today) || (fixedHint ? `${fixedHint.date}T${fixedHint.match[1].padStart(5, '0')}` : null)
+    const recurringAnchor = recurringSlot && dueKey(anchor) === dueKey(recurringSlot) ? recurringSlot : null
     if (anchor && dateKey(anchor) > date && dateKey(anchor) !== next) return []
     if (!anchor && earliestDate && earliestDate > next) return []
     if (!anchor && !earliestDate && deadline && dateKey(deadline) > cutoff) return []
-    const duration = Math.max(1, task.estimated_minutes ?? 30)
     return [{ ...task, id, deadline, duration, anchor, skip, recurringAnchor, earliestDate }]
   }))
 
@@ -219,12 +225,17 @@ export function buildSchedule(
     }
   }
 
-  for (const task of prepared) {
-    if (task.skip || task.anchor) continue
+  // Fixed starts are reserved above. Equal deadlines retain the existing priority and difficulty order.
+  const flexible = prepared.filter(task => !task.skip && !task.anchor)
+    .sort((a, b) => dueKey(a.deadline).localeCompare(dueKey(b.deadline)))
+  let todayDeadlinesEnd = day.start
+  for (const task of flexible) {
+    const dueToday = task.deadline && dateKey(task.deadline) === day.date
     const fitToday = task.earliestDate && task.earliestDate > day.date ? null :
-      firstFreeSlot(day.blocked, day.start, deadlineLimit(task, day), task.duration)
+      firstFreeSlot(day.blocked, dueToday ? day.start : todayDeadlinesEnd, deadlineLimit(task, day), task.duration)
     if (fitToday !== null) {
       add(task, day, fitToday)
+      if (dueToday) todayDeadlinesEnd = Math.max(todayDeadlinesEnd, fitToday + task.duration)
       continue
     }
     const fitLater = firstFreeSlot(overflowDay.blocked, overflowDay.start, deadlineLimit(task, overflowDay), task.duration)

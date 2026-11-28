@@ -37,7 +37,7 @@ describe('chat model fallback', () => {
   })
 
   it('uses the secondary model for weekly advice after a network error', async () => {
-    const advice = { verdict: 'light', trend: 'One planned task.', advice: 'Review the checklist.', suggestion: 'Allow 25 minutes.' }
+    const advice = { verdict: 'light', trend: 'One planned task.', advice: '', suggestion: '' }
     provider.fetchGemini.mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce(modelResult(advice))
     const response = await chat({ mode: 'weekly', week: {
       startDay: '2026-11-23', endDay: '2026-11-29', completed: 0, pending: 1, minutes: 25,
@@ -45,6 +45,19 @@ describe('chat model fallback', () => {
     } })
     expect(await response.json()).toEqual({ ...advice, source: 'gemini' })
     expect(provider.getGeminiAccess).toHaveBeenCalledTimes(1)
+  })
+
+  it('grounds the Saturday summary in local time and omits scheduling advice based only on totals', async () => {
+    const result = { verdict: 'balanced', trend: '250 minutes Saturday and 100 Sunday.',
+      advice: 'Move work to Friday.', suggestion: 'Delay the fixed meeting.' }
+    provider.fetchGemini.mockResolvedValueOnce(modelResult(result))
+    const response = await chat({ mode: 'weekly', todayStr: '2026-11-28', currentTime: '11:20', week: {
+      startDay: '2026-11-23', endDay: '2026-11-29', completed: 0, pending: 5, minutes: 350,
+      dailyMinutes: [0, 0, 0, 0, 0, 250, 100], categories: [{ name: 'Work', count: 5 }],
+    } })
+    const providerRequest = JSON.parse(provider.fetchGemini.mock.calls[0][2])
+    expect(providerRequest.contents[0].parts[0].text).toContain('2026-11-28 11:20')
+    expect(await response.json()).toEqual({ source: 'gemini', verdict: result.verdict, trend: result.trend, advice: '', suggestion: '' })
   })
 
   it('validates balance suggestions from the backup model after a timeout', async () => {
@@ -64,6 +77,28 @@ describe('chat model fallback', () => {
     provider.fetchGemini.mockResolvedValue(new Response(null, { status: 503 }))
     expect(await (await chat(breakdown)).json()).toMatchObject({ source: 'local' })
     expect(provider.fetchGemini).toHaveBeenCalledTimes(GEMINI_MODELS.length)
+  })
+
+  it('accepts only eligible Chill task IDs and builds questions from their real names', async () => {
+    provider.fetchGemini.mockResolvedValueOnce(modelResult({
+      taskIds: ['meeting', 'proof', 'files', 'files'], questionId: 'meeting',
+    }))
+    const tasks = [
+      { id: 'meeting', name: 'Design review', start_date: '2026-11-28T13:00' },
+      { id: 'proof', name: 'Print proof', deadline: '2026-11-28T12:30' },
+      { id: 'files', name: 'Sort files', priority: 4 },
+    ]
+    const response = await chat({ mode: 'chill-snooze', todayStr: '2026-11-28', currentTime: '11:20', tasks })
+    expect(await response.json()).toMatchObject({ canPostpone: [{ id: 'files', name: 'Sort files' }], question: null, questionTaskId: null })
+    const sent = JSON.parse(provider.fetchGemini.mock.calls[0][2]).contents[0].parts[0].text
+    expect(sent).not.toMatch(/Design review|Print proof/)
+  })
+
+  it('protects the 48-hour deadline window before requesting Chill suggestions', async () => {
+    const tasks = [{ id: 'proof', name: 'Print proof', deadline: '2026-11-30T11:20' }]
+    const response = await chat({ mode: 'chill-snooze', todayStr: '2026-11-28', currentTime: '11:20', tasks })
+    expect(await response.json()).toMatchObject({ canPostpone: [], question: null })
+    expect(provider.getGeminiAccess).not.toHaveBeenCalled()
   })
 
   it.each([400, 401, 403, 499])('keeps the local breakdown after terminal HTTP %i', async status => {

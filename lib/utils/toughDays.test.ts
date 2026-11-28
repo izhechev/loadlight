@@ -77,4 +77,12 @@ describe('canDeferTask', () => {
     expect(canDeferTask({ name: 'Check in', category: 'Health' }, through)).toBe(false)
     expect(canDeferTask({ name: 'Sort shelf', priority: 4 }, through)).toBe(true)
   })
+
+  it('keeps fixed appointments and tasks planned inside the deferral window', () => {
+    const fixed = { id: 'meeting', name: 'Design review', priority: 4, startDate: '2026-11-28T13:00' }
+    expect(canDeferTask(fixed, '2026-12-05')).toBe(false)
+    expect(canDeferTask({ name: 'Work session', start_date: '2026-12-09T11:00Z' }, '2026-12-05')).toBe(false)
+    expect(canDeferTask({ name: 'Homework', startDate: '2026-11-29' }, '2026-12-05')).toBe(false)
+    expect(buildToughDayResult([fixed], 'chill', 0, '2026-12-05').remove).toEqual([])
+  })
 })

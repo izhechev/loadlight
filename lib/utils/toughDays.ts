@@ -1,10 +1,14 @@
 import type { BalanceResult, RemoveItem } from './balance'
+import { localDeadlineMs } from './recurrence'
+import { localDateStr, resolveFixedStart } from './scheduling'
 
 export interface LoadTask {
   id: string
   name: string
   category?: string
   deadline?: string | null
+  startDate?: string | null
+  start_date?: string | null
   recurring?: string
   priority?: number
   estimated_minutes?: number | null
@@ -51,7 +55,13 @@ export function countRecentToughDays(history: DayHistoryEntry[], balanceMode: st
 
 export function canDeferTask(task: Omit<LoadTask, 'id'>, deferThrough?: string): boolean {
   if (task.done || (task.recurring && task.recurring !== 'none') || (task.priority ?? 3) < 3 || HEALTH.test(`${task.name} ${task.category ?? ''}`)) return false
-  return !task.deadline || (!!deferThrough && task.deadline.slice(0, 10) > deferThrough)
+  const start = task.startDate ?? task.start_date
+  if (resolveFixedStart(start, null, deferThrough ?? '')) return false
+  return [start, task.deadline].every(date => !date || (!!deferThrough && date.slice(0, 10) > deferThrough))
+}
+
+export function canSnoozeTask(task: Omit<LoadTask, 'id'>, now: number): boolean {
+  return canDeferTask(task, localDateStr(1, now)) && (!task.deadline || localDeadlineMs(task.deadline) > now + 48 * 60 * 60_000)
 }
 
 export function buildToughDayResult(tasks: LoadTask[], balanceMode: string, recentToughDays: number, deferThrough?: string): BalanceResult {

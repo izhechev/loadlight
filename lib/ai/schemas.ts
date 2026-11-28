@@ -75,17 +75,34 @@ export const extractRequestSchema = z.object({
   categories: z.array(category).max(100).optional(),
 })
 
+const adviceTask = z.object({
+  name,
+  start: dateOrTime.nullable(),
+  end: dateOrTime.nullable(),
+  deadline: dateOrTime.nullable(),
+  minutes,
+})
+
 export const adviseRequestSchema = z.object({
   state: z.enum(['normal', 'elevated', 'overwhelmed']),
   taskCount: count,
   urgentCount: count,
   todayMinutes: z.number().nonnegative().max(3_024_000).optional(),
   capacityMinutes: z.number().positive().max(1_440).optional(),
+  plan: z.object({
+    today: day,
+    currentTime: clockTime,
+    next: adviceTask.nullable(),
+    appointment: adviceTask.nullable(),
+    flexible: z.array(adviceTask).max(3),
+  }).optional(),
   signals: z.object({
     taskAccumulation: z.number().min(0).max(1).optional(),
     temporalPressure: z.number().min(0).max(1).optional(),
   }).optional(),
 })
+
+export type DailyAdviceRequest = z.infer<typeof adviseRequestSchema>
 
 export const pastDeadlineRequestSchema = z.object({
   taskName: name,
@@ -203,15 +220,13 @@ export const chatOutputSchemas = {
     z.object({ type: z.literal('ready'), context: basicText.nullish() }),
   ]),
   triage: z.object({
-    canSkip: z.array(taskReason).max(3),
-    urgent: z.array(taskReason).max(3),
-    question: basicText.nullish(),
+    canSkip: z.array(count).max(3),
+    urgent: z.array(count).max(3),
+    questionTask: count.nullish(),
   }),
   'chill-snooze': z.object({
-    canPostpone: z.array(taskReason.extend({ id })).max(4),
-    question: basicText.nullish(),
-    questionTaskName: name.nullish(),
-    questionTaskId: id.nullish(),
+    taskIds: z.array(id).max(4),
+    questionId: id.nullish(),
   }),
   'balance-check': z.object({
     verdict: z.enum(['too_much', 'ok', 'too_little']),
