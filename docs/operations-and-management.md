@@ -37,13 +37,7 @@ cp .env.example .env.local
 
 ### Step 4: Deploy to Vercel
 
-```bash
-npm install -g vercel
-vercel --prod
-# Follow prompts to link to your Vercel account and project
-```
-
-Or connect the GitHub repository to Vercel via the dashboard for automatic deployments on every push to `main`.
+The connected Vercel project deploys pushes to `main`. GitHub Actions runs lint, tests and the production build. [Vercel’s GitHub integration](https://vercel.com/docs/git/vercel-for-github)
 
 ### Step 5: Configure Vercel environment variables
 
@@ -58,9 +52,6 @@ In Vercel dashboard → Project → **Settings → Environment Variables**, add:
 In GitHub repository → **Settings → Secrets and variables → Actions**, add:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `VERCEL_TOKEN` (from vercel.com → Settings → Tokens)
-- `VERCEL_ORG_ID` (from `.vercel/project.json` after first `vercel` deploy)
-- `VERCEL_PROJECT_ID` (from `.vercel/project.json`)
 
 ### Performance & Scalability
 
