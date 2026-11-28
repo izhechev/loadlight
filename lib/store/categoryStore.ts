@@ -47,7 +47,7 @@ interface CategoryStore {
 
 export const useCategoryStore = create<CategoryStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       categories: DEFAULT_CATEGORIES,
 
       addCategory(cat) {

@@ -90,10 +90,10 @@ export function missingLifeAreas(tasks: SignatureTask[]): string[] {
 }
 
 const AREA_SUGGESTIONS: Record<string, AddItem> = {
-  'physical activity': { name: 'Go for a 20-minute walk', category: 'Exercise', reason: 'No physical activity on your list' },
-  'work or study':     { name: 'One focused work block',  category: 'Work',     reason: 'No work or study on your list' },
-  'social time':       { name: 'Call a friend or family', category: 'Personal', reason: 'No social time on your list' },
-  'leisure or hobby':  { name: 'Read or enjoy a hobby',   category: 'Personal', reason: 'No leisure on your list' },
+  'physical activity': { name: 'Go for a 20-minute walk', category: 'Exercise', reason: 'No physical activity on your list', estimatedMinutes: 20 },
+  'work or study':     { name: 'One focused work block',  category: 'Work',     reason: 'No work or study on your list', estimatedMinutes: 30 },
+  'social time':       { name: 'Call a friend or family', category: 'Personal', reason: 'No social time on your list', estimatedMinutes: 10 },
+  'leisure or hobby':  { name: 'Read or enjoy a hobby',   category: 'Personal', reason: 'No leisure on your list', estimatedMinutes: 20 },
 }
 
 /**
@@ -105,8 +105,8 @@ export function buildTooLittleResult(missing: string[]): BalanceResult | null {
   if (missing.length < 2) return null
   return {
     verdict: 'too_little',
-    headline: 'Your list could use more variety',
-    reason: `Nothing on your list covers: ${missing.join(', ')}. You might consider adding one of these.`,
+    headline: 'Optional ideas for today',
+    reason: 'These activities are optional if you have time today.',
     remove: [],
     add: missing.slice(0, 3).map(m => AREA_SUGGESTIONS[m]).filter(Boolean),
   }

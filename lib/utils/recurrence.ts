@@ -5,11 +5,13 @@
 export interface RecurrenceFields {
   recurring?: string | null
   recurringDays?: number | null
+  recurringHours?: number | null
 }
 
-/** UTC "YYYY-MM-DD" for a Unix-ms timestamp. */
-function utcDateStr(ms: number): string {
-  return new Date(ms).toISOString().split('T')[0]
+/** Local calendar date for a Unix-ms timestamp. */
+function localDay(ms: number): string {
+  const local = new Date(ms)
+  return new Date(ms - local.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
 }
 
 /** Add whole days to a "YYYY-MM-DD" string, staying in UTC. */
@@ -61,10 +63,11 @@ export function ensureRecurringDeadline(
   deadline: string | null | undefined,
   rec: RecurrenceFields,
   nowMs: number,
+  startDate?: string | null,
 ): string | null {
   if (deadline) return deadline
   if (!isRecurring(rec)) return null
-  return utcDateStr(nowMs)
+  return startDate || localDay(nowMs)
 }
 
 /**
@@ -78,7 +81,15 @@ export function nextRecurrenceDeadline(
   nowMs: number,
 ): string | null {
   if (!isRecurring(rec)) return null
-  const normalized = deadline ? deadline.replace(' ', 'T') : utcDateStr(nowMs)
+  const normalized = deadline ? deadline.replace(' ', 'T') : localDay(nowMs)
+  if (rec.recurringHours && rec.recurringHours > 0) {
+    const time = new Date(nowMs)
+    const wallNow = nowMs - time.getTimezoneOffset() * 60_000
+    const anchor = normalized.includes('T') ? Date.parse(normalized.slice(0, 16) + 'Z') : wallNow
+    const period = rec.recurringHours * 3_600_000
+    const count = Math.max(1, Math.floor((wallNow - anchor) / period) + 1)
+    return new Date(anchor + count * period).toISOString().slice(0, 16)
+  }
   const datePart = normalized.split('T')[0]
   const timePart = normalized.includes('T') ? normalized.split('T')[1] : null
   // For calendar cadences, recurringDays doubles as the interval multiplier
@@ -105,6 +116,11 @@ export function parseEveryNDays(input: string): number | null {
   return n && n > 1 ? n : null
 }
 
+export function localDeadlineMs(deadline: string): number {
+  const wallClock = deadline.replace(' ', 'T').slice(0, 19)
+  return new Date(wallClock.includes('T') ? wallClock : wallClock + 'T23:59:59.999').getTime()
+}
+
 /**
  * Whether a task should enter the "past deadline" flow when saved.
  * Date-only deadlines count as end-of-day (a task "due 4 Jul" is not overdue
@@ -118,12 +134,7 @@ export function isPastDeadline(
 ): boolean {
   if (!deadline) return false
   if (isRecurring({ recurring })) return false
-  let normalized = deadline.replace(' ', 'T')
-  if (!normalized.includes('T')) normalized += 'T23:59'
-  if (!normalized.endsWith('Z') && !normalized.includes('+')) normalized += 'Z'
-  const dl = new Date(normalized)
-  if (isNaN(dl.getTime())) return false
-  return dl.getTime() < nowMs
+  return localDeadlineMs(deadline) < nowMs
 }
 
 /** Human-readable recurrence badge, or null for non-recurring tasks. */

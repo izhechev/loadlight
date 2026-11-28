@@ -51,6 +51,15 @@ describe('findDuplicateGroups', () => {
     expect(groups).toHaveLength(0)
   })
 
+  it('keeps different appointment dates and planned starts', () => {
+    expect(findDuplicateGroups([
+      t('a', 'Dentist', { deadline: '2026-11-28T10:30' }),
+      t('b', 'Dentist', { deadline: '2026-11-29T10:30' }),
+      { ...t('c', 'Check in'), startDate: '2026-11-28T08:00' },
+      { ...t('d', 'Check in'), startDate: '2026-11-28T19:00' },
+    ])).toEqual([])
+  })
+
   it('returns empty for a clean list', () => {
     expect(findDuplicateGroups([t('a', 'Bath'), t('b', 'Shave')])).toHaveLength(0)
   })

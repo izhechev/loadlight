@@ -17,10 +17,10 @@ describe('shouldRequestBalanceCheck', () => {
 })
 
 describe('addSuggestionToTask', () => {
-  const today = new Date().toISOString().split('T')[0]
+  const now = new Date(2026, 10, 28, 16)
 
   it('maps a suggestion to a sane default task insert', () => {
-    const t = addSuggestionToTask({ name: 'Read a book', category: 'Personal' })
+    const t = addSuggestionToTask({ name: 'Read a book', category: 'Personal' }, now)
     expect(t).toMatchObject({
       name: 'Read a book',
       category: 'Personal',
@@ -28,7 +28,8 @@ describe('addSuggestionToTask', () => {
       demandType: 'routine',
       difficulty: 2,
       priority: 3,
-      startDate: null,
+      startDate: '2026-11-28',
+      deadline: null,
       estimatedMinutes: 30,
       notes: '',
       status: 'active',
@@ -37,9 +38,9 @@ describe('addSuggestionToTask', () => {
     })
   })
 
-  it('sets the deadline to today (date-only) — suggestions are for today', () => {
-    expect(addSuggestionToTask({ name: 'Go for a walk', category: 'Exercise' }).deadline).toBe(today)
-    expect(addSuggestionToTask({ name: 'Read a book', category: 'Personal' }).deadline).toBe(today)
+  it('keeps the duration and plans the suggestion for today without setting a deadline', () => {
+    expect(addSuggestionToTask({ name: 'Go for a walk', category: 'Exercise', estimatedMinutes: 20 }, now))
+      .toMatchObject({ startDate: '2026-11-28', deadline: null, estimatedMinutes: 20 })
   })
 
   it('infers demand type from the category', () => {

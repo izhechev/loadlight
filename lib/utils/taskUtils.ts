@@ -1,6 +1,6 @@
 // Pure utility functions shared by the tasks page and tests.
 
-import { recurrenceStepDays, addCalendarUnits } from './recurrence'
+import { recurrenceStepDays, addCalendarUnits, localDeadlineMs } from './recurrence'
 
 const UTC_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -19,7 +19,9 @@ export function dateKey(dt: string): string {
  * value.  All times in this codebase are stored as naive-UTC strings.
  */
 export function ensureZ(dt: string): string {
-  return dt.endsWith('Z') || dt.includes('+') || (dt.includes('-', 10)) ? dt : dt + 'Z'
+  if (!dt.includes('T')) return dt + 'T00:00Z'
+  if (/[+-]\d{2}$/.test(dt)) return dt + ':00'
+  return /(?:Z|[+-]\d{2}:?\d{2})$/i.test(dt) ? dt : dt + 'Z'
 }
 
 /**
@@ -30,7 +32,7 @@ export function ensureZ(dt: string): string {
 export function formatTime(dt: string | null): string | null {
   if (!dt) return null
   try {
-    const date = new Date(normalizeDt(dt))
+    const date = new Date(ensureZ(normalizeDt(dt)))
     if (isNaN(date.getTime())) return null
     const h = date.getUTCHours()
     const m = date.getUTCMinutes()
@@ -44,7 +46,7 @@ export function formatTime(dt: string | null): string | null {
 /** Format the date portion of a stored datetime for display using UTC. */
 export function formatDate(dt: string): string {
   try {
-    const d = new Date(normalizeDt(dt))
+    const d = new Date(ensureZ(normalizeDt(dt)))
     if (isNaN(d.getTime())) return ''
     return `${d.getUTCDate()} ${UTC_MONTHS[d.getUTCMonth()]}`
   } catch { return '' }
@@ -56,7 +58,7 @@ export function formatDate(dt: string): string {
  */
 export function toInputDt(dt: string | null | undefined): string {
   if (!dt) return ''
-  const d = new Date(normalizeDt(dt))
+  const d = new Date(ensureZ(normalizeDt(dt)))
   if (isNaN(d.getTime())) return dt.replace(' ', 'T').slice(0, 16)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
@@ -85,10 +87,7 @@ export function isDueWithin48h(deadline: string | null, currentTime: number): bo
  */
 export function deadlineStatus(deadline: string | null, currentTime: number): 'overdue' | 'due-soon' | null {
   if (!deadline || currentTime === 0) return null
-  let normalized = normalizeDt(deadline)
-  if (!normalized.includes('T')) normalized += 'T23:59'
-  if (!normalized.endsWith('Z') && !normalized.includes('+')) normalized += 'Z'
-  const ms = new Date(normalized).getTime() - currentTime
+  const ms = localDeadlineMs(deadline) - currentTime
   if (isNaN(ms)) return null
   if (ms < 0) return 'overdue'
   if (ms <= 172_800_000) return 'due-soon'
@@ -135,37 +134,17 @@ export function effectiveDeadline(
   const step = recurrenceStepDays(task)
   if (step === null) return dl
   const normalized = normalizeDt(dl)
-  const base = new Date(normalized)
-  if (isNaN(base.getTime())) return dl
-  const currentNow = now || Date.now()
-
-  // Determine the time-of-day to use:
-  // 1. From the stored deadline (if it has a non-midnight time)
-  // 2. From the task name (e.g. "Take Lamictal 10:30") as fallback for legacy midnight entries
-  let timeStr = normalized.includes('T') ? normalized.split('T')[1] : '00:00'
-  const isMidnight = timeStr.startsWith('00:00')
-  if (isMidnight) {
-    const nameMatch = task.name.match(/\b(\d{1,2}):(\d{2})\b/)
-    if (nameMatch) timeStr = `${nameMatch[1].padStart(2, '0')}:${nameMatch[2]}`
-  }
-
-  // Reconstruct a base date combining original date + correct time
-  const dateOnlyStr = normalized.split('T')[0]
-  const baseWithTime = new Date(`${dateOnlyStr}T${timeStr.split('+')[0].split('Z')[0]}Z`)
-  const effectiveBase = isNaN(baseWithTime.getTime()) ? base : baseWithTime
-
-  if (effectiveBase.getTime() > currentNow) return `${dateOnlyStr}T${timeStr}`
-
-  // Advance in step-day increments (1 = daily, 7 = weekly, N = every N days)
-  // until it's in the future, staying on the task's original day grid
-  const msPerDay = 86400000
-  const elapsed = currentNow - effectiveBase.getTime()
-  const daysAhead = Math.ceil(elapsed / (step * msPerDay)) * step
-  const next = new Date(effectiveBase.getTime() + daysAhead * msPerDay)
-  const yyyy = next.getUTCFullYear()
-  const mm = String(next.getUTCMonth() + 1).padStart(2, '0')
-  const dd = String(next.getUTCDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}T${timeStr}`
+  const date = dateKey(normalized)
+  const storedTime = normalized.split('T')[1]
+  const nameTime = task.name.match(/\b(\d{1,2}):(\d{2})\b/)
+  const time = storedTime && !storedTime.startsWith('00:00') ? storedTime
+    : nameTime ? nameTime[1].padStart(2, '0') + ':' + nameTime[2] : null
+  const base = Date.parse(ensureZ(date + 'T' + (time || '23:59:59.999')))
+  if (!Number.isFinite(base)) return dl
+  const period = step * 86_400_000
+  const elapsedPeriods = Math.max(0, Math.ceil((now - base) / period))
+  const next = new Date(base + elapsedPeriods * period).toISOString().slice(0, 10)
+  return time ? next + 'T' + time : next
 }
 
 /** Parse "HH:MM" into total minutes since midnight. */

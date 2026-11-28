@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  toughDayThreshold, dayLoadMinutes, isToughDay, countRecentToughDays, buildToughDayResult,
+  toughDayThreshold, dayLoadMinutes, isToughDay, countRecentToughDays, buildToughDayResult, canDeferTask,
 } from './toughDays'
 
 describe('toughDayThreshold', () => {
@@ -42,6 +42,11 @@ describe('countRecentToughDays', () => {
     ]
     expect(countRecentToughDays(history, 'average')).toBe(3)
   })
+  it('starts a new streak after a missing calendar day', () => {
+    const history = [{ date: '2026-11-21', minutes: 300 }, { date: '2026-11-28', minutes: 330 }]
+    expect(countRecentToughDays(history, 'average')).toBe(1)
+  })
+
   it('is 0 when the latest day is not tough', () => {
     expect(countRecentToughDays([{ date: '2026-06-24', minutes: 100 }], 'average')).toBe(0)
   })
@@ -59,5 +64,17 @@ describe('buildToughDayResult', () => {
     expect(r.remove.map(x => x.id)).toEqual(['c', 'd']) // heaviest non-health, non-P1, max 3
     expect(r.add).toEqual([])
     expect(r.reason).toContain('2')
+  })
+})
+
+
+describe('canDeferTask', () => {
+  it('protects near deadlines, important work, and health tasks', () => {
+    const through = '2026-12-05'
+    expect(canDeferTask({ name: 'Optional reading', deadline: '2026-11-28' }, through)).toBe(false)
+    expect(canDeferTask({ name: 'Optional reading', deadline: '2026-12-06' }, through)).toBe(true)
+    expect(canDeferTask({ name: 'Important submission', priority: 2 }, through)).toBe(false)
+    expect(canDeferTask({ name: 'Check in', category: 'Health' }, through)).toBe(false)
+    expect(canDeferTask({ name: 'Sort shelf', priority: 4 }, through)).toBe(true)
   })
 })

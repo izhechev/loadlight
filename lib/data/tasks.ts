@@ -37,7 +37,13 @@ export function isLocalMode(): boolean {
 // Types
 // ─────────────────────────────────────────────
 
+export interface TaskStep {
+  name: string
+  done: boolean
+}
+
 export interface Task {
+  steps?: TaskStep[]
   id: string
   userId?: string
   name: string
@@ -101,9 +107,19 @@ export interface AiLogInsert {
 
 function lsGetTasks(): Task[] {
   if (typeof window === 'undefined') return []
-  try {
-    return JSON.parse(localStorage.getItem('loadlight-tasks') ?? '[]')
-  } catch { return [] }
+  const rows = JSON.parse(localStorage.getItem('loadlight-tasks') ?? '[]')
+  return rows.map(({ demand_type, life_domain, estimated_minutes, start_date, recurring_days,
+    recurring_hours, ...task }: Task & Record<string, unknown>) => ({
+    ...task,
+    demandType: task.demandType ?? demand_type ?? 'routine',
+    lifeDomain: task.lifeDomain ?? life_domain ?? 'personal',
+    estimatedMinutes: 'estimatedMinutes' in task ? task.estimatedMinutes : estimated_minutes ?? null,
+    startDate: 'startDate' in task ? task.startDate : start_date ?? null,
+    recurringDays: 'recurringDays' in task ? task.recurringDays : recurring_days ?? null,
+    recurringHours: 'recurringHours' in task ? task.recurringHours : recurring_hours ?? null,
+    status: task.status ?? (task.done ? 'completed' : 'active'),
+    done: Boolean(task.done || task.status === 'completed' || task.status === 'archived' && task.completedAt),
+  }))
 }
 
 function lsSetTasks(tasks: Task[]): void {
@@ -171,28 +187,27 @@ function notifyTasksChanged(): void {
 }
 
 /** Give a recurring task a concrete deadline (today, date-only) if it has none. */
-function withBackfilledDeadline<T extends Pick<Task, 'deadline' | 'recurring' | 'recurringDays' | 'status'>>(task: T): T {
+function withBackfilledDeadline<T extends Pick<Task, 'deadline' | 'startDate' | 'recurring' | 'recurringDays' | 'status'>>(task: T): T {
   if (task.status === 'active') {
-    const filled = ensureRecurringDeadline(task.deadline, task, Date.now())
+    const filled = ensureRecurringDeadline(task.deadline, task, Date.now(), task.startDate)
     if (filled !== (task.deadline ?? null)) return { ...task, deadline: filled }
   }
   return task
 }
 
-export async function getTasks(): Promise<Task[]> {
+export async function getTasks(includeArchived = false): Promise<Task[]> {
   if (isLocalMode()) {
     const tasks = lsGetTasks()
     const repaired = tasks.map(withBackfilledDeadline)
     // Persist any backfilled deadlines so they stay stable across loads
     if (repaired.some((t, i) => t !== tasks[i])) lsSetTasks(repaired)
-    return repaired
+    return includeArchived ? repaired : repaired.filter(t => t.status !== 'archived')
   }
 
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from('tasks')
-    .select('*')
-    .order('created_at', { ascending: false })
+  let query = supabase.from('tasks').select('*')
+  if (!includeArchived) query = query.neq('status', 'archived')
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) throw error
 
@@ -201,7 +216,7 @@ export async function getTasks(): Promise<Task[]> {
   // Persist backfilled deadlines fire-and-forget; reads shouldn't block on writes
   repaired.forEach((t, i) => {
     if (t !== tasks[i]) {
-      supabase.from('tasks').update({ deadline: toUtcTs(t.deadline) }).eq('id', t.id).then(() => {})
+      supabase.from('tasks').update({ deadline: toUtcTs(t.deadline, true) }).eq('id', t.id).then(() => {})
     }
   })
   return repaired
@@ -286,17 +301,22 @@ export async function addTasks(rawTasks: Omit<Task, 'id' | 'createdAt'>[]): Prom
 export async function updateTask(id: string, updates: Partial<Task>): Promise<void> {
   if (isLocalMode()) {
     const tasks = lsGetTasks()
-    lsSetTasks(tasks.map(t => t.id === id ? { ...t, ...updates } : t))
+    if (!tasks.some(t => t.id === id)) throw new Error('Task no longer exists.')
+    const patch = { ...updates }
+    if (patch.status === 'active' || patch.status === 'completed') patch.done = patch.status === 'completed'
+    else if (patch.status === undefined && patch.done !== undefined) patch.status = patch.done ? 'completed' : 'active'
+    lsSetTasks(tasks.map(t => t.id === id ? { ...t, ...patch } : t))
     notifyTasksChanged()
     return
   }
 
   const supabase = createClient()
-  const row = taskToDbRow(updates as Task)
-  let { error } = await supabase.from('tasks').update(row).eq('id', id)
+  const row = taskToDbRow(updates)
+  if (updates.recurringDays === null) row.recurring_days = null
+  let { error } = await supabase.from('tasks').update(row).eq('id', id).select('id').single()
   if (error && isRecurrenceSchemaMismatch(error)) {
     downgradeRowForOldSchema(row)
-    ;({ error } = await supabase.from('tasks').update(row).eq('id', id))
+    ;({ error } = await supabase.from('tasks').update(row).eq('id', id).select('id').single())
   }
 
   if (error) throw error
@@ -304,16 +324,43 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<vo
   notifyTasksChanged()
 }
 
-export async function deleteTask(id: string): Promise<void> {
+export async function completeRecurringTask(id: string, nextDeadline: string): Promise<void> {
   if (isLocalMode()) {
-    lsSetTasks(lsGetTasks().filter(t => t.id !== id))
-    notifyTasksChanged()
-    return
+    const tasks = lsGetTasks()
+    const task = tasks.find(t => t.id === id && t.status === 'active')
+    if (!task) return
+    const completedAt = new Date().toISOString()
+    const updated = tasks.map(t => t.id === id ? { ...t, done: true, status: 'completed' as const, completedAt } : t)
+    const exists = tasks.some(t => t.id !== id && t.status !== 'archived' && t.name === task.name &&
+      t.category === task.category && t.recurring === task.recurring && t.deadline === nextDeadline)
+    if (!exists) updated.push({
+      ...task, id: crypto.randomUUID(), deadline: nextDeadline, startDate: null, snoozedUntil: null,
+      createdAt: completedAt, completedAt: null, steps: task.steps?.map(step => ({ ...step, done: false })),
+    })
+    lsSetTasks(updated)
+  } else {
+    const { error } = await createClient().rpc('complete_recurring_task', {
+      task_id: id, next_deadline: toUtcTs(nextDeadline, true),
+    })
+    if (error) throw new Error('Could not complete this repeat. Check the connection and recurring-task database update.')
   }
+  notifyTasksChanged()
+}
 
-  const supabase = createClient()
-  const { error } = await supabase.from('tasks').delete().eq('id', id)
-  if (error) throw error
+export async function saveTaskSteps(id: string, previous: TaskStep[], steps: TaskStep[]): Promise<void> {
+  const conflict = 'This task changed. Reopen its steps and try again.'
+  if (isLocalMode()) {
+    const tasks = lsGetTasks()
+    const task = tasks.find(t => t.id === id && t.status === 'active')
+    if (!task || JSON.stringify(task.steps ?? []) !== JSON.stringify(previous)) throw new Error(conflict)
+    lsSetTasks(tasks.map(t => t.id === id ? { ...t, steps } : t))
+  } else {
+    const { data, error } = await createClient().from('tasks').update({ steps })
+      .eq('id', id).eq('status', 'active').eq('steps', JSON.stringify(previous)).select('id').maybeSingle()
+    if (error) throw new Error(/steps.*column|column.*steps/i.test(error.message)
+      ? 'Saving steps needs the task steps database update.' : 'Could not save the steps. Try again.')
+    if (!data) throw new Error(conflict)
+  }
   notifyTasksChanged()
 }
 
@@ -439,6 +486,7 @@ export async function logAiCall(log: AiLogInsert): Promise<void> {
 function dbRowToTask(row: any): Task {
   return {
     id:               row.id,
+    steps:            row.steps ?? [],
     userId:           row.user_id,
     name:             row.name,
     category:         row.category ?? 'Personal',
@@ -446,7 +494,7 @@ function dbRowToTask(row: any): Task {
     demandType:       row.demand_type ?? 'routine',
     difficulty:       row.difficulty ?? 2,
     priority:         row.priority ?? 3,
-    deadline:         row.deadline ?? null,
+    deadline:         fromDbDeadline(row.deadline),
     startDate:        row.start_date ?? null,
     estimatedMinutes: row.estimated_minutes ?? null,
     notes:            row.notes ?? '',
@@ -465,12 +513,19 @@ function dbRowToTask(row: any): Task {
 // doesn't reinterpret them through the database session timezone (which may
 // not be UTC). We store "naive" local times as UTC — the convention used
 // by formatTime (getUTCHours) in the UI.
-function toUtcTs(dt: string | null | undefined): string | null | undefined {
+function toUtcTs(dt: string | null | undefined, endOfDay = false): string | null | undefined {
   if (dt == null) return dt
-  // Already has timezone info → leave as-is
-  if (dt.includes('+') || dt.endsWith('Z')) return dt
-  // Append Z to mark as UTC
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dt)) {
+    return `${dt}T${endOfDay ? '23:59:59.999' : '00:00:00'}Z`
+  }
+  if (/(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(dt)) return dt
   return dt + 'Z'
+}
+
+// PostgreSQL stores date-only deadlines at the last millisecond of the day.
+function fromDbDeadline(deadline: string | null | undefined): string | null {
+  if (deadline && /[T ]23:59:59\.9990*(?:Z|\+00(?::?00)?)$/.test(deadline)) return deadline.slice(0, 10)
+  return deadline ?? null
 }
 
 function taskToDbRow(task: Partial<Task>): Record<string, unknown> {
@@ -482,7 +537,7 @@ function taskToDbRow(task: Partial<Task>): Record<string, unknown> {
   if (task.demandType       !== undefined) row.demand_type       = task.demandType
   if (task.difficulty       !== undefined) row.difficulty        = task.difficulty
   if (task.priority         !== undefined) row.priority          = task.priority
-  if (task.deadline         !== undefined) row.deadline          = toUtcTs(task.deadline)
+  if (task.deadline         !== undefined) row.deadline          = toUtcTs(task.deadline, true)
   if (task.startDate        !== undefined) row.start_date        = toUtcTs(task.startDate)
   if (task.estimatedMinutes !== undefined) row.estimated_minutes = task.estimatedMinutes
   if (task.notes            !== undefined) row.notes             = task.notes

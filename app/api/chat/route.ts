@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { suggestedSteps } from '@/lib/utils/taskSteps'
 import { readAiRequest } from '@/lib/ai/request'
-import { parseEveryNDays } from '@/lib/utils/recurrence'
+import { extractTaskDrafts, taskPreview } from '@/lib/ai/taskExtraction'
+import { buildSchedule, localDateStr } from '@/lib/utils/scheduling'
 import { chatOutputSchemas, chatRequestSchema, type ChatTask } from '@/lib/ai/schemas'
 import { fetchGemini, GEMINI_MODELS, geminiText, getGeminiAccess, readGeminiJson, type GeminiResponse } from '@/lib/ai/server'
 
@@ -10,6 +12,7 @@ type ChatGeneration = {
   system: string
   prompt: string
   tasks?: ChatTask[]
+  extractInput?: { text: string; today: string; categories: string[] }
 }
 
 async function generateWithGemini(options: ChatGeneration) {
@@ -46,93 +49,9 @@ ${options.jsonSchemaText}`,
 
   if (options.mode === 'breakdown') return { object: null }
 
-  // Rule-based fallback when the AI service is unavailable.
-  if (options.mode === 'extract') {
-    const match = options.prompt.match(/<user_input>\s*([\s\S]*?)\s*<\/user_input>/)
-    const text = match ? match[1] : ''
-    const todayStr = new Date().toISOString().split('T')[0]
-
-    const tasks = text.split(/ and | then |, /i).filter((t: string) => t.trim().length > 0).map((t: string) => {
-      const lowerT = t.toLowerCase()
-      const isWeekly = lowerT.includes('weekly') || lowerT.includes('every week') || lowerT.includes('every sat') || lowerT.includes('every sun') || lowerT.includes('every mon')
-
-      let times_per_day = 1
-      let recurring_hours: number | null = null
-      const timesMatch = lowerT.match(/(\d+)\s*times\s*(a|per)\s*day/i) || lowerT.match(/twice\s*(a|per)?\s*day/i)
-      if (timesMatch) {
-        times_per_day = timesMatch[0].includes('twice') ? 2 : parseInt(timesMatch[1]) || 1
-      }
-      const everyHoursMatch = lowerT.match(/every\s+(\d+)\s*h(ours?)?/i)
-      if (everyHoursMatch) {
-        recurring_hours = parseInt(everyHoursMatch[1])
-      }
-      const recurring_days = parseEveryNDays(t)
-
-      const isDaily = lowerT.includes('daily') || lowerT.includes('every day') || lowerT.includes('everyday') || lowerT.includes('a day') || lowerT.includes('per day') || times_per_day > 1 || recurring_hours !== null || recurring_days !== null
-
-      // Extract time: "10:30", "3pm", "15:00", "9am"
-      let deadline: string | null = null
-      const hhmmMatch = t.match(/\b(\d{1,2}):(\d{2})\b/)
-      const ampmMatch = t.match(/\b(\d{1,2})\s*(am|pm)\b/i)
-      if (hhmmMatch) {
-        const h = hhmmMatch[1].padStart(2, '0')
-        const m = hhmmMatch[2].padStart(2, '0')
-        deadline = `${todayStr}T${h}:${m}`
-      } else if (ampmMatch) {
-        let h = parseInt(ampmMatch[1])
-        const isPM = ampmMatch[2].toLowerCase() === 'pm'
-        if (isPM && h !== 12) h += 12
-        if (!isPM && h === 12) h = 0
-        deadline = `${todayStr}T${String(h).padStart(2, '0')}:00`
-      }
-
-      let name = t.replace(/i have to|need to|want to|maybe/gi, '').trim() || 'New Task'
-
-      // Remove time expressions from name
-      name = name.replace(/\b\d{1,2}:\d{2}\b/g, '').trim()
-      name = name.replace(/\b\d{1,2}\s*(am|pm)\b/gi, '').trim()
-      name = name.replace(/every\s+\d+\s*h(ours?)?/gi, '').trim()
-      name = name.replace(/every\s+(other|second)\s+day|every\s+(\d+|one|two|three|four|five|six|seven)\s+days?/gi, '').trim()
-      name = name.replace(/daily|every\s*day|everyday|every\s*week|weekly|every\s*(mon|tue|wed|thu|fri|sat|sun)[a-z]*|\d+\s*times\s*(a|per)\s*day|twice\s*(a|per)?\s*day/gi, '').trim()
-      name = name.replace(/\b(at|by|before|after)\s*$/i, '').replace(/^(to|on|at|for)\s+/i, '').replace(/[\.,;\s]+$/, '').trim()
-      name = name.charAt(0).toUpperCase() + name.slice(1)
-
-      let demand_type = 'routine'
-      let category = 'Personal'
-      let difficulty = 2
-
-      if (name.toLowerCase().includes('gym') || name.toLowerCase().includes('workout') || name.toLowerCase().includes('run')) {
-        demand_type = 'physical'
-        category = 'Exercise'
-        difficulty = 3
-      }
-
-      let estimated_minutes = 30
-      if (name.toLowerCase().includes('pill') || name.toLowerCase().includes('medicine') || name.toLowerCase().includes('lithium') || name.toLowerCase().includes('water') || name.toLowerCase().includes('text')) {
-        estimated_minutes = 2
-      } else if (name.toLowerCase().includes('gym') || name.toLowerCase().includes('workout')) {
-        estimated_minutes = 60
-      }
-
-      const priority = deadline ? 1 : isDaily ? 2 : 3
-
-      return {
-        name,
-        category,
-        demand_type,
-        difficulty,
-        deadline,
-        start_date: null,
-        priority,
-        notes: '',
-        estimated_minutes,
-        recurring: isDaily ? 'daily' : isWeekly ? 'weekly' : 'none',
-        times_per_day,
-        recurring_hours,
-        recurring_days,
-      }
-    })
-    return { object: { tasks } } as any
+  if (options.mode === 'extract' && options.extractInput) {
+    const { text, today, categories } = options.extractInput
+    return { object: { tasks: extractTaskDrafts(text, today, categories).map(taskPreview), offline: true } }
   }
 
   if (options.mode === 'triage') {
@@ -151,16 +70,9 @@ ${options.jsonSchemaText}`,
     return { object: { canPostpone, question: null, questionTaskName: null, questionTaskId: null } } as any
   }
 
-  if (options.mode === 'balance-check') {
-    return { object: { verdict: 'ok', headline: '', reason: '', remove: [], add: [] } } as any
-  }
+  if (options.mode === 'balance-check' || options.mode === 'weekly' || options.mode === 'analyze') return { object: null }
 
-  return { object: {
-    verdict: 'balanced',
-    trend: 'AI is currently in offline mode.',
-    advice: '',
-    suggestion: ''
-  }} as any
+  return { object: null }
 }
 
 // RQ6: Hardcoded ethical constraints — not user-configurable
@@ -191,9 +103,8 @@ export async function POST(req: Request) {
   const text = body.text ? sanitise(body.text) : ''
 
   if (mode === 'extract') {
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
-    const dayName = today.toLocaleDateString('en-US', { weekday: 'long' })
+    const todayStr = body.todayStr ?? new Date().toISOString().slice(0, 10)
+    const dayName = new Date(todayStr).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })
 
     // Pre-process: if input contains "Task:" labels (structured list from app UI),
     // extract task names and times ourselves before the AI sees the noisy form elements.
@@ -249,6 +160,7 @@ export async function POST(req: Request) {
 
     return Response.json((await generateWithGemini({
       mode: 'extract',
+      extractInput: { text: extractText, today: todayStr, categories },
       jsonSchemaText: `{ "tasks": [{ "name": "string", "category": "string", "demand_type": "cognitive" | "emotional" | "creative" | "routine" | "physical", "difficulty": number (1-5), "deadline": "YYYY-MM-DDTHH:mm" or null, "start_date": "YYYY-MM-DDTHH:mm" or null, "priority": 1 | 2 | 3 | 4, "notes": "string", "estimated_minutes": number or null, "recurring": "none" | "daily" | "weekly" | "monthly" | "yearly", "times_per_day": number, "recurring_hours": number | null, "recurring_days": number | null }], "clarification": { "question": "string", "taskName": "string", "options": [{ "label": "string", "recurring": "none" | "daily" | "weekly", "recurring_hours": number | null }] } | null }`,
       system: ETHICAL_SYSTEM_PROMPT,
       prompt: `<system_instruction>
@@ -327,387 +239,72 @@ Analyze the <user_input> step-by-step and output the final JSON.`,
     })).object)
   }
 
-  if (mode === 'analyze') {
-    const taskList = tasks ?? []
-    const totalMinutes = taskList.reduce((acc, t) => acc + (t.estimated_minutes ?? 30), 0)
-    const hours = Math.round(totalMinutes / 60 * 10) / 10
-    const pending = taskList.filter(t => !t.done).length
-    const demandCounts = taskList.reduce<Record<string, number>>((acc, t) => {
-      const dt = t.demand_type ?? 'routine'
-      acc[dt] = (acc[dt] ?? 0) + 1
-      return acc
-    }, {})
-    const dominant = Object.entries(demandCounts).sort((a, b) => b[1] - a[1])[0]
+  if (mode === 'analyze' || mode === 'weekly') {
+    const week = body.week
+    if (!week || week.pending + week.completed === 0) {
+      return Response.json({ source: 'rules', verdict: null, trend: '', advice: '', suggestion: '' })
+    }
 
-    return Response.json((await generateWithGemini({
-      mode: 'analyze',
-      jsonSchemaText: `{ "verdict": "overloaded" | "balanced" | "light", "trend": "string", "advice": "string", "suggestion": "string" }`,
-      system: ETHICAL_SYSTEM_PROMPT,
-      prompt: `Analyse this workload data and give a brief supportive assessment.
-
-Balance mode: ${balanceMode ?? 'balanced'}
-Total tasks: ${taskList.length} (${pending} pending)
-Total estimated hours: ${hours}h
-Dominant demand type: ${dominant ? `${dominant[0]} (${dominant[1]} tasks)` : 'none'}
-Demand distribution: ${JSON.stringify(demandCounts)}`,
-    })).object)
-  }
-
-  if (mode === 'weekly') {
-    const taskList = tasks ?? []
-    const totalMinutes = taskList.reduce((acc, t) => acc + (t.estimated_minutes ?? 30), 0)
-    const hours = Math.round(totalMinutes / 60 * 10) / 10
-    const done = taskList.filter(t => t.done).length
-    const byType = taskList.reduce<Record<string, number>>((acc, t) => {
-      const cat = t.category ?? 'other'
-      acc[cat] = (acc[cat] ?? 0) + 1
-      return acc
-    }, {})
-
-    return Response.json((await generateWithGemini({
+    const result = await generateWithGemini({
       mode: 'weekly',
       jsonSchemaText: `{ "verdict": "overloaded" | "balanced" | "light", "trend": "string", "advice": "string", "suggestion": "string" }`,
       system: ETHICAL_SYSTEM_PROMPT,
-      prompt: `Generate a weekly workload summary.
-
-Balance mode: ${balanceMode ?? 'balanced'}
-Total tasks this week: ${taskList.length}
-Completed: ${done}/${taskList.length}
-Estimated hours: ${hours}h
-Task breakdown by category: ${JSON.stringify(byType)}
-
-Give a trend observation, one piece of advice, and one specific actionable suggestion.`,
-    })).object)
+      prompt: `Summarize only the workload shown. This snapshot cannot establish a trend across weeks.
+Week: ${week.startDay} through ${week.endDay}
+Mode: ${balanceMode ?? 'average'}
+Completed this week: ${week.completed}
+Pending tasks planned or due this week: ${week.pending}
+Pending estimated minutes: ${week.minutes}
+Estimated minutes by weekday (Monday first): ${week.dailyMinutes.join(', ')}
+Pending task counts by category: ${JSON.stringify(week.categories)}
+Point out a pattern supported by these totals and give one optional action. Never infer how much free time the user has.`,
+    })
+    const parsed = chatOutputSchemas.weekly.safeParse(result.object)
+    if (!parsed.success) return Response.json({ source: 'rules', verdict: null, trend: '', advice: '', suggestion: '' })
+    return Response.json({ ...parsed.data, source: 'gemini' })
   }
 
   if (mode === 'breakdown') {
     const result = await generateWithGemini({
       mode: 'breakdown',
-      jsonSchemaText: `{ "tasks": [{ "name": "string", "category": "string", "demand_type": "cognitive" | "emotional" | "creative" | "routine" | "physical", "difficulty": number (1-5), "deadline": "YYYY-MM-DDTHH:mm" or null, "start_date": "YYYY-MM-DDTHH:mm" or null, "priority": 1 | 2 | 3 | 4, "notes": "string", "estimated_minutes": number or null, "recurring": "none" | "daily" | "weekly" | "monthly" | "yearly", "times_per_day": number }] }`,
-      system: `You are a productivity expert for LoadLight. Your job is to break down a single, large, overwhelming task into 3 to 5 smaller, highly actionable sub-tasks.`,
-      prompt: `Please break down this large task into smaller steps:
-
-<user_input>
-${text}
-</user_input>
-
-<user_categories>
-${categories.join(', ')}
-</user_categories>
-
-RULES:
-1. Generate exactly 3 to 5 smaller tasks that add up to the original goal.
-2. Keep the original category if possible, or use the most relevant one from the list.
-3. Make the estimated_minutes for each sub-task smaller (e.g., 10-30 mins).
-4. Use sentence case for task names and start with a clear action verb.`,
+      jsonSchemaText: '{ "tasks": [{ "name": "string" }] }',
+      system: 'Suggest three to five short, actionable checklist steps for the named task.',
+      prompt: text ?? '',
     })
-    if (!result.object) return Response.json({ error: 'Task breakdown is unavailable.' }, { status: 503 })
-    return Response.json(result.object)
+    if (result.object) return Response.json({ ...result.object, source: 'ai' })
+    return Response.json({ tasks: suggestedSteps(text ?? '').map(name => ({ name })), source: 'local' })
   }
 
   if (mode === 'schedule_chat') {
-    const taskList  = tasks ?? []
-    const undoneTasks = taskList.filter(t => !t.done)
-    const today     = new Date()
-    const todayStr  = today.toISOString().split('T')[0]
-    const totalMins  = undoneTasks.reduce((s, t) => s + (t.estimated_minutes ?? 30), 0)
-    const history    = body.history ?? []
-
-    // Build conversation context
-    const userTurns = history.filter(m => m.role === 'user').length
-    const forceReady = userTurns >= 3
-
-    // Extract task names already discussed in assistant questions — never re-ask about these
-    const taskNames = undoneTasks.map(t => t.name)
-    const alreadyAsked = taskNames.filter(name =>
-      history.some(m => m.role === 'assistant' && m.text.toLowerCase().includes(name.toLowerCase().slice(0, 10)))
-    )
-
-    // Pair questions with their answers for a clean summary
-    const qaPairs: string[] = []
-    for (let i = 0; i < history.length; i++) {
-      if (history[i].role === 'assistant' && history[i + 1]?.role === 'user') {
-        qaPairs.push(`Q: ${history[i].text}\nA: ${history[i + 1].text}`)
-      }
+    const history = body.history ?? []
+    if (history.filter(item => item.role === 'user').length >= 3) {
+      return Response.json({ type: 'ready' })
     }
-    const conversationSummary = qaPairs.join('\n---\n')
-    const taskList_str = undoneTasks.map((t, i) => {
-      const rec = t.recurring
-      const recLabel = rec && rec !== 'none' ? ` | ${rec}` : ''
-      return `[${i}] "${t.name}" | ~${t.estimated_minutes ?? 30}min | priority ${t.priority ?? 3}${recLabel}`
-    }).join('\n')
-
     const result = await generateWithGemini({
       mode: 'schedule_chat',
-      jsonSchemaText: `{ "type": "question" | "ready", "question": "string (only if type=question)", "context": "string (only if type=ready)" }`,
-      system: `You are a personal planning assistant. Ask specific, targeted questions about tasks you don't understand. Never repeat a question already answered.`,
-      prompt: `Current time: ${body.currentTime ?? todayStr}. Task load: ~${Math.round(totalMins / 60 * 10) / 10}h. Today: ${todayStr}.
+      jsonSchemaText: `{ "type": "question" | "ready", "question": "string when asking" }`,
+      system: 'Clarify ambiguous constraints in the user’s planning notes. Ask one question about a missing time only when it prevents planning. Never infer times, assign times, or ask a question about recurrence.',
+      prompt: `Planning date: ${body.todayStr ?? localDateStr()}, time: ${body.currentTime ?? 'unknown'}.
+Task names: ${JSON.stringify((tasks ?? []).filter(task => !task.done).map(task => task.name))}
+User's planning notes: ${JSON.stringify(text)}
+Conversation: ${JSON.stringify(history)}
 
-Tasks (recurring label shown if already known):
-${taskList_str}
-
-${conversationSummary ? `ALREADY ANSWERED — do NOT ask about these again:\n${conversationSummary}\n` : ''}
-${text && userTurns === 0 ? `User context: "${text}"\n` : ''}
-
-${forceReady
-  ? 'Return type="ready" now with a 1-2 sentence context summary of what you learned.'
-  : `BANNED from asking about: ${alreadyAsked.length > 0 ? alreadyAsked.map(n => `"${n}"`).join(', ') : 'nothing yet'}.
-
-Find the next UNCLEAR task not yet discussed. Prioritise these two types of unclear:
-1. RECURRENCE: tasks that sound like habits or routines (medications, exercise, meditation, hygiene) but have no recurring label — ask "Is '[task name]' something you do every day, every week, or just once?"
-2. MEANING: project names, abbreviations, formal processes you genuinely don't understand — ask what it is.
-
-Ask ONE question at a time. If all tasks are clear, return type="ready".
-Response ${userTurns + 1} of max 3.`}`,
+Ask for one of these formats if a time is missing: "Busy 09:00–11:00", "Task name at 09:00", or "Task name by 11:00".
+Use the exact task name. If the notes already provide the needed times or have no time constraints, return type="ready".`,
     })
-
-    const obj = result.object as any
-    if (obj?.type === 'ready' || forceReady) {
-      return Response.json({ type: 'ready', context: obj?.context ?? conversationSummary })
-    }
-    const question = obj?.question
-    if (question && typeof question === 'string') {
-      return Response.json({ type: 'question', question })
-    }
-    // Fallback
-    if (history.length === 0) {
-      return Response.json({
-        type: 'question',
-        question: `You have ${undoneTasks.length} tasks (~${Math.round(totalMins / 60 * 10) / 10}h total). Which tasks absolutely must happen today?`
-      })
-    }
-    return Response.json({ type: 'ready', context: conversationSummary })
+    const answer = result.object as { type?: string; question?: string } | null
+    return Response.json(answer?.type === 'question' && answer.question
+      ? { type: 'question', question: answer.question }
+      : { type: 'ready' })
   }
 
   if (mode === 'schedule') {
-    const taskList = tasks ?? []
-    const today = new Date()
-    // Prefer the client's local date — the server clock is UTC, which at 1am
-    // local still says yesterday and dated whole plans one day early
-    const todayStr = body.todayStr ?? today.toISOString().split('T')[0]
-    const undoneTasks = taskList.filter(t => !t.done)
-
-    const parseHHMM = (hhmm: string) => {
-      const [h, m] = hhmm.split(':').map(Number)
-      return h * 60 + (m ?? 0)
-    }
-    const fmt = (min: number) =>
-      `${Math.floor(min / 60).toString().padStart(2, '0')}:${(min % 60).toString().padStart(2, '0')}`
-
-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
-    const endOfDayMin     = 23 * 60       // working window ends 23:00
-    const workStartMin    = 8 * 60        // and never starts before 08:00
-    const overflowDate    = body.overflowDate ?? tomorrow.toISOString().split('T')[0]
-    // Use current real time as the start, clamped into working hours —
-    // planning at 01:17 must produce an 08:00 plan, not a night shift
-    const nowMin          = body.currentTime ? parseHHMM(body.currentTime) : 9 * 60
-    const windowPassed    = nowMin >= endOfDayMin
-    const scheduleDate    = windowPassed ? overflowDate : todayStr
-    const effectiveStartMin = windowPassed ? workStartMin : Math.max(nowMin, workStartMin)
-    const effectiveStartStr = fmt(effectiveStartMin)
-    const schedulable = undoneTasks
-
-    let scheduled: { id: string; name: string; start_date: string; deadline: string }[] = []
-    let overflow:  { id: string; name: string; deadline: string; start_date?: string | null }[] = []
-    let aiSucceeded = false
-
-    // Pre-process: extract task-specific fixed times from user instruction text.
-    // e.g. "lamictal is everyday 10:30 and 22:30" → lamictal tasks get pinned times.
-    const taskTimeOverrides = new Map<string, string>() // task ID → "HH:MM"
-    if (text) {
-      // Normalize: semicolons to colons in time-like patterns (e.g. 22;30 → 22:30)
-      const normalized = text.replace(/(\d{1,2});(\d{2})\b/g, '$1:$2').toLowerCase()
-      const timeRegex = /\b(\d{1,2}):(\d{2})\b/g
-      const allTimes: { time: string; idx: number }[] = []
-      let tm
-      while ((tm = timeRegex.exec(normalized)) !== null) {
-        const h = parseInt(tm[1]), mn = parseInt(tm[2])
-        if (h >= 0 && h <= 23 && mn >= 0 && mn <= 59)
-          allTimes.push({ time: `${String(h).padStart(2, '0')}:${String(mn).padStart(2, '0')}`, idx: tm.index })
-      }
-      if (allTimes.length > 0) {
-        // For each task, find keywords (4+ chars) that appear in the instruction near a time
-        type Match = { task: typeof schedulable[0]; kwIdx: number }
-        const keywordGroups = new Map<string, Match[]>() // keyword → [matched tasks]
-        for (const task of schedulable) {
-          const words = task.name.toLowerCase().split(/[\s()\/]+/).filter(w => w.replace(/[^a-z]/g, '').length >= 4)
-          for (const word of words) {
-            const kwIdx = normalized.indexOf(word)
-            if (kwIdx === -1) continue
-            const nearby = allTimes.filter(t => Math.abs(t.idx - kwIdx) <= 80)
-            if (nearby.length === 0) continue
-            const existing = keywordGroups.get(word) ?? []
-            existing.push({ task, kwIdx })
-            keywordGroups.set(word, existing)
-            break // one keyword match per task is enough
-          }
-        }
-        // Assign times to matched tasks (sorted by name so (1/2) < (2/2))
-        for (const matches of keywordGroups.values()) {
-          const sorted = [...matches].sort((a, b) => a.task.name.localeCompare(b.task.name))
-          const nearbyTimes = allTimes
-            .filter(t => sorted.some(m => Math.abs(t.idx - m.kwIdx) <= 80))
-            .map(t => t.time)
-          sorted.forEach((m, i) => {
-            if (i < nearbyTimes.length) taskTimeOverrides.set(m.task.id ?? '', nearbyTimes[i])
-          })
-        }
-      }
-    }
-
-    // AI scheduling: use INDEX numbers not IDs so Gemini can never produce an ID mismatch
-    try {
-      const aiResult = await generateWithGemini({
-        mode: 'schedule_ai',
-        jsonSchemaText: `{ "today": [{ "index": number, "start": "HH:MM", "end": "HH:MM" }], "overflow": [{ "index": number }] }`,
-        system: `You are a smart daily scheduler. Output ONLY valid JSON matching the schema. Never use task names or IDs in output — use the integer index only.`,
-        prompt: `Schedule the user's tasks for ${scheduleDate}.
-Current time: ${effectiveStartStr}. Schedule starting from ${effectiveStartStr} (never before this time).
-Only put a task in "overflow" if it would need to start after 23:30.
-
-Tasks — reference ONLY by the [index] number:
-${schedulable.map((t, i) => {
-  // Check override from user instruction first, then stored deadline
-  const overrideTime = taskTimeOverrides.get(t.id ?? '')
-  if (overrideTime) {
-    return `[${i}] "${t.name}" | ${t.estimated_minutes ?? 5}min | FIXED TIME: schedule at exactly ${overrideTime}`
-  }
-  const dTime = t.deadline?.includes('T') ? t.deadline.split('T')[1] : null
-  // Only treat deadline as fixed if not a schedule artifact (no start_date set today)
-  const isScheduleArtifact = t.start_date?.startsWith(scheduleDate)
-  if (dTime && t.deadline!.split('T')[0] === scheduleDate && !dTime.startsWith('09:00') && !isScheduleArtifact) {
-    return `[${i}] "${t.name}" | ${t.estimated_minutes ?? 5}min | FIXED TIME: schedule at exactly ${dTime.slice(0, 5)}`
-  }
-  return `[${i}] "${t.name}" | ${t.estimated_minutes ?? 30}min | priority ${t.priority ?? 3}`
-}).join('\n')}
-${text ? `\nUser notes: "${text}"` : ''}
-
-Rules:
-1. FIXED TIME tasks MUST be scheduled at their exact listed time. Do NOT move them.
-2. Sort flexible tasks by priority ascending (1=most urgent). Fill gaps around fixed tasks.
-3. Start times must be >= ${effectiveStartStr}. Never schedule before this.
-4. "start" and "end" are 24-hour HH:MM strings (e.g. "09:22", "14:30").
-5. Every task must appear in exactly one list. Include ALL ${schedulable.length} tasks.`,
-      })
-
-      const aiData = aiResult.object as { today?: { index: number; start: string; end: string }[]; overflow?: { index: number }[] }
-      const used = new Set<number>()
-
-      if (Array.isArray(aiData?.today)) {
-        for (const item of aiData.today) {
-          const idx = Number(item.index)
-          if (Number.isInteger(idx) && idx >= 0 && idx < schedulable.length && !used.has(idx) && item.start && item.end) {
-            used.add(idx)
-            scheduled.push({
-              id:         schedulable[idx].id ?? '',
-              name:       schedulable[idx].name,
-              start_date: `${scheduleDate}T${item.start}`,
-              deadline:   `${scheduleDate}T${item.end}`,
-            })
-          }
-        }
-      }
-      if (Array.isArray(aiData?.overflow)) {
-        for (const item of aiData.overflow) {
-          const idx = Number(item.index)
-          if (Number.isInteger(idx) && idx >= 0 && idx < schedulable.length && !used.has(idx)) {
-            used.add(idx)
-            overflow.push({ id: schedulable[idx].id ?? '', name: schedulable[idx].name, deadline: `${overflowDate}T09:00` })
-          }
-        }
-      }
-      // Safety: any schedulable task AI missed goes to overflow
-      schedulable.forEach((t, i) => {
-        if (!used.has(i)) overflow.push({ id: t.id ?? '', name: t.name, deadline: `${overflowDate}T09:00` })
-      })
-
-      // Validate: all scheduled times must be on or after effectiveStartMin
-      const timesValid = scheduled.every(s => {
-        const st = parseHHMM(s.start_date.split('T')[1] ?? '00:00')
-        return st >= effectiveStartMin - 5
-      })
-      aiSucceeded = used.size > 0 && timesValid
-      if (!timesValid) { scheduled = []; overflow = [] }
-    } catch { /* fall through */ }
-
-    // Greedy fallback — pinned tasks at their exact time, flexible tasks fill the gaps
-    if (!aiSucceeded) {
-      // Pinned = has a specific time on scheduleDate (not 09:00 artifact), OR has a user instruction override
-      const getPinnedTime = (t: typeof schedulable[0]): number | null => {
-        const override = taskTimeOverrides.get(t.id ?? '')
-        if (override) return parseHHMM(override)
-        if (!t.deadline?.includes('T')) return null
-        const [dDate, dTime] = t.deadline.split('T')
-        if (dDate !== scheduleDate) return null
-        if (!dTime || dTime.startsWith('09:00')) return null
-        // Don't treat deadline as fixed if it's a schedule artifact from a prior run
-        if (t.start_date?.startsWith(scheduleDate)) return null
-        return parseHHMM(dTime)
-      }
-      const isPinned = (t: typeof schedulable[0]) => getPinnedTime(t) !== null
-      const pinnedTasks = schedulable
-        .filter(isPinned)
-        .sort((a, b) => getPinnedTime(a)! - getPinnedTime(b)!)
-      const flexTasks = schedulable
-        .filter(t => !isPinned(t))
-        .sort((a, b) => {
-          const pa = a.priority ?? 3, pb = b.priority ?? 3
-          if (pa !== pb) return pa - pb
-          return (a.estimated_minutes ?? 30) - (b.estimated_minutes ?? 30)
-        })
-
-      let cursor = effectiveStartMin
-      let fi = 0
-
-      // Interleave: fill gaps before each pinned task, then insert pinned task
-      for (const pinned of pinnedTasks) {
-        const pinnedMin = getPinnedTime(pinned)!
-        const pinnedDur = pinned.estimated_minutes ?? 5
-        // Fill flexible tasks before this pinned slot
-        while (fi < flexTasks.length) {
-          const dur = flexTasks[fi].estimated_minutes ?? 30
-          if (cursor + dur <= pinnedMin) {
-            scheduled.push({ id: flexTasks[fi].id ?? '', name: flexTasks[fi].name, start_date: `${scheduleDate}T${fmt(cursor)}`, deadline: `${scheduleDate}T${fmt(cursor + dur)}` })
-            cursor += dur
-            fi++
-          } else break
-        }
-        // Jump to pinned time if we're still before it
-        if (cursor < pinnedMin) cursor = pinnedMin
-        scheduled.push({ id: pinned.id ?? '', name: pinned.name, start_date: `${scheduleDate}T${fmt(cursor)}`, deadline: `${scheduleDate}T${fmt(cursor + pinnedDur)}` })
-        cursor += pinnedDur
-      }
-
-      // Fill remaining flexible tasks after all pinned tasks
-      while (fi < flexTasks.length) {
-        const task = flexTasks[fi]
-        const dur = task.estimated_minutes ?? 30
-        if (cursor + dur <= endOfDayMin) {
-          scheduled.push({ id: task.id ?? '', name: task.name, start_date: `${scheduleDate}T${fmt(cursor)}`, deadline: `${scheduleDate}T${fmt(cursor + dur)}` })
-          cursor += dur
-        } else {
-          overflow.push({ id: task.id ?? '', name: task.name, deadline: `${overflowDate}T09:00`, start_date: null })
-        }
-        fi++
-      }
-    }
-
-    // Deduplicate by task ID
-    const seenIds = new Set<string>()
-    const dedup = <T extends { id: string }>(arr: T[]) => arr.filter(item => {
-      if (!item.id) return true
-      if (seenIds.has(item.id)) return false
-      seenIds.add(item.id)
-      return true
-    })
-    scheduled = dedup(scheduled)
-    overflow  = dedup(overflow)
-
-    const message = scheduled.length
-      ? `${scheduled.length} task${scheduled.length !== 1 ? 's' : ''} fit today. ${overflow.length > 0 ? `${overflow.length} moved to ${overflowDate}.` : ''}`
-      : `Nothing fits today. All ${overflow.length} tasks moved to ${overflowDate}.`
-
-    return Response.json({ scheduled, overflow, message })
+    return Response.json(buildSchedule(tasks ?? [], {
+      today: body.todayStr ?? localDateStr(),
+      currentTime: body.currentTime ?? '09:00',
+      overflowDate: body.overflowDate,
+      text: body.text,
+    }))
   }
 
   if (mode === 'triage') {
@@ -780,54 +377,28 @@ Today: ${now.toISOString().split('T')[0]}`,
   }
 
   if (mode === 'balance-check') {
-    const activeTasks = (tasks ?? []).filter(t => !t.done)
-
-    // Suppress entirely when overwhelmed or nothing to analyse
-    if (body.state === 'overwhelmed' || activeTasks.length === 0) {
-      return Response.json({ verdict: 'ok', headline: '', reason: '', remove: [], add: [] })
+    const unavailable = { source: 'rules', verdict: 'ok', headline: '', reason: '', remove: [], add: [] }
+    const spare = (body.toughDayThreshold ?? 0) - (body.dayLoadMinutes ?? 0)
+    const missing = body.missingAreas ?? []
+    if (body.state === 'overwhelmed' || (body.dayTaskCount ?? tasks?.length ?? 0) === 0 || spare < 10 || missing.length < 2) {
+      return Response.json(unavailable)
     }
 
-    // Deduplicate recurring tasks by name+category so "three sports" counts once
-    const seen = new Set<string>()
-    const deduped = activeTasks.filter(t => {
-      const key = `${(t.name ?? '').trim().toLowerCase()}||${(t.category ?? '').toLowerCase()}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-
-    const taskSummary = deduped.map(t =>
-      `- id:"${t.id ?? ''}" name:"${t.name}" [cat:${t.category ?? 'Personal'}, type:${t.demand_type ?? 'routine'}, ~${t.estimated_minutes ?? 30}min]`
-    ).join('\n')
-
-    const loadMin = Number(body.dayLoadMinutes ?? 0)
-    const threshold = Number(body.toughDayThreshold ?? 0)
-    const toughDays = Number(body.recentToughDays ?? 0)
-    const loadH = Math.round(loadMin / 60 * 10) / 10
-    const thresholdSet = body.toughDayThreshold != null
-    const isToughDay = thresholdSet && loadMin >= threshold
-    const missingAreas: string[] = Array.isArray(body.missingAreas) ? body.missingAreas : []
-
-    return Response.json((await generateWithGemini({
+    const result = await generateWithGemini({
       mode: 'balance-check',
-      jsonSchemaText: `{ "verdict": "too_much" | "ok" | "too_little", "headline": "string", "reason": "string", "remove": [{ "id": "string", "name": "string", "reason": "string" }], "add": [{ "name": "string", "category": "string", "reason": "string" }] }`,
+      jsonSchemaText: `{ "verdict": "too_little", "headline": "string", "reason": "string", "remove": [], "add": [{ "name": "string", "category": "string", "reason": "string", "estimatedMinutes": number }] }`,
       system: ETHICAL_SYSTEM_PROMPT,
-      prompt: `Analyse the user's workload BALANCE. Weigh THREE things together:
-1. CONTENT — how many activities and what kind (over-concentration, e.g. three or more similar high-effort commitments such as multiple sports).
-2. LOAD BY TIME — total estimated time across tasks is the difficulty proxy: more tasks AND longer/harder tasks both raise the load. Today's load is ${loadMin} min (~${loadH}h)${thresholdSet ? `; a "heavy day" for this user is ${threshold}+ min` : ''}.
-3. RECENT HEAVY DAYS — there have been ${toughDays} heavy day(s) in a row${toughDays >= 2 ? ' — mention this streak' : ''}.
-
-Decide ONE verdict:
-- "too_much": the user is over-concentrated in one kind of activity, OR today's load is heavy by time${isToughDay ? ' (today IS a heavy day)' : ''}, OR there is a heavy-day streak. Populate "remove" with up to 3 candidates they might drop — prefer the heaviest (most minutes) and lowest-priority. NEVER include health or medication tasks (pills, vitamins, therapy, doctor, medical, lamictal, lithium).
-- "too_little": the time load is NOT heavy AND the list is missing whole life areas. Missing areas detected for this user: ${missingAreas.length > 0 ? missingAreas.join(', ') : 'none'}. If 2 or more areas are missing and the load is below the heavy-day threshold, choose "too_little". In the headline or reason NAME the missing areas plainly (e.g. "No physical activity or social time on your list"). Populate "add" with 2-3 realistic activities that fill the MISSING areas specifically (missing physical activity → a walk, a sport session; missing social time → call a friend or family member; missing work or study → one focused work block; missing leisure → reading, music, a hobby). Map each to one of these categories: ${categories.join(', ')}.
-- "ok": the mix and load are reasonable. Leave "remove" and "add" empty.
-
-headline: <=8 words. reason: one observational sentence. Each item "reason": <=8 words.
-Tone: "you might consider", "one option is". Never "you should". No emotional language.
-
-Active tasks:
-${taskSummary}`,
-    })).object)
+      prompt: `Offer up to three optional task ideas today. The task list cannot tell you what the user did outside the app. Do not suggest that any area is required.
+Areas not represented on today's list: ${missing.join(', ')}
+App categories: ${categories.join(', ')}
+Each idea must fit in ${Math.min(spare, 180)} minutes. Choose a duration of 5–180 minutes. Keep the headline, reason and suggestions short. Do not recommend deleting, hiding or deferring any task.`,
+    })
+    const parsed = chatOutputSchemas['balance-check'].safeParse(result.object)
+    if (!parsed.success || parsed.data.verdict !== 'too_little') return Response.json(unavailable)
+    const valid = parsed.data.add.filter(item => categories.includes(item.category)
+      && typeof item.estimatedMinutes === 'number' && item.estimatedMinutes <= spare)
+    if (!valid.length) return Response.json(unavailable)
+    return Response.json({ ...parsed.data, source: 'gemini', remove: [], add: valid })
   }
 
   return Response.json({ error: 'Unknown mode' }, { status: 400 })

@@ -4,7 +4,7 @@
  * Runtime queries use the Supabase JS client, not a Drizzle connection.
  */
 import {
-  pgTable, uuid, text, integer, boolean, timestamp, real,
+  pgTable, uuid, text, integer, boolean, timestamp, real, jsonb,
 } from 'drizzle-orm/pg-core'
 
 // ─────────────────────────────────────────────
@@ -34,6 +34,7 @@ export const tasks = pgTable('tasks', {
   startDate:        timestamp('start_date', { withTimezone: true }),
   estimatedMinutes: integer('estimated_minutes'),
   notes:            text('notes').notNull().default(''),
+  steps:            jsonb('steps').$type<{ name: string; done: boolean }[]>().notNull().default([]),
   status:           text('status').notNull().default('active'),  // active | completed | archived
   recurring:        text('recurring').notNull().default('none'), // none | daily | weekly | monthly | yearly
   recurringHours:   integer('recurring_hours'),
@@ -143,6 +144,7 @@ create table tasks (
   start_date        timestamptz,
   estimated_minutes integer,
   notes             text not null default '',
+  steps             jsonb not null default '[]'::jsonb,
   status            text not null default 'active' check (status in ('active','completed','archived')),
   recurring         text not null default 'none' check (recurring in ('none','daily','weekly','monthly','yearly')),
   recurring_hours   integer,

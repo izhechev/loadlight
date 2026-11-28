@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { Lock, ChevronRight, Brain, RefreshCw, BarChart3, Info, Download, Upload, CheckCircle, KeyRound } from "@/lib/icons"
+import { Lock, ChevronRight, RefreshCw, BarChart3, Info, Download, Upload, CheckCircle, KeyRound } from "@/lib/icons"
 import { ClassicIcon, type IconName } from "@/lib/classic-icons"
 import { AppLayout } from "@/components/app-layout"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
-import { getTasks, deleteTask, type Task } from "@/lib/data/tasks"
+import { getTasks, updateTask, type Task } from "@/lib/data/tasks"
 import { findDuplicateGroups, type DuplicateGroup } from "@/lib/utils/duplicates"
 
 type BalanceMode = 'beast' | 'average' | 'chill'
@@ -37,16 +37,22 @@ export default function SettingsPage() {
   const [dupGroups, setDupGroups] = useState<DuplicateGroup<Task>[] | null>(null)
   const [dupScanning, setDupScanning] = useState(false)
 
+  const [dupError, setDupError] = useState('')
+
   async function scanDuplicates() {
     setDupScanning(true)
     try { setDupGroups(findDuplicateGroups(await getTasks())) }
-    catch { setDupGroups([]) }
+    catch { setDupGroups(null); setDupError('Could not check your tasks. Try again.') }
     finally { setDupScanning(false) }
   }
 
-  function cleanGroup(group: DuplicateGroup<Task>) {
-    group.duplicates.forEach(d => deleteTask(d.id).catch(() => {}))
-    setDupGroups(prev => (prev ?? []).filter(g => g !== group))
+  async function cleanGroups(groups: DuplicateGroup<Task>[]) {
+    setDupScanning(true)
+    setDupError('')
+    const copies = groups.flatMap(group => group.duplicates)
+    const results = await Promise.allSettled(copies.map(task => updateTask(task.id, { status: 'archived' })))
+    if (results.some(result => result.status === 'rejected')) setDupError('Some copies could not be removed. Try again.')
+    await scanDuplicates()
   }
 
   useEffect(() => {
@@ -366,13 +372,14 @@ export default function SettingsPage() {
             <div>
               <p className="font-black text-sm" style={{ color: '#1a1a1a' }}>Find duplicates</p>
               <p className="text-xs font-bold" style={{ color: '#5a7a9a' }}>
-                Groups identical active tasks (same name, category and time) so you can delete the extras.
+                Check for copies with the same name, category, date and time. You can restore removed copies from Tasks.
               </p>
             </div>
             <button onClick={scanDuplicates} disabled={dupScanning} className="vista-btn-secondary text-xs font-black px-4 py-2 disabled:opacity-50">
               {dupScanning ? 'Scanning…' : 'Scan'}
             </button>
           </div>
+          {dupError && <p role="alert">{dupError}</p>}
           {dupGroups !== null && (
             dupGroups.length === 0 ? (
               <p className="text-xs font-black" style={{ color: '#1a7a50' }}>No duplicates found — your list is clean.</p>
@@ -386,13 +393,13 @@ export default function SettingsPage() {
                         {g.tasks.length} copies — keeps 1, removes {g.duplicates.length}
                       </p>
                     </div>
-                    <button onClick={() => cleanGroup(g)} className="glow-button text-[11px] font-black px-3 py-1.5 shrink-0">
+                    <button disabled={dupScanning} onClick={() => cleanGroups([g])} className="glow-button text-[11px] font-black px-3 py-1.5 shrink-0">
                       Remove {g.duplicates.length}
                     </button>
                   </div>
                 ))}
                 <button
-                  onClick={() => { (dupGroups ?? []).forEach(cleanGroup); setDupGroups([]) }}
+                  disabled={dupScanning} onClick={() => cleanGroups(dupGroups ?? [])}
                   className="vista-btn-secondary text-xs font-black px-4 py-2 w-full"
                 >
                   Clean all ({dupGroups.reduce((n, g) => n + g.duplicates.length, 0)} tasks)

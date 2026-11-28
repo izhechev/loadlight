@@ -1,39 +1,22 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import Link from "next/link"
 import { Loader2, RefreshCw, Plus, ChevronRight, CheckCircle, AlertTriangle, Lock } from "@/lib/icons"
 import { AppLayout } from "@/components/app-layout"
 import { ChillSuggestions } from "@/components/chill-suggestions"
-import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib/store/overwhelmedStore"
+import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
-import { getTasks, updateTask, isLocalMode } from "@/lib/data/tasks"
+import { getTasks, updateTask, type Task } from "@/lib/data/tasks"
+import { activeWorkload, dayKey, dueIn48Hours, getDailyWorkload, getTaskSignals, getWeeklyWorkload, taskMinutes, workloadDeadline } from "@/lib/utils/workload"
+import { canDeferTask } from "@/lib/utils/toughDays"
 import styles from "./dashboard.module.css"
 
 type BalanceMode = 'beast' | 'average' | 'chill'
 
-interface Task {
-  id: string
-  name: string
-  category: string
-  demand_type: DemandType
-  difficulty: number
-  deadline: string | null
-  start_date?: string | null
-  priority?: 1 | 2 | 3 | 4
-  notes?: string
-  estimated_minutes: number | null
-  done: boolean
-  createdAt: number
-  recurring?: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
-  recurring_hours?: number | null
-  snoozedUntil?: number
-}
-
 interface AnalysisResult {
-  verdict: 'overloaded' | 'balanced' | 'light'
+  source: 'gemini' | 'rules'
   trend: string
   advice: string
   suggestion: string
@@ -47,19 +30,8 @@ interface SparkEntry {
   dueSoon: number
 }
 
-const WORK_CATEGORIES = ['work', 'study', 'administrative', 'admin', 'creative', 'Work', 'Study', 'Admin', 'Administrative', 'Creative']
+const WORK_CATEGORIES = /^(work|study|administrative|admin)$/i
 const SPARK_KEY = 'loadlight-sparkline-history'
-
-function isDueWithin48h(d: string | null) {
-  if (!d) return false
-  const ms = new Date(d).getTime() - Date.now()
-  // Include overdue tasks (ms < 0) and tasks due within 48h
-  return ms <= 172800000
-}
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 function loadSparkHistory(): SparkEntry[] {
   try {
@@ -133,45 +105,40 @@ function StatCard({ label, value, color, sparkData, sparkKey, sparkColor, deltaF
   )
 }
 
-function OverwhelmedFeedback({ score, state, activeCount }: {
-  score: number
-  state: 'normal' | 'elevated' | 'overwhelmed'
+function OverwhelmedFeedback({ minutes, capacity, activeCount, rest }: {
+  minutes: number
+  capacity: number
   activeCount: number
+  rest: boolean
 }) {
-  const { label, headline, description } = {
-    normal: {
-      label: 'Light',
-      headline: "You're managing well",
-      description: 'Your workload looks balanced.',
-    },
-    elevated: {
-      label: 'Moderate',
-      headline: 'Your plate is getting full',
-      description: 'Consider completing a task before adding more.',
-    },
-    overwhelmed: {
-      label: 'Heavy',
-      headline: 'Time to take a breather',
-      description: 'Rest mode is active. Focus on what truly matters right now.',
-    },
-  }[state]
-  const scorePercent = Math.round(score * 100)
+  const ratio = minutes / capacity
+  const state = rest || ratio >= 1 ? 'overwhelmed' : ratio >= 0.75 ? 'elevated' : 'normal'
+  const label = rest ? 'Rest mode' : state === 'overwhelmed' ? 'Heavy day' : state === 'elevated' ? 'Nearly full' : 'Within capacity'
+  const headline = rest
+    ? 'Rest mode is active'
+    : minutes > capacity
+      ? `Today is ${minutes - capacity} min over capacity`
+      : minutes === capacity
+        ? 'Today is at capacity'
+        : minutes > 0
+          ? `${capacity - minutes} min of capacity left`
+          : 'Nothing planned for today'
 
   return (
     <section className={styles.loadPanel} data-state={state} aria-labelledby="load-status-title">
       <div className={styles.loadStatus}>
         <div className={styles.loadOrb} aria-hidden="true" />
-        <span>{label} load</span>
+        <span>{label}</span>
       </div>
       <div className={styles.loadDetails}>
         <h2 id="load-status-title">{headline}</h2>
-        <p>{description}</p>
+        <p>Includes tasks planned for today, due today, or already overdue.</p>
         <div className={styles.loadTrack} aria-hidden="true">
-          <div className={styles.loadFill} style={{ width: `${scorePercent}%` }} />
+          <div className={styles.loadFill} style={{ width: `${Math.round(Math.min(ratio, 1) * 100)}%` }} />
         </div>
         <div className={styles.loadMeta}>
-          <span>Load score {scorePercent}/100</span>
-          <span>{activeCount} {activeCount === 1 ? 'task' : 'tasks'} left</span>
+          <span>{minutes} of {capacity} min planned</span>
+          <span>{activeCount} {activeCount === 1 ? 'task' : 'tasks'}</span>
         </div>
       </div>
     </section>
@@ -223,9 +190,11 @@ function BalanceSlider({ value, onChange, locked, lockDaysLeft }: { value: numbe
 }
 
 export default function DashboardPage() {
-  const { state, compositeScore, computeAndTransition } = useOverwhelmedStore()
+  const { state, computeAndTransition } = useOverwhelmedStore()
   const { categories } = useCategoryStore()
   const [tasks, setTasks] = useState<Task[]>([])
+  const [now, setNow] = useState(() => Date.now())
+  const [loaded, setLoaded] = useState(false)
   const [sliderValue, setSliderValue] = useState(50)
   const [balanceMode, setBalanceMode] = useState<BalanceMode>('average')
   const [chillLockUntil, setChillLockUntil] = useState<number | null>(null)
@@ -236,24 +205,15 @@ export default function DashboardPage() {
   const [advisory, setAdvisory] = useState<string | null>(null)
   const [sparkHistory, setSparkHistory] = useState<SparkEntry[]>([])
   const autoFetched = useRef(false)
+  const lastSignals = useRef('')
 
   const loadTasks = useCallback(() => {
     return getTasks()
-      .then(data => setTasks(data.map(t => ({
-        ...t,
-        category: t.category || t.lifeDomain || 'Personal',
-        // Alias camelCase data-layer fields to the snake_case names this page reads
-        demand_type: (t as any).demand_type ?? t.demandType ?? 'routine',
-        estimated_minutes: (t as any).estimated_minutes ?? t.estimatedMinutes ?? null,
-        recurring_hours: (t as any).recurring_hours ?? t.recurringHours ?? null,
-        recurring_days: (t as any).recurring_days ?? t.recurringDays ?? null,
-      })) as unknown as Task[]))
-      .catch(() => {
-        try {
-          const t = localStorage.getItem('loadlight-tasks')
-          if (t) setTasks((JSON.parse(t) as any[]).map(tsk => ({ ...tsk, category: tsk.category || tsk.life_domain || 'Personal' })) as Task[])
-        } catch { /* ignore */ }
+      .then(data => {
+        setTasks(data)
+        setLoaded(true)
       })
+      .catch(() => {})
   }, [])
 
   // Live refresh: pick up tasks added elsewhere (e.g. balance-popup suggestions)
@@ -278,133 +238,85 @@ export default function DashboardPage() {
     } catch { /* ignore */ }
   }, [loadTasks])
 
-  const updateState = useCallback(() => {
-    if (!tasks.length) return
-    const sevenDaysAgo = Date.now() - 604800000
-    const allUndone = tasks.filter(t => !t.done)
-    // Deduplicate recurring tasks so signals aren't inflated by future copies
-    const seenKeys = new Set<string>()
-    const undoneTasks = allUndone.filter(t => {
-      if (!t.recurring || t.recurring === 'none') return true
-      const key = `${t.name.trim().toLowerCase()}||${(t.category || '').toLowerCase()}`
-      if (seenKeys.has(key)) return false
-      seenKeys.add(key)
-      return true
-    })
-    const demandTypeCounts: Record<DemandType, number> = { cognitive: 0, emotional: 0, creative: 0, routine: 0, physical: 0 }
-    undoneTasks.forEach(t => { demandTypeCounts[t.demand_type]++ })
-    const totalUndoneDifficulty = undoneTasks.reduce((acc, t) => acc + (t.difficulty || 2), 0)
-    const totalUndoneMinutes = undoneTasks.reduce((acc, t) => acc + (t.estimated_minutes || 30), 0)
-    computeAndTransition({
-      undoneCount: undoneTasks.length,
-      doneCount: tasks.filter(t => t.done).length,
-      addedLast7Days: tasks.filter(t => t.createdAt > sevenDaysAgo).length,
-      completedLast7Days: tasks.filter(t => t.done && t.createdAt > sevenDaysAgo).length,
-      tasksWithDeadlines: undoneTasks.filter(t => t.deadline).length,
-      tasksDueWithin48h: undoneTasks.filter(t => isDueWithin48h(t.deadline)).length,
-      demandTypeCounts,
-      totalUndoneDifficulty,
-      totalUndoneMinutes,
-    } as TaskSignalData)
-  }, [tasks, computeAndTransition])
-
-  useEffect(() => { updateState() }, [tasks, updateState])
-
-  // Update sparkline history on mount
   useEffect(() => {
-    if (!tasks.length) return
-    const undoneTasks = tasks.filter(t => !t.done)
-    const activeMin = undoneTasks.reduce((acc, t) => acc + (t.estimated_minutes ?? 30), 0)
-    const dueSoonCount = undoneTasks.filter(t => isDueWithin48h(t.deadline)).length
-    const today = todayStr()
-    const history = loadSparkHistory()
-    const existing = history.findIndex(e => e.date === today)
-    const entry: SparkEntry = { date: today, undone: undoneTasks.length, done: tasks.filter(t => t.done).length, minutes: activeMin, dueSoon: dueSoonCount }
-    if (existing >= 0) history[existing] = entry
-    else history.push(entry)
-    const trimmed = history.slice(-8)
-    saveSparkHistory(trimmed)
-    setSparkHistory(trimmed)
-  }, [tasks])
+    const interval = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => window.clearInterval(interval)
+  }, [])
 
-  // Auto-fetch AI advisory once on mount when tasks exist
   useEffect(() => {
-    if (autoFetched.current || !tasks.length) return
-    autoFetched.current = true
-    fetchSummary()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks])
+    if (!loaded) return
+    const signals = getTaskSignals(tasks, now)
+    const key = JSON.stringify(signals)
+    if (lastSignals.current === key) return
+    lastSignals.current = key
+    computeAndTransition(signals)
+  }, [tasks, loaded, now, computeAndTransition])
 
-  // Balance check now lives in the global BalanceCheckProvider (root layout)
-
-  const allUndone = tasks.filter(t => !t.done)
-  // Deduplicate recurring tasks for all display metrics
-  const undoneTasks = (() => {
-    const seen = new Set<string>()
-    return allUndone
-      .slice()
-      .sort((a, b) => {
-        if (a.deadline && b.deadline) return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-        if (a.deadline) return -1; if (b.deadline) return 1; return 0
-      })
-      .filter(t => {
-        if (!t.recurring || t.recurring === 'none') return true
-        const key = `${t.name.trim().toLowerCase()}||${(t.category || '').toLowerCase()}`
-        if (seen.has(key)) return false
-        seen.add(key); return true
-      })
-  })()
-  const activeMin = undoneTasks.reduce((acc, t) => acc + (t.estimated_minutes ?? 30), 0)
-  const workMin = undoneTasks.filter(t => WORK_CATEGORIES.some(w => t.category?.toLowerCase().includes(w.toLowerCase()))).reduce((acc, t) => acc + (t.estimated_minutes ?? 30), 0)
+  const pending = activeWorkload(tasks, now)
+  const day = getDailyWorkload(tasks, balanceMode, now)
+  const week = useMemo(() => getWeeklyWorkload(tasks, now), [tasks, now])
+  const completed = tasks.filter(task => task.done || task.status === 'completed').length
+  const plannedWork = day.tasks.filter(task => WORK_CATEGORIES.test(task.category))
+    .reduce((sum, task) => sum + taskMinutes(task), 0)
   const targetWork = balanceMode === 'beast' ? 70 : balanceMode === 'average' ? 50 : 30
-  const workPct = activeMin > 0 ? Math.round(workMin / activeMin * 100) : 0
-  const donePct = tasks.length > 0 ? Math.round(tasks.filter(t => t.done).length / tasks.length * 100) : 0
-  const pendingTasks = undoneTasks.slice(0, 5)
-  const dueSoon = undoneTasks.filter(t => isDueWithin48h(t.deadline))
+  const workPct = day.minutes > 0 ? Math.round(plannedWork / day.minutes * 100) : 0
+  const donePct = tasks.length > 0 ? Math.round(completed / tasks.length * 100) : 0
+  const upcoming = pending.map(task => ({ ...task, deadline: workloadDeadline(task, now) }))
+  const pendingTasks = upcoming.slice().sort((a, b) => {
+    if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline)
+    if (a.deadline) return -1
+    if (b.deadline) return 1
+    return (a.priority ?? 3) - (b.priority ?? 3)
+  }).slice(0, 5)
+  const dueSoon = upcoming.filter(task => dueIn48Hours(task.deadline, now)).length
 
-  async function fetchSummary() {
+  useEffect(() => {
+    if (!loaded) return
+    const today = day.today
+    const history = loadSparkHistory()
+    const entry: SparkEntry = { date: today, undone: pending.length, done: completed, minutes: day.minutes, dueSoon }
+    const updated = [...history.filter(day => day.date !== today), entry].slice(-8)
+    saveSparkHistory(updated)
+    setSparkHistory(updated)
+  }, [day.today, day.minutes, pending.length, completed, dueSoon, loaded])
+
+  const fetchSummary = useCallback(async () => {
     setIsAnalysing(true)
-    // Fetch both: weekly summary (existing) + real-time advisory (spec)
+    setAdvisory(null)
+    setWeeklyAnalysis(null)
+    const { state: currentState, signals } = useOverwhelmedStore.getState()
     try {
-      const [summaryRes, adviseRes] = await Promise.allSettled([
+      const [summary, advice] = await Promise.allSettled([
         fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            mode: 'weekly',
-            tasks: undoneTasks,
-            balanceMode,
-            totalDone: tasks.filter(t => t.done).length,
-          }),
-        }),
+          body: JSON.stringify({ mode: 'weekly', week, balanceMode }),
+        }).then(res => res.ok ? res.json() as Promise<AnalysisResult> : null),
         fetch('/api/ai/advise', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            state,
-            signals: { taskAccumulation: 0, temporalPressure: 0 },
-            taskCount: undoneTasks.length,
-            urgentCount: dueSoon.length,
+            state: currentState,
+            signals: { taskAccumulation: signals.taskAccumulation, temporalPressure: signals.temporalPressure },
+            taskCount: pending.length,
+            urgentCount: dueSoon,
+            todayMinutes: day.minutes,
+            capacityMinutes: day.capacity,
           }),
-        }),
+        }).then(res => res.ok ? res.json() as Promise<{ advice: string | null }> : null),
       ])
-
-      if (summaryRes.status === 'fulfilled' && summaryRes.value.ok) {
-        setWeeklyAnalysis(await summaryRes.value.json() as AnalysisResult)
-      } else {
-        setWeeklyAnalysis({ verdict: 'light', trend: 'Unable to generate advice.', advice: '', suggestion: '' })
-      }
-
-      if (adviseRes.status === 'fulfilled' && adviseRes.value.ok) {
-        const d = await adviseRes.value.json() as { advice: string | null }
-        if (d.advice) setAdvisory(d.advice)
-      }
-    } catch {
-      setWeeklyAnalysis({ verdict: 'light', trend: 'Unable to generate advice.', advice: '', suggestion: '' })
+      if (summary.status === 'fulfilled') setWeeklyAnalysis(summary.value)
+      if (advice.status === 'fulfilled') setAdvisory(advice.value?.advice ?? null)
     } finally {
       setIsAnalysing(false)
     }
-  }
+  }, [week, balanceMode, pending.length, dueSoon, day.minutes, day.capacity])
+
+  useEffect(() => {
+    if (autoFetched.current || !loaded || !tasks.length) return
+    autoFetched.current = true
+    void fetchSummary()
+  }, [loaded, tasks.length, fetchSummary])
 
   const chillLocked = !!chillLockUntil && Date.now() < chillLockUntil
 
@@ -434,6 +346,7 @@ export default function DashboardPage() {
       const u = localStorage.getItem('loadlight-user')
       const p = u ? JSON.parse(u) as Record<string, unknown> : {}
       localStorage.setItem('loadlight-user', JSON.stringify({ ...p, balanceMode: mode, sliderValue: v }))
+      window.dispatchEvent(new Event('loadlight:balance-mode-changed'))
     } catch { /* ignore */ }
   }
 
@@ -445,16 +358,14 @@ export default function DashboardPage() {
     setPendingChillValue(null)
   }
 
-  function handleSnooze(ids: string[], days = 1) {
-    const snoozedUntil = Date.now() + days * 24 * 60 * 60 * 1000
-    setTasks(prev => {
-      const updated = prev.map(t => ids.includes(t.id) ? { ...t, snoozedUntil } : t)
-      if (isLocalMode()) { try { localStorage.setItem('loadlight-tasks', JSON.stringify(updated)) } catch { /* ignore */ } }
-      return updated
-    })
-    ids.forEach(id => updateTask(id, { snoozedUntil }).catch(() => {}))
+  async function handleSnooze(ids: string[]) {
+    const snoozedUntil = Date.now() + 24 * 60 * 60_000
+    const until = dayKey(new Date(snoozedUntil))
+    const eligible = (await getTasks()).filter(task => ids.includes(task.id) && canDeferTask(task, until))
+    const settled = await Promise.allSettled(eligible.map(task => updateTask(task.id, { snoozedUntil })))
+    await loadTasks()
+    return eligible.filter((_, index) => settled[index].status === 'fulfilled').map(task => task.id)
   }
-
 
   return (
     <AppLayout>
@@ -495,7 +406,7 @@ export default function DashboardPage() {
       <div className="space-y-4 max-w-4xl mx-auto">
 
         <h1 className={styles.pageTitle}>Workload overview</h1>
-        <OverwhelmedFeedback score={compositeScore} state={state} activeCount={undoneTasks.length} />
+        <OverwhelmedFeedback minutes={day.minutes} capacity={day.capacity} activeCount={day.tasks.length} rest={state === 'overwhelmed'} />
 
         {/* ── Chill Mode suggestions (only in chill balance mode) ── */}
         {balanceMode === 'chill' && tasks.length > 0 && (
@@ -508,9 +419,9 @@ export default function DashboardPage() {
         {/* ── Stats row with sparklines ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 anim-fade-in-up" style={{ animationDelay: '0.05s' }}>
           <StatCard label="Total tasks"      value={tasks.length}                                      color="text-sky-800"                                    sparkData={sparkHistory} sparkKey="undone"   sparkColor="#0ea5e9" />
-          <StatCard label="Completed"        value={tasks.filter(t => t.done).length}                  color="text-emerald-800"                                sparkData={sparkHistory} sparkKey="done"    sparkColor="#10b981" />
-          <StatCard label="Hours estimated"  value={`${Math.round(activeMin / 60 * 10) / 10}h`}        color="text-purple-800"                                 sparkData={sparkHistory} sparkKey="minutes" sparkColor="#a855f7" deltaFormat={m => `${Math.round(m / 60 * 10) / 10}h`} />
-          <StatCard label="Due soon"         value={dueSoon.length}                                     color={dueSoon.length > 0 ? 'text-red-800' : 'text-slate-700'} sparkData={sparkHistory} sparkKey="dueSoon" sparkColor="#ef4444" />
+          <StatCard label="Completed"        value={completed}                  color="text-emerald-800"                                sparkData={sparkHistory} sparkKey="done"    sparkColor="#10b981" />
+          <StatCard label="Hours planned today"  value={`${Math.round(day.minutes / 60 * 10) / 10}h`}        color="text-purple-800"                                 sparkData={sparkHistory} sparkKey="minutes" sparkColor="#a855f7" deltaFormat={m => `${Math.round(m / 60 * 10) / 10}h`} />
+          <StatCard label="Due soon"         value={dueSoon}                                     color={dueSoon > 0 ? 'text-red-800' : 'text-slate-700'} sparkData={sparkHistory} sparkKey="dueSoon" sparkColor="#ef4444" />
         </div>
 
         <div className="grid md:grid-cols-2 gap-4">
@@ -522,7 +433,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Work gauge — only meaningful with enough active tasks */}
-            {undoneTasks.length >= 4 ? (
+            {day.tasks.length >= 4 ? (
               <div className="mb-3">
                 <div className="flex justify-between text-xs font-black mb-1.5">
                   <span style={{ color: '#3a5a7a', fontWeight: 700 }}>Work <strong style={{ color: '#1a5a98' }}>{workPct}%</strong></span>
@@ -538,9 +449,9 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="mb-3 aero-info rounded-xl p-3 text-xs" style={{ fontWeight: 600 }}>
-                {undoneTasks.length === 0
-                  ? 'No active tasks — add some to track your work/leisure balance.'
-                  : `Only ${undoneTasks.length} active task${undoneTasks.length > 1 ? 's' : ''} — balance gauge needs 4+ tasks to be meaningful.`}
+                {day.tasks.length === 0
+                  ? 'No tasks planned for today.'
+                  : `Only ${day.tasks.length} task${day.tasks.length > 1 ? 's' : ''} for today — balance gauge needs 4+ tasks to be meaningful.`}
               </div>
             )}
 
@@ -557,7 +468,7 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {undoneTasks.length >= 4 && workPct > targetWork + 15 && (
+            {day.tasks.length >= 4 && workPct > targetWork + 15 && (
               <div className="mb-4 aero-danger rounded-2xl p-3 flex items-start gap-2">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <p className="text-xs">Work is taking over. Maybe move some tasks to next week?</p>
@@ -595,7 +506,7 @@ export default function DashboardPage() {
                     <div key={t.id} className="flex items-center gap-3 rounded-2xl p-3 skeu-card shadow-sm">
                       <ClassicIcon name={categoryIconName(cat ?? { name: t.category })} size={18} alt={t.category} />
                       <span className="flex-1 text-sm font-semibold truncate" style={{ color: '#1a1a1a' }}>{t.name}</span>
-                      {isDueWithin48h(t.deadline) && (
+                      {dueIn48Hours(t.deadline, now) && (
                         <span className="text-xs text-red-500 font-bold shrink-0">Due soon!</span>
                       )}
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${cls.bg} ${cls.text} badge-skeu shrink-0 shadow-sm border border-white/10`}>
@@ -604,8 +515,8 @@ export default function DashboardPage() {
                     </div>
                   )
                 })}
-                {undoneTasks.length > 5 && (
-                  <p className="text-xs text-slate-400 text-center pt-1 font-bold">+{undoneTasks.length - 5} more tasks</p>
+                {pending.length > 5 && (
+                  <p className="text-xs text-slate-400 text-center pt-1 font-bold">+{pending.length - 5} more tasks</p>
                 )}
               </div>
             ) : (
@@ -626,8 +537,6 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               <ClassicIcon name="chart" size={20} />
               <h2 className="font-black" style={{ color: '#1a2a3a' }}>Workload Analysis</h2>
-              {/* Spec: always-visible "AI workload analysis" indicator */}
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full aero-info badge-skeu">AI workload analysis</span>
             </div>
             <button
               onClick={fetchSummary}
@@ -653,33 +562,24 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {weeklyAnalysis && (
-                <>
-                  <div className={`rounded-2xl px-4 py-3 font-bold text-sm flex items-center gap-2 ${
-                    weeklyAnalysis.verdict === 'overloaded' ? 'aero-danger'  :
-                    weeklyAnalysis.verdict === 'balanced'   ? 'aero-success' :
-                                                              'aero-info'
-                  }`}>
-                    {weeklyAnalysis.verdict === 'overloaded' ? <><ClassicIcon name="warning" size={16} /> Overloaded</> : weeklyAnalysis.verdict === 'balanced' ? <><ClassicIcon name="check" size={16} /> Balanced</> : 'Light week'}
-                  </div>
-                  {weeklyAnalysis.trend && <p className="text-sm leading-relaxed font-medium" style={{ color: '#2a3a50' }}>{weeklyAnalysis.trend}</p>}
-                  {weeklyAnalysis.suggestion && (
-                    <div className="skeu-inset rounded-2xl p-4">
-                      <p className="text-xs font-black uppercase tracking-wide mb-1.5" style={{ color: '#6a8aaa' }}>Observation</p>
-                      <p className="text-sm leading-relaxed font-medium" style={{ color: '#2a3a50' }}>{weeklyAnalysis.suggestion}</p>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {!advisory && !weeklyAnalysis && (
-                <div className="skeu-inset rounded-2xl p-6 text-center">
-                  <ClassicIcon name="chart" size={32} className="mx-auto mb-2 opacity-60" />
-                  <p className="text-sm font-bold" style={{ color: '#5a7a9a' }}>Add tasks to get workload insights</p>
+              <div className="skeu-inset rounded-2xl p-4">
+                <h3 className="font-bold">This week</h3>
+                <p>{week.completed} completed, {week.pending} pending, {week.minutes} min left</p>
+              </div>
+              {weeklyAnalysis?.source === 'gemini' ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold">Gemini summary</p>
+                  <p>{weeklyAnalysis.trend}</p>
+                  {weeklyAnalysis.advice && <p>{weeklyAnalysis.advice}</p>}
+                  {weeklyAnalysis.suggestion && <p>{weeklyAnalysis.suggestion}</p>}
                 </div>
+              ) : (
+                <p className="text-sm">
+                  {tasks.length > 0
+                    ? 'Showing task totals. No Gemini summary is available.'
+                    : 'Add tasks to see your workload.'}
+                </p>
               )}
-
-              <p className="text-[10px] font-bold" style={{ color: '#7a9ab8' }}>AI workload analysis · task data only · not medical advice</p>
             </div>
           )}
         </div>

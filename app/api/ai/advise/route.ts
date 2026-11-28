@@ -20,7 +20,7 @@ Provide a 1-2 sentence observation about the user's current workload based on th
 export async function POST(request: NextRequest) {
   const body = await readAiRequest(request, adviseRequestSchema)
   if (body instanceof Response) return body
-  const { state, signals, taskCount, urgentCount } = body
+  const { state, signals, taskCount, urgentCount, todayMinutes, capacityMinutes } = body
 
   // Never advise when user is overwhelmed
   if (state === 'overwhelmed') {
@@ -32,11 +32,13 @@ export async function POST(request: NextRequest) {
 
   const userPrompt = `Current state: ${state}
 Tasks left: ${taskCount}
-Urgent (due within 48h): ${urgentCount}
-Task accumulation signal: ${Math.round((signals?.taskAccumulation ?? 0) * 100)}%
-Temporal pressure signal: ${Math.round((signals?.temporalPressure ?? 0) * 100)}%
+Today's planned minutes: ${todayMinutes ?? 'unknown'}
+Today's capacity in minutes: ${capacityMinutes ?? 'unknown'}
+Urgent or overdue (due within 48 hours or earlier): ${urgentCount}
+Task accumulation signal: ${signals?.taskAccumulation == null ? 'unavailable' : `${Math.round(signals.taskAccumulation * 100)}%`}
+Temporal pressure signal: ${signals?.temporalPressure == null ? 'unavailable' : `${Math.round(signals.temporalPressure * 100)}%`}
 
-Provide a 1-2 sentence workload observation.`
+Use these numbers for a short workload observation. The user’s planning capacity is a setting, not an estimate of their health.`
 
   const start = Date.now()
   const requestBody = JSON.stringify({

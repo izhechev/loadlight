@@ -8,18 +8,19 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
-import { useCategoryStore } from "@/lib/store/categoryStore"
-import { getTasks, updateTask, deleteTask, addTask, type Task } from "@/lib/data/tasks"
+import { getTasks, updateTask, addTask } from "@/lib/data/tasks"
 import { BalancePopup } from "@/components/balance-popup"
-import { shouldRequestBalanceCheck, addSuggestionToTask, type BalanceResult, type AddItem } from "@/lib/utils/balance"
-import { dayLoadMinutes, toughDayThreshold, isToughDay, countRecentToughDays, buildToughDayResult, type LoadTask } from "@/lib/utils/toughDays"
+import { shouldRequestBalanceCheck, addSuggestionToTask, type BalanceResult } from "@/lib/utils/balance"
+import { canDeferTask, countRecentToughDays, buildToughDayResult } from "@/lib/utils/toughDays"
 import { taskSignature, shouldSkipCheck, shouldShowResult, missingLifeAreas, buildTooLittleResult, type DismissedRecord } from "@/lib/utils/balanceTrigger"
+import { dayKey, getDailyWorkload, taskMinutes, workloadDeadline } from "@/lib/utils/workload"
 
 export const TASKS_CHANGED_EVENT = 'loadlight:tasks-changed'
 
 const APP_PAGES = ['/dashboard', '/tasks', '/categories', '/settings']
 const DISMISSED_KEY = 'loadlight-balance-dismissed'
-const SPARK_KEY = 'loadlight-sparkline-history'
+const SPARK_KEY = 'loadlight-daily-history'
+const REMINDER_KEY = 'loadlight-reminders-fired'
 const DEBOUNCE_MS = 20_000
 
 function readDismissed(): DismissedRecord | null {
@@ -37,26 +38,32 @@ function readBalanceMode(): string {
   return 'average'
 }
 
-/** Spark history entries carry {date, minutes}; today's entry may be stale. */
-function loadHistoryWithToday(todayLoadMin: number): { date: string; minutes: number }[] {
-  const today = new Date().toISOString().slice(0, 10)
-  let hist: { date: string; minutes: number }[] = []
+function logDayLoad(date: string, minutes: number) {
+  let history: { date: string; minutes: number }[] = []
   try {
     const raw = localStorage.getItem(SPARK_KEY)
-    if (raw) hist = (JSON.parse(raw) as { date: string; minutes: number }[]).map(e => ({ date: e.date, minutes: e.minutes }))
-  } catch { /* ignore */ }
-  return hist.some(h => h.date === today)
-    ? hist.map(h => h.date === today ? { date: today, minutes: todayLoadMin } : h)
-    : [...hist, { date: today, minutes: todayLoadMin }]
+    if (raw) history = JSON.parse(raw)
+    const highest = Math.max(history.find(day => day.date === date)?.minutes ?? 0, minutes)
+    history = [...history.filter(day => day.date !== date), { date, minutes: highest }].slice(-8)
+    localStorage.setItem(SPARK_KEY, JSON.stringify(history))
+  } catch { /* no storage */ }
+  return history
+}
+
+function weekFrom(now: Date) {
+  const date = new Date(now)
+  date.setDate(date.getDate() + 7)
+  return date
 }
 
 export function BalanceCheckProvider() {
   const pathname = usePathname()
   const { state } = useOverwhelmedStore()
-  const { categories } = useCategoryStore()
   const [result, setResult] = useState<BalanceResult | null>(null)
+  const [showIdeas, setShowIdeas] = useState(false)
   const lastSig = useRef<string | null>(null)
   const running = useRef(false)
+  const nextExpiry = useRef(Infinity)
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const onAppPage = APP_PAGES.some(p => pathname === p || pathname?.startsWith(p + '/'))
@@ -65,70 +72,58 @@ export function BalanceCheckProvider() {
     if (running.current) return
     running.current = true
     try {
-      const all = await getTasks()
-      // Data layer returns camelCase; the API and load helpers read snake_case
-      const active = all
-        .filter(t => !t.done && t.status !== 'archived')
-        .map(t => ({
-          id: t.id,
-          name: t.name,
-          category: t.category,
-          demand_type: t.demandType,
-          estimated_minutes: (t as Task & { estimated_minutes?: number | null }).estimated_minutes ?? t.estimatedMinutes ?? null,
-          priority: t.priority,
-          done: false,
-        }))
-
-      if (!shouldRequestBalanceCheck(state, active.length)) return
-
+      const now = Date.now()
       const balanceMode = readBalanceMode()
-      const loadMin = dayLoadMinutes(active as LoadTask[])
-      const sig = taskSignature(active, loadMin)
+      const tasks = await getTasks()
+      nextExpiry.current = tasks.reduce((next, task) =>
+        task.snoozedUntil && task.snoozedUntil > now ? Math.min(next, task.snoozedUntil) : next, Infinity)
+      const day = getDailyWorkload(tasks, balanceMode, now)
+      const recent = countRecentToughDays(logDayLoad(day.today, day.minutes), balanceMode)
+      const active = day.tasks.map(task => ({
+        id: task.id,
+        name: task.name,
+        category: task.category,
+        deadline: task.deadline,
+        recurring: task.recurring,
+        estimated_minutes: taskMinutes(task),
+        priority: task.priority,
+      }))
+
+      if (!shouldRequestBalanceCheck(state, active.length)) {
+        setResult(null)
+        lastSig.current = null
+        return
+      }
+
+      const sig = `${day.today}|${balanceMode}|${taskSignature(active, day.minutes)}`
       if (shouldSkipCheck(sig, lastSig.current)) return
       lastSig.current = sig
+      setShowIdeas(false)
 
-      const threshold = toughDayThreshold(balanceMode)
-      const tough = isToughDay(loadMin, balanceMode)
-      const recentToughDays = countRecentToughDays(loadHistoryWithToday(loadMin), balanceMode)
-      const missing = missingLifeAreas(active)
       const dismissed = readDismissed()
-
-      const present = (r: BalanceResult | null) => {
-        if (r && shouldShowResult(r.verdict, sig, dismissed)) setResult(r)
-      }
-      // Local verdicts when the AI is unavailable or says "ok": heavy day →
-      // too_much; light day missing 2+ life areas → too_little suggestions
-      const localFallback = () => {
-        if (tough) present(buildToughDayResult(active as LoadTask[], balanceMode, recentToughDays))
-        else present(buildTooLittleResult(missing))
+      const spareMinutes = day.capacity - day.minutes
+      const present = (advice: BalanceResult | null) => {
+        const add = advice?.add.filter(item => (item.estimatedMinutes ?? 30) <= spareMinutes) ?? []
+        const result = advice?.verdict === 'too_little' && !add.length ? null : advice
+        setResult(result && shouldShowResult(result.verdict, sig, dismissed) ? { ...result, add } : null)
       }
 
-      try {
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            mode: 'balance-check',
-            tasks: active,
-            state,
-            balanceMode,
-            categories: categories.map(c => c.name),
-            dayLoadMinutes: loadMin,
-            toughDayThreshold: threshold,
-            recentToughDays,
-            missingAreas: missing,
-          }),
+      if (day.heavy) {
+        present({
+          ...buildToughDayResult(active, balanceMode, recent, dayKey(weekFrom(new Date(now)))),
+          source: 'rules',
         })
-        const data = await res.json() as BalanceResult
-        if (data && data.verdict && data.verdict !== 'ok') present(data)
-        else localFallback()
-      } catch {
-        localFallback()
+        return
       }
+
+      const ideas = buildTooLittleResult(missingLifeAreas(active))
+      present(ideas ? { ...ideas, source: 'rules' } : null)
+    } catch {
+      setResult(null)
     } finally {
       running.current = false
     }
-  }, [state, categories])
+  }, [state])
 
   // Check on app open (first app page reached) and re-check when tasks change,
   // debounced so bulk edits produce one check after the last change
@@ -139,9 +134,23 @@ export function BalanceCheckProvider() {
       if (debounceTimer.current) clearTimeout(debounceTimer.current)
       debounceTimer.current = setTimeout(runCheck, DEBOUNCE_MS)
     }
+    let checkedDay = dayKey(new Date())
+    const refreshDay = () => {
+      const now = new Date()
+      const day = dayKey(now)
+      if (day === checkedDay && now.getTime() < nextExpiry.current) return
+      checkedDay = day
+      void runCheck()
+    }
+    const clock = window.setInterval(refreshDay, 30_000)
+    document.addEventListener('visibilitychange', refreshDay)
     window.addEventListener(TASKS_CHANGED_EVENT, onChanged)
+    window.addEventListener('loadlight:balance-mode-changed', onChanged)
     return () => {
+      window.clearInterval(clock)
+      document.removeEventListener('visibilitychange', refreshDay)
       window.removeEventListener(TASKS_CHANGED_EVENT, onChanged)
+      window.removeEventListener('loadlight:balance-mode-changed', onChanged)
       if (debounceTimer.current) clearTimeout(debounceTimer.current)
     }
   }, [onAppPage, runCheck])
@@ -151,7 +160,8 @@ export function BalanceCheckProvider() {
   // compare against the current wall clock, not real UTC.
   useEffect(() => {
     if (!onAppPage) return
-    const notified = new Set<string>()
+    let notified: string[] = []
+    try { notified = JSON.parse(localStorage.getItem(REMINDER_KEY) ?? '[]') } catch { /* optional storage */ }
     const check = async () => {
       try {
         if (localStorage.getItem('loadlight-notify') !== '1') return
@@ -159,14 +169,16 @@ export function BalanceCheckProvider() {
         const nowWall = Date.now() - new Date().getTimezoneOffset() * 60000
         const all = await getTasks()
         for (const t of all) {
-          if (t.done || t.status === 'archived' || !t.deadline?.includes('T')) continue
-          const dl = t.deadline.replace(' ', 'T')
-          const ms = new Date(dl.endsWith('Z') || dl.includes('+') ? dl : dl + 'Z').getTime()
-          const key = `${t.id}|${t.deadline}`
+          if (t.done || t.status === 'completed' || t.status === 'archived' || (t.snoozedUntil ?? 0) > Date.now()) continue
+          const deadline = workloadDeadline(t, Date.now())
+          if (!deadline || !deadline.slice(11, 16) || deadline.slice(11, 16) === '00:00') continue
+          const ms = Date.parse(`${deadline.replace(' ', 'T').slice(0, 16)}:00Z`)
+          const key = `${t.id}|${ms}`
           // Fire within the 2 minutes after the deadline passes, once per task+time
-          if (!notified.has(key) && !isNaN(ms) && ms <= nowWall && nowWall - ms < 120_000) {
-            notified.add(key)
-            new Notification(t.name, { body: 'Due now · LoadLight' })
+          if (!notified.includes(key) && !isNaN(ms) && ms <= nowWall && nowWall - ms < 120_000) {
+            new Notification(t.name, { body: 'Due now · LoadLight', tag: key })
+            notified = [...notified, key].slice(-100)
+            localStorage.setItem(REMINDER_KEY, JSON.stringify(notified))
           }
         }
       } catch { /* ignore */ }
@@ -185,14 +197,36 @@ export function BalanceCheckProvider() {
     setResult(null)
   }
 
-  if (!onAppPage || !result) return null
+  async function defer(id: string, archive: boolean) {
+    const now = new Date()
+    const until = weekFrom(now)
+    const task = (await getTasks()).find(task => task.id === id)
+    if (!task || !canDeferTask(task, dayKey(until))) {
+      throw new Error('This task can no longer be moved.')
+    }
+    await updateTask(id, archive ? { status: 'archived' } : { snoozedUntil: until.getTime() })
+  }
+
+  if (!onAppPage || !result || state === 'overwhelmed') return null
+  if (result.verdict === 'too_little' && !showIdeas) {
+    return (
+      <button
+        type="button"
+        className="vista-btn-secondary fixed bottom-5 right-5 z-30 min-h-10 px-3 text-sm font-bold"
+        onClick={() => setShowIdeas(true)}
+      >
+        Ideas for today
+      </button>
+    )
+  }
 
   return (
     <BalancePopup
+      key={lastSig.current}
       result={result}
-      onHide={id => { updateTask(id, { snoozedUntil: Date.now() + 7 * 24 * 60 * 60 * 1000 }).catch(() => {}) }}
-      onDelete={id => { deleteTask(id).catch(() => {}) }}
-      onAdd={(item: AddItem) => { addTask(addSuggestionToTask(item)).catch(() => {}) }}
+      onHide={id => defer(id, false)}
+      onArchive={id => defer(id, true)}
+      onAdd={async item => { await addTask(addSuggestionToTask(item)) }}
       onClose={close}
     />
   )

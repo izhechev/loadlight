@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import Image from "next/image"
@@ -27,40 +26,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { state, triggerOverwhelmedButton, exitRestMode, selfReportCount } = useOverwhelmedStore()
   const [showCrisis, setShowCrisis] = useState(false)
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'default') Notification.requestPermission()
-
-      const checkReminders = () => {
-        if (Notification.permission !== 'granted') return
-        try {
-          const stored = localStorage.getItem('loadlight-tasks')
-          if (!stored) return
-          const tasks = JSON.parse(stored) as any[]
-          const now = Date.now()
-          const notifiedTasks = JSON.parse(localStorage.getItem('loadlight-notified') || '[]') as string[]
-          tasks.filter(t => !t.done && t.deadline).forEach(t => {
-            if (notifiedTasks.includes(t.id)) return
-            const dueTime = new Date(t.deadline).getTime()
-            const timeUntilDue = dueTime - now
-            if (timeUntilDue <= 2 * 60 * 60 * 1000) {
-              new Notification('Task Reminder: ' + t.name, {
-                body: `This task is due ${timeUntilDue < 0 ? 'now/overdue' : 'soon'}.`,
-                icon: '/logo.png'
-              })
-              notifiedTasks.push(t.id)
-            }
-          })
-          localStorage.setItem('loadlight-notified', JSON.stringify(notifiedTasks))
-        } catch (err) { console.error(err) }
-      }
-
-      checkReminders()
-      const interval = setInterval(checkReminders, 5 * 60 * 1000)
-      return () => clearInterval(interval)
-    }
-  }, [])
 
   useEffect(() => {
     if (state === "overwhelmed") {

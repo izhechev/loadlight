@@ -1,7 +1,8 @@
 "use client"
 
+import { getTasks } from '@/lib/data/tasks'
 import { useState, useEffect } from "react"
-import { X, Coffee, BookOpen, Music, Footprints, Phone, MessageSquare, LogOut, Loader2, CheckCircle, AlertCircle, HelpCircle, Globe } from "@/lib/icons"
+import { Coffee, BookOpen, Music, Footprints, Phone, MessageSquare, LogOut, Loader2, CheckCircle, AlertCircle, HelpCircle, Globe } from "@/lib/icons"
 
 interface RestModeOverlayProps {
   onDismiss: () => void
@@ -102,10 +103,6 @@ function getCrisisInfo(): CrisisInfo {
   return { country: '', lines: INTERNATIONAL_FALLBACK }
 }
 
-function getStoredTasks() {
-  try { return JSON.parse(localStorage.getItem('loadlight-tasks') ?? '[]') } catch { return [] }
-}
-
 // Sorted list of all available countries for the manual selector
 const COUNTRY_OPTIONS: { label: string; info: CrisisInfo }[] = Object.values(
   Object.entries(CRISIS_BY_TZ).reduce<Record<string, { label: string; info: CrisisInfo }>>((acc, [, info]) => {
@@ -185,9 +182,10 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
 
   useEffect(() => {
     async function runTriage() {
-      const tasks = getStoredTasks()
-      if (!tasks.length) { setTriageLoading(false); return }
       try {
+        const tasks = (await getTasks()).filter(t => !t.done && (t.snoozedUntil ?? 0) <= Date.now())
+          .map(t => ({ ...t, demand_type: t.demandType, estimated_minutes: t.estimatedMinutes }))
+        if (!tasks.length) return
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

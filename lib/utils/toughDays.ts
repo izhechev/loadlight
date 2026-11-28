@@ -3,13 +3,16 @@ import type { BalanceResult, RemoveItem } from './balance'
 export interface LoadTask {
   id: string
   name: string
+  category?: string
+  deadline?: string | null
+  recurring?: string
   priority?: number
   estimated_minutes?: number | null
   done?: boolean
 }
 export interface DayHistoryEntry { date: string; minutes: number }
 
-const HEALTH = /pill|medication|medicine|vitamin|supplement|therapy|doctor|medical|lamictal|lithium/i
+const HEALTH = /\b(health|pills?|medications?|medicine|vitamins?|supplements?|therapy|doctors?|medic(al|ation)|dentist|dental|prescription|appointment|lamictal|lithium)\b/i
 
 /** Daily "heavy day" cutoff in minutes, scaling with balance mode. */
 export function toughDayThreshold(balanceMode: string): number {
@@ -32,30 +35,39 @@ export function isToughDay(loadMinutes: number, balanceMode: string): boolean {
 /** Consecutive tough days ending at the most recent history entry. */
 export function countRecentToughDays(history: DayHistoryEntry[], balanceMode: string): number {
   const threshold = toughDayThreshold(balanceMode)
+  const ordered = [...history].sort((a, b) => b.date.localeCompare(a.date))
   let count = 0
-  for (let i = history.length - 1; i >= 0; i--) {
-    if (history[i].minutes >= threshold) count++
-    else break
+  let previousDate: number | null = null
+  for (const entry of ordered) {
+    const date = Date.parse(entry.date)
+    if (!Number.isFinite(date) || entry.minutes < threshold) break
+    if (previousDate === date) continue
+    if (previousDate !== null && previousDate - date !== 86_400_000) break
+    previousDate = date
+    count++
   }
   return count
 }
 
-/** Deterministic tough-day advisory: drop the heaviest, lowest-priority, non-health tasks. */
-export function buildToughDayResult(tasks: LoadTask[], balanceMode: string, recentToughDays: number): BalanceResult {
-  const droppable = tasks
-    .filter(t => !t.done && (t.priority ?? 3) > 1 && !HEALTH.test(t.name ?? ''))
-    .sort((a, b) => (b.estimated_minutes ?? 30) - (a.estimated_minutes ?? 30))
+export function canDeferTask(task: Omit<LoadTask, 'id'>, deferThrough?: string): boolean {
+  if (task.done || (task.recurring && task.recurring !== 'none') || (task.priority ?? 3) < 3 || HEALTH.test(`${task.name} ${task.category ?? ''}`)) return false
+  return !task.deadline || (!!deferThrough && task.deadline.slice(0, 10) > deferThrough)
+}
+
+export function buildToughDayResult(tasks: LoadTask[], balanceMode: string, recentToughDays: number, deferThrough?: string): BalanceResult {
+  const remove: RemoveItem[] = tasks
+    .filter(task => canDeferTask(task, deferThrough))
+    .sort((a, b) => (b.priority ?? 3) - (a.priority ?? 3) || (b.estimated_minutes ?? 30) - (a.estimated_minutes ?? 30))
     .slice(0, 3)
-  const remove: RemoveItem[] = droppable.map(t => ({
-    id: t.id,
-    name: t.name,
-    reason: `${t.estimated_minutes ?? 30} min — one of the heaviest`,
-  }))
-  const streak = recentToughDays >= 2 ? `${recentToughDays} heavy days in a row` : 'a heavy day'
+    .map(task => ({ id: task.id, name: task.name, reason: `${task.estimated_minutes ?? 30} min and no deadline in the next week` }))
+  const streak = recentToughDays >= 2 ? ` You’ve had ${recentToughDays} heavy days in a row.` : ''
+  const next = remove.length > 0
+    ? ' Consider moving a lower-priority task.'
+    : ' Review your time estimates and commitments.'
   return {
     verdict: 'too_much',
-    headline: 'Heavy day — you might ease off',
-    reason: `Your tasks add up to a lot of time today (${streak}). You might consider moving one of the heavier ones.`,
+    headline: 'Heavy day',
+    reason: `${dayLoadMinutes(tasks)} min planned against your ${toughDayThreshold(balanceMode)} min capacity.${streak}${next}`,
     remove,
     add: [],
   }

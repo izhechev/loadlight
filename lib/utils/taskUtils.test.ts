@@ -46,6 +46,13 @@ describe('formatTime', () => {
     expect(formatTime('2026-04-16T00:00Z')).toBeNull()
   })
 
+  it('keeps guest and database clock values identical', () => {
+    expect(formatTime('2026-11-28T15:00')).toBe('3:00pm')
+    expect(toInputDt('2026-11-28T15:00')).toBe('2026-11-28T15:00')
+    expect(formatDate('2026-11-28')).toBe('28 Nov')
+    expect(formatTime('2026-11-28')).toBeNull()
+  })
+
   it('formats an afternoon time as 12-hour pm', () => {
     expect(formatTime('2026-04-16T20:42Z')).toBe('8:42pm')
   })
@@ -291,7 +298,6 @@ describe('effectiveDeadline', () => {
   })
 
   it('returns the stored deadline when it is in the future (daily recurring)', () => {
-    const futureMs = new Date('2099-12-31T10:00Z').getTime()
     const task = dailyAt('10:00', 'Task 10:00')
     const result = effectiveDeadline(task, Date.now())
     // Should be a future date, not null

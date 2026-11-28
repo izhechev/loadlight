@@ -8,6 +8,7 @@ export interface DupTask {
   category?: string | null
   deadline?: string | null
   done?: boolean
+  startDate?: string | null
   recurring?: string | null
   createdAt?: string | number | null
 }
@@ -33,12 +34,8 @@ function normalizeName(name: string): string {
     .replace(/\s+/g, ' ')
 }
 
-/** Time-of-day portion of a deadline ("10:30") or '' — different dose times stay separate. */
-function timeKey(deadline: string | null | undefined): string {
-  if (!deadline) return ''
-  const n = deadline.replace(' ', 'T')
-  if (!n.includes('T')) return ''
-  return n.split('T')[1].slice(0, 5)
+function dateAndTime(value: string | null | undefined): string {
+  return value?.replace(' ', 'T').slice(0, 16) ?? ''
 }
 
 /** Rough "how much information does this copy carry" score for choosing the keeper. */
@@ -56,7 +53,7 @@ export function findDuplicateGroups<T extends DupTask>(tasks: T[]): DuplicateGro
     if (t.done) continue
     const norm = normalizeName(t.name ?? '')
     if (!norm) continue
-    const key = `${norm}|${(t.category ?? '').toLowerCase()}|${timeKey(t.deadline)}`
+    const key = `${norm}|${(t.category ?? '').toLowerCase()}|${dateAndTime(t.deadline)}|${dateAndTime(t.startDate)}`
     byKey.set(key, [...(byKey.get(key) ?? []), t])
   }
   const groups: DuplicateGroup<T>[] = []

@@ -1,240 +1,129 @@
-import { NextResponse, type NextRequest } from 'next/server'
 import { readAiRequest } from '@/lib/ai/request'
 import { extractOutputSchema, extractRequestSchema, type ExtractedTask } from '@/lib/ai/schemas'
 import { fetchGemini, GEMINI_MODELS, geminiText, getGeminiAccess, readGeminiJson, recordAiCall, type GeminiResponse } from '@/lib/ai/server'
-import { parseEveryNDays } from '@/lib/utils/recurrence'
-import { correctWeekdayDeadline } from '@/lib/utils/dateWords'
+import { extractTaskDrafts, taskPreview, type TaskDraft } from '@/lib/ai/taskExtraction'
 
-const SYSTEM_PROMPT = `You are a task extraction assistant for LoadLight, a task and wellbeing manager.
-
-Extract tasks from the user's free-form input. For each task produce these fields:
-- name: concise noun phrase, 1-4 words. Normalize colloquial phrasing and drop filler verbs:
-    "hit the gym daily" → name "Gym", recurring "daily"
-    "do the laundry" → "Laundry"
-    "buy groceries" → "Groceries"
-    "call mom" → "Call mom"
-    "finish the report" → "Finish report"
-    "take lamictal 10:30 and 22:30 daily" → TWO tasks: "Take Lamictal" (deadline today at 10:30) and "Take Lamictal" (deadline today at 22:30), both recurring "daily"
-- category: match to (Work, Study, Personal, Exercise, Creative, Admin) or infer
-- lifeDomain: work | study | personal | health | finance | social | creativity | home
-- demandType: cognitive | emotional | creative | routine | physical
-- difficulty: 1 (trivial) to 5 (very hard)
-- priority: 1 (critical) to 4 (low)
-- deadline: MUST be "YYYY-MM-DDTHH:mm" (including the time) when ANY time is mentioned. NEVER return just "YYYY-MM-DD" if a time was given.
-    Examples: "at 10:30" → "2026-04-13T10:30", "22:30" → "2026-04-13T22:30", "3pm" → "2026-04-13T15:00"
-    If no time mentioned: null
-- startDate: "YYYY-MM-DDTHH:mm" if mentioned, else null
-- estimatedMinutes: integer if mentioned, else null
-- notes: any extra context
-- recurring: "none" | "daily" | "weekly" | "monthly" | "yearly". Set to "daily" when user says "daily", "every day", "everyday", or gives a fixed daily time. Set to "monthly" for "every month", "monthly", "every 1st". Set to "yearly" for "every year", "yearly", "annually", and for BIRTHDAYS, name days, and anniversaries (e.g. "Mani birthday 26 July" → recurring "yearly", deadline the NEXT occurrence of 26 July).
-- recurringHours: integer if user says "every X hours", else null
-- recurringDays: interval multiplier, else null. Mappings (ALWAYS set a deadline — today, or the next occurrence — when any of these apply):
-    "every X days" / "every other day" / "every second day" → recurring "daily", recurringDays X (2 for other/second)
-    "every X weeks" / "biweekly" / "every other week" → recurring "daily", recurringDays X*7 (biweekly = 14)
-    "every X months" → recurring "monthly", recurringDays X (X > 1 only; plain monthly → recurringDays null)
-    "every X years" → recurring "yearly", recurringDays X (X > 1 only; plain yearly → recurringDays null)
-
-CRITICAL RULE for recurring tasks with a fixed time:
-When a task recurs daily AND has a specific time (e.g. "everyday at 10:30", "daily 22:30"), you MUST:
-  1. Keep the task name clean — do NOT include the time in the name: "Take Lamictal" NOT "Take Lamictal 10:30"
-  2. Set deadline to today's date with that time: "2026-04-13T10:30"
-  3. Set recurring to "daily"
-
-Return ONLY valid JSON — no markdown, no explanation. Format: {"tasks": [...]}`
+const SYSTEM_PROMPT = `Extract tasks in the order they appear. Return a JSON object with a tasks array.
+Each task has name, category, lifeDomain, demandType, difficulty, priority, deadline, startDate, estimatedMinutes, notes, recurring, recurringHours, recurringDays and timesPerDay.
+- Keep the original wording of each task name, removing only its scheduling details. Keep separate lines and distinct actions as separate tasks.
+- Use the provided category names. lifeDomain is work, study, personal, health, finance, social, creativity or home.
+- demandType is cognitive, emotional, creative, routine or physical. Difficulty is 1–5 and priority is 1–4.
+- Use YYYY-MM-DD for date-only deadlines and YYYY-MM-DDTHH:mm for a date with a time. Use the provided date as the reference for relative days and weekdays. Use null when there is no date or time. Use startDate for an appointment at a fixed time. Use deadline for an action that needs to finish by a time.
+- estimatedMinutes is minutes only when the user gives a duration. Use null otherwise.
+- recurring is none, daily, weekly, monthly or yearly. Preserve explicit cadence. Use recurringHours for every N hours and recurringDays for every N days, or the month/year interval for monthly/yearly tasks.
+- Create one task per explicit daily time and use timesPerDay = 1 for each. Use timesPerDay greater than 1 only for a daily count without separate times.`
 
 const SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_LOW_AND_ABOVE' },
-  { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_LOW_AND_ABOVE' },
-  { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_LOW_AND_ABOVE' },
-  // MEDIUM threshold for dangerous content — LOW incorrectly flags medication names
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_LOW_AND_ABOVE' },
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_LOW_AND_ABOVE' },
   { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
 ]
 
-function extractionResponse(
-  tasks: ExtractedTask[],
-  offline = false,
-  clarification?: ReturnType<typeof extractOutputSchema.parse>['clarification'],
-) {
-  return NextResponse.json({
-    tasks: tasks.map(({ demandType, startDate, estimatedMinutes, recurringHours, recurringDays, ...task }) => ({
-      ...task,
-      deadline: task.deadline ?? null,
-      demand_type: demandType,
-      start_date: startDate ?? null,
-      estimated_minutes: estimatedMinutes ?? null,
-      recurring_hours: recurringHours ?? null,
-      recurring_days: recurringDays ?? null,
-    })),
-    offline,
-    clarification,
-  })
+function knownDetails(model: ExtractedTask, local?: TaskDraft): TaskDraft {
+  const recurrence = local?.recurring !== undefined && local.recurring !== 'none' ? local : model
+  return {
+    ...model,
+    lifeDomain: model.lifeDomain ?? local?.lifeDomain ?? 'personal',
+    deadline: local?.startDate ? local.deadline : local?.deadline ?? model.deadline ?? null,
+    startDate: local?.deadline ? local.startDate : local?.startDate ?? model.startDate ?? null,
+    estimatedMinutes: local?.estimatedMinutes ?? model.estimatedMinutes ?? null,
+    recurring: recurrence.recurring,
+    recurringHours: recurrence.recurringHours ?? null,
+    recurringDays: recurrence.recurringDays ?? null,
+    timesPerDay: recurrence.timesPerDay ?? 1,
+  }
 }
 
-function offlineFallback(input: string) {
-  const today = new Date().toISOString().split('T')[0]
-  const isDaily = /\b(daily|every\s*day|everyday)\b/i.test(input)
-  const times = [...input.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].map(m => ({
-    h: m[1].padStart(2, '0'), min: m[2],
-  }))
+function taskNameKey(name: string) {
+  const words = name.normalize('NFKC').toLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) ?? []
+  return words.filter(word => !['a', 'an', 'the'].includes(word)).join(' ')
+}
 
-  // If recurring daily with explicit times: one task per time
-  if (isDaily && times.length > 0 && !input.trim().includes('\n')) {
-    // Strip time references and recurring words to get a clean task name
-    const baseName = input
-      .replace(/\b(daily|every\s*day|everyday)\b/gi, '')
-      .replace(/\b(at|and)\b/gi, '')
-      .replace(/\b\d{1,2}:\d{2}\b/g, '')
-      .replace(/\s{2,}/g, ' ')
-      .trim()
-      .replace(/^[,\s]+|[,\s]+$/g, '')
-    const tasks = times.slice(0, 60).map<ExtractedTask>(t => ({
-      name: baseName || input.trim(),
-      category: 'Personal',
-      demandType: 'routine',
-      difficulty: 2,
-      priority: 3,
-      deadline: `${today}T${t.h}:${t.min}`,
-      startDate: null,
-      estimatedMinutes: null,
-      notes: '',
-      recurring: 'daily',
-      recurringHours: null,
-    }))
-    return extractionResponse(tasks, true)
+function alignTasks(localTasks: TaskDraft[], modelTasks: ExtractedTask[]): TaskDraft[] | null {
+  if (localTasks.length !== modelTasks.length) {
+    return localTasks.length === 1 ? modelTasks.map(model => knownDetails(model)) : null
   }
 
-  const tasks = input
-    .split('\n')
-    .map(l => l.trim())
-    .filter(Boolean)
-    .slice(0, 60)
-    .map<ExtractedTask>(line => {
-      const days = parseEveryNDays(line)
-      const nDays = days && days <= 366 ? days : null
-      return {
-        name: line,
-        category: 'Personal',
-        demandType: 'routine',
-        difficulty: 2,
-        priority: 3,
-        deadline: nDays ? today : null,
-        startDate: null,
-        estimatedMinutes: null,
-        notes: '',
-        recurring: nDays ? 'daily' : 'none',
-        recurringHours: null,
-        recurringDays: nDays,
-      }
-    })
-  // offline flag lets the client show a visible warning
-  return extractionResponse(tasks, true)
+  const localKeys = localTasks.map(task => taskNameKey(task.name))
+  const modelKeys = modelTasks.map(task => taskNameKey(task.name))
+  const used = new Set<ExtractedTask>()
+  const aligned: TaskDraft[] = []
+
+  for (const [index, task] of localTasks.entries()) {
+    const key = localKeys[index]
+    if (!key) return null
+    const sameName = modelTasks.filter((_, i) => modelKeys[i] === key)
+    const repeatedName = localKeys.filter(localKey => localKey === key).length > 1
+    // Same-name drafts need an exact appointment or deadline to identify the occurrence.
+    const candidates = repeatedName || sameName.length > 1
+      ? sameName.filter(model => (
+        task.startDate
+          ? model.startDate?.slice(0, 16) === task.startDate
+          : task.deadline && model.deadline?.slice(0, 16) === task.deadline
+      ))
+      : sameName
+
+    if (candidates.length !== 1 || used.has(candidates[0])) return null
+    used.add(candidates[0])
+    aligned.push(knownDetails(candidates[0], task))
+  }
+
+  return aligned
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   const body = await readAiRequest(request, extractRequestSchema)
   if (body instanceof Response) return body
-  const { text, categories } = body
-  if (!text.trim()) return NextResponse.json({ tasks: [] })
+  const { text, categories, today = new Date().toISOString().slice(0, 10) } = body
+  const localTasks = extractTaskDrafts(text, today, categories)
+  if (!localTasks.length) return Response.json({ tasks: [] })
 
+  const offline = () => Response.json({ tasks: localTasks.map(taskPreview), offline: true })
   const access = await getGeminiAccess()
-  if (!access) return offlineFallback(text)
-
-  // LLMs miscompute weekdays from a bare date — spell out the next week
-  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  const nowUtc = Date.now()
-  const calendar = Array.from({ length: 8 }, (_, i) => {
-    const d = new Date(nowUtc + i * 86400000)
-    return `${DAY_NAMES[d.getUTCDay()]} = ${d.toISOString().split('T')[0]}`
-  }).join(', ')
-
-  const userPrompt = `Today's date: ${new Date().toISOString().split('T')[0]} (${DAY_NAMES[new Date().getUTCDay()]})
-Upcoming days for date resolution — use these EXACT dates when the user names a weekday: ${calendar}
-Available categories: ${(categories ?? ['Work', 'Study', 'Personal', 'Exercise', 'Creative', 'Admin']).join(', ')}
-
-User input:
-${text}`
-
-  const start = Date.now()
+  if (!access) return offline()
 
   const requestBody = JSON.stringify({
     systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    contents: [{ parts: [{ text: userPrompt }] }],
+    contents: [{ parts: [{ text: JSON.stringify({ today, categories, text }) }] }],
     generationConfig: { maxOutputTokens: 8192, responseMimeType: 'application/json' },
     safetySettings: SAFETY_SETTINGS,
   })
+  const start = Date.now()
 
-  async function callWithFallback(apiKey: string): Promise<{ data: GeminiResponse; model: string } | null> {
-    for (const model of GEMINI_MODELS) {
-      try {
-        const res = await fetchGemini(model, apiKey, requestBody)
-        if (res.ok) return { data: await res.json(), model }
-      } catch {
-        console.warn('LoadLight received no Gemini extraction response.')
+  for (const model of GEMINI_MODELS) {
+    try {
+      const res = await fetchGemini(model, access.apiKey, requestBody)
+      if (!res.ok) continue
+
+      const data: GeminiResponse = await res.json()
+      const candidate = data.candidates?.[0]
+      if (candidate?.finishReason === 'SAFETY') {
+        const hit = (name: string) => candidate.safetyRatings?.some(r => r.category === name && r.probability !== 'NEGLIGIBLE')
+        const category = hit('HARM_CATEGORY_DANGEROUS_CONTENT') ? 'self_harm' :
+          hit('HARM_CATEGORY_SEXUALLY_EXPLICIT') ? 'sexual' :
+          hit('HARM_CATEGORY_HATE_SPEECH') ? 'hate' : 'other'
+        return Response.json({ blocked: true, category })
       }
+
+      const raw = geminiText(data)
+      if (!raw) continue
+      const parsed = extractOutputSchema.safeParse(readGeminiJson(raw))
+      if (!parsed.success) continue
+
+      const { tasks, clarification } = parsed.data
+      const aligned = alignTasks(localTasks, tasks)
+      await recordAiCall(access, 'extraction', model, start, data.usageMetadata)
+      if (!aligned) return offline()
+      return Response.json({
+        tasks: aligned.map(taskPreview),
+        clarification,
+        offline: false,
+      })
+    } catch {
+      console.warn('LoadLight received no usable task extraction response.')
     }
-    return null
   }
 
-  try {
-    const result = await callWithFallback(access.apiKey)
-
-    if (!result) {
-      console.error('All Gemini models failed — using offline fallback')
-      return offlineFallback(text)
-    }
-
-    const { data, model } = result
-
-    const candidate = data.candidates?.[0]
-
-    // Safety filter triggered
-    if (candidate?.finishReason === 'SAFETY') {
-      const ratings = candidate.safetyRatings ?? []
-      const hit = (cat: string) => ratings.some(r => r.category === cat && r.probability !== 'NEGLIGIBLE')
-      const category =
-        hit('HARM_CATEGORY_DANGEROUS_CONTENT') ? 'self_harm' :
-        hit('HARM_CATEGORY_SEXUALLY_EXPLICIT') ? 'sexual' :
-        hit('HARM_CATEGORY_HATE_SPEECH')        ? 'hate' : 'other'
-      return NextResponse.json({ blocked: true, category })
-    }
-
-    const raw = geminiText(data)
-    if (!raw) return offlineFallback(text)
-
-    const parsed = extractOutputSchema.safeParse(readGeminiJson(raw))
-    if (!parsed.success) return offlineFallback(text)
-
-    const today = new Date().toISOString().split('T')[0]
-
-    // Collect ALL HH:mm times mentioned in the original user input (fallback pool)
-    const inputTimes = [...text.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].map(m => ({
-      h: m[1].padStart(2, '0'),
-      min: m[2],
-    }))
-
-    // Apply corrections only when matching the user input to one task is unambiguous.
-    const everyN = parseEveryNDays(text)
-
-    const tasks = parsed.data.tasks
-    if (tasks.length === 1) {
-      const [task] = tasks
-      if (everyN && everyN <= 366 && !task.recurringDays) {
-        task.recurringDays = everyN
-        task.recurring = 'daily'
-        if (!task.deadline) task.deadline = today
-      }
-      if (inputTimes.length === 1 && task.recurring !== 'none') {
-        const [{ h, min }] = inputTimes
-        const dateStr = task.deadline?.split('T')[0] ?? today
-        task.deadline = `${dateStr}T${h}:${min}`
-      }
-      task.deadline = correctWeekdayDeadline(task.deadline ?? null, text, Date.now())
-    }
-
-    await recordAiCall(access, 'extraction', model, start, data.usageMetadata)
-    return extractionResponse(tasks, false, parsed.data.clarification)
-  } catch {
-    console.warn('LoadLight received no usable Gemini extraction response.')
-    return offlineFallback(text)
-  }
+  return offline()
 }

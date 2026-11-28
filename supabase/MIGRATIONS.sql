@@ -1,15 +1,15 @@
 -- LoadLight — pending production migrations
--- Run each block ONCE in the Supabase SQL editor (Dashboard → SQL Editor).
--- Blocks are ordered; already-applied blocks fail harmlessly ("already exists").
+-- Run the required blocks in the Supabase SQL editor (Dashboard → SQL Editor).
+-- The blocks can also be rerun together.
 -- The app degrades gracefully while these are pending, but new recurrence
 -- features (every-N-days, monthly, yearly) only persist after they run.
 
 -- ── 2026-07-04: every-N-days cadence ────────────────────────────────────────
-alter table tasks add column recurring_days integer;
+alter table tasks add column if not exists recurring_days integer;
 
 -- ── 2026-07-05: monthly + yearly cadences (birthdays, bills) ────────────────
-alter table tasks drop constraint tasks_recurring_check;
-alter table tasks add constraint tasks_recurring_check
+alter table tasks drop constraint if exists tasks_recurring_check,
+  add constraint tasks_recurring_check
   check (recurring in ('none','daily','weekly','monthly','yearly'));
 
 -- Shared account quota for all routes that use the Gemini API.
@@ -75,3 +75,41 @@ grant execute on function loadlight_private.consume_ai_quota() to authenticated;
 grant execute on function public.consume_ai_quota() to authenticated;
 
 commit;
+
+-- Store a task's checklist on its parent so a breakdown is one write.
+alter table public.tasks add column if not exists steps jsonb not null default '[]'::jsonb;
+
+-- Complete one occurrence and create the next in the same transaction.
+create or replace function public.complete_recurring_task(task_id uuid, next_deadline timestamptz)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  original public.tasks;
+begin
+  update public.tasks set status = 'completed', completed_at = now()
+    where id = task_id and user_id = auth.uid() and status = 'active' and recurring <> 'none'
+    returning * into original;
+  if not found then return; end if;
+  if next_deadline is null or next_deadline <= original.deadline then
+    raise exception 'Next occurrence must follow the current deadline';
+  end if;
+  if not exists (
+    select 1 from public.tasks where user_id = original.user_id and name = original.name
+      and category = original.category and recurring = original.recurring
+      and status <> 'archived' and deadline = next_deadline
+  ) then
+    insert into public.tasks (user_id, name, category, life_domain, demand_type, difficulty, priority,
+      deadline, estimated_minutes, notes, recurring, recurring_hours, recurring_days, steps)
+    values (original.user_id, original.name, original.category, original.life_domain, original.demand_type,
+      original.difficulty, original.priority, next_deadline, original.estimated_minutes, original.notes,
+      original.recurring, original.recurring_hours, original.recurring_days,
+      coalesce((select jsonb_agg(step || '{"done":false}'::jsonb order by position)
+        from jsonb_array_elements(original.steps) with ordinality s(step, position)), '[]'::jsonb));
+  end if;
+end;
+$$;
+revoke all on function public.complete_recurring_task(uuid, timestamptz) from public, anon;
+grant execute on function public.complete_recurring_task(uuid, timestamptz) to authenticated;

@@ -74,6 +74,12 @@ describe('ensureRecurringDeadline', () => {
 // Deadline for the next instance created when a recurring task is completed.
 
 describe('nextRecurrenceDeadline', () => {
+  it('keeps hourly repeats on their clock interval when completed late', () => {
+    const now = new Date(2026, 10, 28, 17, 0).getTime()
+    expect(nextRecurrenceDeadline('2026-11-28T08:00', { recurring: 'daily', recurringHours: 4 }, now)).toBe('2026-11-28T20:00')
+  })
+
+
   it('advances a daily task with a time by one day, preserving the time', () => {
     expect(nextRecurrenceDeadline('2026-07-04T10:00', { recurring: 'daily' }, NOW)).toBe('2026-07-05T10:00')
   })

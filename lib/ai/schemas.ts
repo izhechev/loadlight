@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { LIFE_DOMAINS } from './taskExtraction'
 
 export const demandType = z.enum(['cognitive', 'emotional', 'creative', 'routine', 'physical'])
 export const recurrence = z.enum(['none', 'daily', 'weekly', 'monthly', 'yearly'])
@@ -34,13 +35,26 @@ export const chatRequestSchema = z.object({
     priority: priority.optional(),
     difficulty: difficulty.optional(),
     done: z.boolean().optional(),
+    status: z.enum(['active', 'completed', 'archived']).optional(),
+    snoozedUntil: z.number().nonnegative().nullish(),
     deadline: dateOrTime.nullish(),
     start_date: dateOrTime.nullish(),
     recurring: recurrence.optional(),
+    recurring_days: dayInterval,
   })).max(300).optional(),
   balanceMode: z.enum(['beast', 'average', 'balanced', 'chill']).optional(),
   state: z.enum(['normal', 'elevated', 'overwhelmed']).optional(),
   dayLoadMinutes: z.number().nonnegative().max(3_024_000).optional(),
+  dayTaskCount: count.optional(),
+  week: z.object({
+    startDay: day,
+    endDay: day,
+    pending: count,
+    completed: count,
+    minutes: z.number().nonnegative().max(3_024_000),
+    dailyMinutes: z.array(z.number().nonnegative().max(3_024_000)).length(7),
+    categories: z.array(z.object({ name: category, count })).max(12),
+  }).optional(),
   toughDayThreshold: minutes.optional(),
   recentToughDays: count.optional(),
   missingAreas: z.array(category).max(20).optional(),
@@ -57,6 +71,7 @@ export type ChatTask = NonNullable<z.infer<typeof chatRequestSchema>['tasks']>[n
 
 export const extractRequestSchema = z.object({
   text: z.string().max(8_000),
+  today: day.optional(),
   categories: z.array(category).max(100).optional(),
 })
 
@@ -64,6 +79,8 @@ export const adviseRequestSchema = z.object({
   state: z.enum(['normal', 'elevated', 'overwhelmed']),
   taskCount: count,
   urgentCount: count,
+  todayMinutes: z.number().nonnegative().max(3_024_000).optional(),
+  capacityMinutes: z.number().positive().max(1_440).optional(),
   signals: z.object({
     taskAccumulation: z.number().min(0).max(1).optional(),
     temporalPressure: z.number().min(0).max(1).optional(),
@@ -109,6 +126,8 @@ const clarification = z.object({
 
 const extractedTask = z.object({
   ...extractionFields,
+  lifeDomain: z.enum(LIFE_DOMAINS).optional(),
+  timesPerDay: z.number().int().min(1).max(24).optional(),
   demandType: demandType.default('routine'),
   startDate: dateOrTime.nullish(),
   estimatedMinutes: minutes.nullish(),
@@ -130,7 +149,6 @@ const analysisOutput = z.object({
   suggestion: basicText,
 })
 const taskReason = z.object({ name, reason: basicText })
-const indexedTask = z.object({ index: count })
 const chatTaskOutput = z.object({
   ...extractionFields,
   demand_type: demandType.default('routine'),
@@ -142,17 +160,13 @@ const chatTaskOutput = z.object({
 })
 export const chatOutputSchemas = {
   extract: z.object({ tasks: z.array(chatTaskOutput).min(1).max(60), clarification }),
-  breakdown: z.object({ tasks: z.array(chatTaskOutput).min(3).max(5) }),
+  breakdown: z.object({ tasks: z.array(z.object({ name })).min(3).max(5) }),
   analyze: analysisOutput,
   weekly: analysisOutput,
   schedule_chat: z.discriminatedUnion('type', [
     z.object({ type: z.literal('question'), question: basicText.min(1) }),
     z.object({ type: z.literal('ready'), context: basicText.nullish() }),
   ]),
-  schedule_ai: z.object({
-    today: z.array(indexedTask.extend({ start: clockTime, end: clockTime })).max(300),
-    overflow: z.array(indexedTask).max(300),
-  }),
   triage: z.object({
     canSkip: z.array(taskReason).max(3),
     urgent: z.array(taskReason).max(3),
@@ -169,6 +183,6 @@ export const chatOutputSchemas = {
     headline: basicText,
     reason: basicText,
     remove: z.array(taskReason.extend({ id })).max(3),
-    add: z.array(taskReason.extend({ category })).max(3),
+    add: z.array(taskReason.extend({ category, estimatedMinutes: z.number().int().min(5).max(180).optional() })).max(3),
   }),
 }

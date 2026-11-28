@@ -1,14 +1,16 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, react/no-unescaped-entities */
+/* eslint-disable react/no-unescaped-entities */
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Brain, Loader2, CheckCircle, Trash2, Plus, Calendar, ArrowLeft, Zap, AlertTriangle, RefreshCw, Flag, StickyNote, PlayCircle, HelpCircle } from "@/lib/icons"
+import { Brain, Loader2, CheckCircle, Trash2, Plus, ArrowLeft, Zap, AlertTriangle, RefreshCw, Flag, StickyNote, HelpCircle } from "@/lib/icons"
 import { AppLayout } from "@/components/app-layout"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
-import { addTasks } from "@/lib/data/tasks"
+import { addTasks, type Task } from "@/lib/data/tasks"
+import { extractTaskDrafts, LIFE_DOMAINS, taskPreview, type TaskPreview as ExtractedTask } from "@/lib/ai/taskExtraction"
+import { localDateStr } from "@/lib/utils/scheduling"
 import { isPastDeadline } from "@/lib/utils/recurrence"
 import { CrisisRedirect } from "@/components/rest-mode-overlay"
 import { PastDeadlineModal } from "@/components/past-deadline-modal"
@@ -38,58 +40,55 @@ function containsCrisisPhrase(text: string): boolean {
   return CRISIS_PATTERNS.some(p => p.test(text))
 }
 
-// Convert stored timestamp (with or without tz) → "YYYY-MM-DDTHH:mm" using UTC components
-// so datetime-local inputs always show the intended time, not the browser's local tz conversion
-function toInputDt(dt: string | null | undefined): string {
-  if (!dt) return ''
-  const d = new Date(dt.replace(' ', 'T'))
-  if (isNaN(d.getTime())) return dt.replace(' ', 'T').slice(0, 16)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
+const previewInputClass = 'input-skeu min-w-0 rounded-lg px-2 py-1 text-xs text-slate-700'
+
+function TaskDateField({ label, value, onChange }: {
+  label: string
+  value: string | null
+  onChange: (value: string | null) => void
+}) {
+  const hasTime = !!value?.replace(' ', 'T').includes('T')
+  const calendarDate = value?.slice(0, 10) ?? localDateStr()
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+        {label}
+        <input
+          type={hasTime ? 'datetime-local' : 'date'}
+          value={value?.replace(' ', 'T').slice(0, hasTime ? 16 : 10) ?? ''}
+          onChange={e => onChange(e.target.value || null)}
+          className={previewInputClass}
+        />
+      </label>
+      <button
+        type="button"
+        className="text-xs font-semibold text-sky-800 underline underline-offset-2"
+        aria-label={`${hasTime ? 'Remove' : 'Add'} ${label.toLowerCase()} time`}
+        onClick={() => onChange(hasTime ? calendarDate : `${calendarDate}T09:00`)}
+      >
+        {hasTime ? 'Remove time' : 'Add time'}
+      </button>
+    </div>
+  )
 }
 
-type DemandType = 'cognitive' | 'emotional' | 'creative' | 'routine' | 'physical'
-
-interface ExtractedTask {
-  name: string
-  category: string
-  demand_type: DemandType
-  difficulty: number
-  deadline: string | null       // "YYYY-MM-DDTHH:mm" — date + optional time
-  start_date: string | null     // "YYYY-MM-DDTHH:mm" — when to begin
-  priority: 1 | 2 | 3 | 4      // 1=urgent, 2=high, 3=normal, 4=low
-  notes: string
-  estimated_minutes: number | null
-  recurring?: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
-  times_per_day?: number
-  recurring_hours?: number | null  // e.g. 8 → "every 8 hours"
-  recurring_days?: number | null   // e.g. 2 → "every 2 days"
+function storedDate(value: string | null): string | null {
+  if (!value || !value.replace(' ', 'T').includes('T')) return value
+  return `${value.replace(' ', 'T').slice(0, 16)}Z`
 }
 
-const DEMAND_COLORS: Record<DemandType, string> = {
-  cognitive: 'bg-sky-100/90 text-sky-700',
-  emotional: 'bg-pink-100/90 text-pink-700',
-  creative: 'bg-purple-100/90 text-purple-700',
-  routine: 'bg-blue-100/90 text-blue-700',
-  physical: 'bg-teal-100/90 text-teal-700',
-}
+type DemandType = ExtractedTask['demand_type']
+
+const DEMAND_TYPES: DemandType[] = ['cognitive', 'emotional', 'creative', 'routine', 'physical']
 
 function difficultyLabel(d: number): string {
   return ['', 'Trivial', 'Easy', 'Moderate', 'Hard', 'Extreme'][d] ?? String(d)
 }
 
-function difficultyColor(d: number): string {
-  if (d <= 1) return 'bg-green-100 text-green-700'
-  if (d <= 2) return 'bg-lime-100 text-lime-700'
-  if (d <= 3) return 'bg-yellow-100 text-yellow-700'
-  if (d <= 4) return 'bg-orange-100 text-orange-700'
-  return 'bg-red-100 text-red-700'
-}
-
 interface Clarification {
   question: string
   taskName: string
-  options: { label: string; recurring: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly' }[]
+  options: { label: string; recurring: ExtractedTask['recurring']; recurring_hours?: number | null }[]
 }
 
 export default function AddTaskPage() {
@@ -102,6 +101,9 @@ export default function AddTaskPage() {
   const [clarification, setClarification] = useState<Clarification | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const [offlineDraft, setOfflineDraft] = useState(false)
   const [showOverwhelmedConfirm, setShowOverwhelmedConfirm] = useState(false)
   const [showCrisisModal, setShowCrisisModal] = useState(false)
   const [showBlockedModal, setShowBlockedModal] = useState(false)
@@ -109,21 +111,22 @@ export default function AddTaskPage() {
   const [currentPastDeadlineTask, setCurrentPastDeadlineTask] = useState<ExtractedTask | null>(null)
   const [resolvedTasks, setResolvedTasks] = useState<ExtractedTask[]>([])
 
-  // Restore tasks from localStorage
-  function getStoredTasks(): ExtractedTask[] {
-    try { return JSON.parse(localStorage.getItem('loadlight-tasks') ?? '[]') as ExtractedTask[] } catch { return [] }
+  function updateDraft(index: number, changes: Partial<ExtractedTask>) {
+    setPreview(drafts => drafts?.map((draft, i) => i === index ? { ...draft, ...changes } : draft) ?? null)
   }
 
-  function applyClarification(recurring: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly') {
-    if (!clarification || !preview) return
-    setPreview(prev => prev!.map(t =>
-      t.name === clarification.taskName ? { ...t, recurring } : t
-    ))
+  function applyClarification(option: Clarification['options'][number]) {
+    if (!clarification) return
+    setPreview(drafts => drafts?.map(draft =>
+      draft.name === clarification.taskName
+        ? { ...draft, recurring: option.recurring, recurring_days: null, recurring_hours: option.recurring_hours ?? null }
+        : draft
+    ) ?? null)
     setClarification(null)
   }
 
   async function handleExtractIntent() {
-    if (!input.trim()) return
+    if (isExtracting || savingRef.current || !input.trim()) return
     // Instant local check for obvious crisis phrases (no network)
     if (containsCrisisPhrase(input)) { setShowCrisisModal(true); return }
     if (overwhelmedState === 'overwhelmed') { setShowOverwhelmedConfirm(true); return }
@@ -135,128 +138,91 @@ export default function AddTaskPage() {
     setPreview(null)
     setClarification(null)
     setError(null)
+    const today = localDateStr()
+    const categoryNames = categories.map(category => category.name)
     try {
       const res = await fetch('/api/ai/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: input,
-          categories: categories.map(c => c.name),
+          categories: categoryNames,
+          today,
         }),
       })
       if (!res.ok) throw new Error('API error')
-      const data = await res.json() as { tasks?: ExtractedTask[]; clarification?: Clarification | null; blocked?: boolean; category?: string; offline?: boolean; _debug?: unknown }
+      const data = await res.json() as { tasks?: ExtractedTask[]; clarification?: Clarification | null; blocked?: boolean; category?: string; offline?: boolean }
       if (data.blocked) {
         if (data.category === 'self_harm') { setShowCrisisModal(true) } else { setShowBlockedModal(true) }
         return
       }
-      if (data.offline) {
-        setError('AI unavailable — fields pre-filled from your input. Edit before saving.')
-      }
-      if (data.tasks?.length) {
-        const appendZ = (dt: string | null | undefined) => dt ? (dt.endsWith('Z') || dt.includes('+') ? dt : dt + 'Z') : null
-        setPreview(data.tasks.map(t => ({
-          ...t,
-          recurring: t.recurring || 'none',
-          // The extract API returns camelCase; accept both spellings
-          recurring_hours: t.recurring_hours ?? (t as unknown as Record<string, unknown>).recurringHours as number | null ?? null,
-          recurring_days: t.recurring_days ?? (t as unknown as Record<string, unknown>).recurringDays as number | null ?? null,
-          deadline: appendZ(t.deadline),
-          start_date: appendZ(t.start_date ?? (t as unknown as Record<string, unknown>).startDate as string | null),
-        })))
-        if (data.clarification?.question) setClarification(data.clarification)
-      } else {
-        throw new Error('No tasks extracted')
-      }
+      if (!data.tasks?.length) throw new Error('No tasks extracted')
+      setPreview(data.tasks)
+      setOfflineDraft(!!data.offline)
+      if (data.clarification?.question) setClarification(data.clarification)
     } catch {
-      // NFR-8: fallback to manual entry
-      setPreview([{
-        name: input,
-        category: 'personal',
-        demand_type: 'routine',
-        difficulty: 2,
-        deadline: null,
-        start_date: null,
-        priority: 3,
-        notes: '',
-        estimated_minutes: 30,
-        recurring: 'none',
-        times_per_day: 1,
-        recurring_hours: null
-      }])
-      setError('AI unavailable — added as manual task. You can edit the details below.')
+      const tasks = extractTaskDrafts(input, today, categoryNames).map(taskPreview)
+      setPreview(tasks)
+      setOfflineDraft(true)
+      if (!tasks.length) setError('Enter at least one task.')
     } finally {
       setIsExtracting(false)
     }
   }
 
-  // keep old name used by button
-  const handleExtract = handleExtractIntent
-
   async function performSave(tasksToSave: ExtractedTask[]) {
-    const finalTasks: any[] = []
-    tasksToSave.forEach(t => {
-      const times = t.times_per_day || 1
-      if (times > 1) {
-        for (let i = 1; i <= times; i++) {
-          finalTasks.push({ ...t, name: `${t.name} (${i}/${times})`, id: Math.random().toString(36).slice(2), done: false, createdAt: Date.now() })
-        }
-      } else {
-        finalTasks.push({ ...t, id: Math.random().toString(36).slice(2), done: false, createdAt: Date.now() })
-      }
+    if (savingRef.current || !tasksToSave.length) return
+    savingRef.current = true
+    setSaving(true)
+    setError(null)
+
+    const finalTasks = tasksToSave.flatMap((draft): Omit<Task, 'id' | 'createdAt'>[] => {
+      const count = draft.recurring === 'daily' ? draft.times_per_day : 1
+      return Array.from({ length: count }, (_, index) => ({
+        name: count > 1 ? `${draft.name.trim()} (${index + 1}/${count})` : draft.name.trim(),
+        category: draft.category,
+        lifeDomain: draft.life_domain,
+        demandType: draft.demand_type,
+        difficulty: draft.difficulty,
+        priority: draft.priority,
+        deadline: storedDate(draft.deadline),
+        startDate: storedDate(draft.start_date),
+        estimatedMinutes: draft.estimated_minutes,
+        notes: draft.notes,
+        status: 'active',
+        recurring: draft.recurring,
+        recurringHours: draft.recurring_hours,
+        recurringDays: draft.recurring_days,
+      }))
     })
 
-    // addTasks persists to localStorage in demo mode — no manual write here,
-    // or every task would be stored twice (once raw, once mapped)
     try {
-      await addTasks(finalTasks.map(t => ({
-      name: t.name,
-      category: t.category ?? 'Personal',
-      lifeDomain: t.life_domain ?? 'personal',
-      demandType: t.demand_type ?? 'routine',
-      difficulty: t.difficulty ?? 2,
-      priority: t.priority ?? 3,
-      deadline: (() => {
-        const timeMatch = t.name.match(/\b(\d{1,2}):(\d{2})\b/)
-        if (timeMatch) {
-          const dateStr = t.deadline ? t.deadline.split('T')[0] : new Date().toISOString().split('T')[0]
-          return `${dateStr}T${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`
-        }
-        return t.deadline ?? null
-      })(),
-      startDate: t.start_date ?? null,
-      estimatedMinutes: t.estimated_minutes ?? null,
-      notes: t.notes ?? '',
-      status: 'active' as const,
-        recurring: t.recurring ?? 'none',
-        recurringHours: t.recurring_hours ?? null,
-        recurringDays: t.recurring_days ?? null,
-      })))
+      await addTasks(finalTasks)
+      setSaved(true)
+      router.push('/tasks')
     } catch (err) {
-      // Surface the failure — pretending the save worked loses the user's tasks
       setError(err instanceof Error && err.message === 'Not authenticated'
-        ? 'You are signed out. Log in to save tasks.'
-        : 'Could not save tasks. Check your connection and try again.')
-      return
+        ? 'Sign in again to save your tasks.'
+        : 'Could not save tasks. Try again.')
+    } finally {
+      savingRef.current = false
+      setSaving(false)
     }
-
-    setSaved(true)
-    setTimeout(() => router.push('/tasks'), 800)
   }
 
   async function confirm() {
-    if (!preview) return
+    if (savingRef.current || !preview?.length || preview.some(task => !task.name.trim())) return
 
-    const now = Date.now()
+    // The app stores the selected wall-clock time in the UTC fields.
+    const now = new Date()
+    const wallClockNow = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes())
     const pastTasks: ExtractedTask[] = []
     const futureTasks: ExtractedTask[] = []
 
-    preview.forEach(t => {
-      // Date-only deadlines count as end-of-day; recurring tasks roll forward
-      // on their own — neither should be diverted into the past-deadline flow
-      if (isPastDeadline(t.deadline, t.recurring, now)) pastTasks.push(t)
-      else futureTasks.push(t)
-    })
+    for (const task of preview) {
+      if (isPastDeadline(task.deadline, task.recurring, wallClockNow)) pastTasks.push(task)
+      else futureTasks.push(task)
+    }
 
     if (pastTasks.length > 0) {
       setPastDeadlineQueue(pastTasks.slice(1))
@@ -282,7 +248,8 @@ export default function AddTaskPage() {
       setCurrentPastDeadlineTask(null)
       setPastDeadlineQueue([])
       setResolvedTasks([])
-      performSave(newResolved)
+      if (newResolved.length) void performSave(newResolved)
+      else setPreview(null)
     }
   }
 
@@ -296,7 +263,7 @@ export default function AddTaskPage() {
           </button>
           <div>
             <h1 className="text-2xl font-black text-slate-800">Add Tasks</h1>
-            <p className="text-sm text-slate-500 font-bold">Type naturally — AI extracts and classifies each task</p>
+            <p className="text-sm text-slate-500 font-bold">Type naturally — Review names, dates, and estimates before saving</p>
           </div>
         </div>
 
@@ -368,9 +335,11 @@ export default function AddTaskPage() {
             </div>
             <textarea
               autoFocus
+              aria-label="Tasks to add"
+              maxLength={8000}
               value={input}
               onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleExtract() }}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleExtractIntent() }}
               placeholder={'"Finish the report by Friday, buy groceries, call mom, hit the gym"'}
               className="input-skeu w-full rounded-xl p-4 text-sm text-slate-800 placeholder:text-slate-400 resize-none focus:outline-none min-h-[100px]"
               rows={4}
@@ -383,8 +352,8 @@ export default function AddTaskPage() {
             <div className="flex justify-between items-center mt-3">
               <p className="text-xs text-slate-400 font-bold italic">Ctrl+Enter to extract</p>
               <button
-                onClick={handleExtract}
-                disabled={isExtracting || !input.trim()}
+                onClick={handleExtractIntent}
+                disabled={isExtracting || saving || !input.trim()}
                 className="glow-button font-black px-5 py-2 text-sm flex items-center gap-2 disabled:opacity-50"
               >
                 {isExtracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
@@ -398,7 +367,7 @@ export default function AddTaskPage() {
             <div className="glass-panel p-6 anim-fade-in-up">
               <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-emerald-600" />
-                AI Extracted {preview.length} Task{preview.length !== 1 ? 's' : ''} — Review &amp; Confirm
+                Review {preview.length} {preview.length === 1 ? 'task' : 'tasks'}
               </p>
 
               {/* Clarifying question */}
@@ -412,7 +381,7 @@ export default function AddTaskPage() {
                       {clarification.options.map(opt => (
                         <button
                           key={opt.label}
-                          onClick={() => applyClarification(opt.recurring)}
+                          onClick={() => applyClarification(opt)}
                           className="px-3 py-1.5 rounded-full text-xs font-black bg-white border border-sky-200 text-sky-700 hover:bg-sky-100 transition-colors shadow-sm"
                         >
                           {opt.label}
@@ -428,46 +397,69 @@ export default function AddTaskPage() {
                   const cat = categories.find(c => c.name.toLowerCase() === catName || c.id === task.category)
                   const cls = getCategoryClasses(cat?.color ?? 'sky')
                   return (
-                  <div key={i} className={`bg-white/50 rounded-2xl border border-sky-100/60 overflow-hidden ${cls.bg.replace('bg-', 'border-l-4 border-l-')}`}>
+                  <div key={i} className="bg-white/50 rounded-2xl border border-sky-100/60 overflow-hidden">
                     {/* Task row */}
                     <div className="flex items-center gap-3 p-4">
-                      <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="flex-1 font-bold text-slate-800 text-sm">{task.name}</span>
-                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${cls.bg} ${cls.text} badge-skeu shrink-0 border border-sky-100/50 shadow-sm inline-flex items-center gap-1`}><ClassicIcon name={categoryIconName(cat ?? { name: task.category })} size={12} /> {task.category}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${DEMAND_COLORS[task.demand_type]} border border-sky-100/50 shadow-sm`}>{task.demand_type}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${difficultyColor(task.difficulty)} border border-white/5 shadow-sm`}>{difficultyLabel(task.difficulty)}</span>
-                        {task.estimated_minutes && <span className="text-[10px] text-slate-400 font-bold">{task.estimated_minutes}m</span>}
-                      </div>
-                      <button onClick={() => setPreview(prev => prev?.filter((_, j) => j !== i) ?? null)} className="text-slate-500 hover:text-red-400 transition-colors ml-1">
+                      <span className={`inline-flex shrink-0 rounded-lg p-1 ${cls.bg}`} aria-hidden="true">
+                        <ClassicIcon name={categoryIconName(cat ?? { name: task.category })} size={18} />
+                      </span>
+                      <input
+                        type="text"
+                        aria-label="Task name"
+                        maxLength={512}
+                        value={task.name}
+                        onChange={e => updateDraft(i, { name: e.target.value })}
+                        className={`${previewInputClass} w-full flex-1 font-bold text-sm`}
+                      />
+                      <button aria-label={`Remove ${task.name || 'task'}`} onClick={() => setPreview(prev => prev?.filter((_, j) => j !== i) ?? null)} className="text-slate-500 hover:text-red-400 transition-colors ml-1">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                     {/* Date / time / priority / notes row */}
                     <div className="px-4 pb-3 border-t border-sky-100/50 pt-2 space-y-2">
 
-                      {/* Row 1: deadline + start date */}
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Due:</span>
+                        <TaskDateField label="Due date" value={task.deadline} onChange={deadline => updateDraft(i, { deadline })} />
+                        <TaskDateField label="Start date" value={task.start_date} onChange={start_date => updateDraft(i, { start_date })} />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-slate-600">
+                        <label className="flex items-center gap-1">
+                          Category
+                          <select aria-label="Category" value={task.category} onChange={e => updateDraft(i, { category: e.target.value })} className={previewInputClass}>
+                            {!categories.some(category => category.name === task.category) && <option>{task.category}</option>}
+                            {categories.map(category => <option key={category.id}>{category.name}</option>)}
+                          </select>
+                        </label>
+                        <label className="flex items-center gap-1">
+                          Life area
+                          <select aria-label="Life area" value={task.life_domain} onChange={e => updateDraft(i, { life_domain: e.target.value as ExtractedTask['life_domain'] })} className={previewInputClass}>
+                            {LIFE_DOMAINS.map(domain => <option key={domain} value={domain}>{domain[0].toUpperCase() + domain.slice(1)}</option>)}
+                          </select>
+                        </label>
+                        <label className="flex items-center gap-1">
+                          Effort type
+                          <select aria-label="Effort type" value={task.demand_type} onChange={e => updateDraft(i, { demand_type: e.target.value as DemandType })} className={previewInputClass}>
+                            {DEMAND_TYPES.map(type => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}
+                          </select>
+                        </label>
+                        <label className="flex items-center gap-1">
+                          Difficulty
+                          <select aria-label="Difficulty" value={task.difficulty} onChange={e => updateDraft(i, { difficulty: Number(e.target.value) })} className={previewInputClass}>
+                            {[1, 2, 3, 4, 5].map(difficulty => <option key={difficulty} value={difficulty}>{difficultyLabel(difficulty)}</option>)}
+                          </select>
+                        </label>
+                        <label className="flex items-center gap-1">
+                          Minutes
                           <input
-                            type="datetime-local"
-                            value={toInputDt(task.deadline)}
-                            onChange={e => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, deadline: e.target.value ? e.target.value + 'Z' : null } : t) ?? null)}
-                            className="input-skeu text-[10px] rounded-lg px-2 py-1 text-slate-700 focus:outline-none"
+                            type="number"
+                            min={0}
+                            max={10080}
+                            step={1}
+                            value={task.estimated_minutes ?? ''}
+                            onChange={e => updateDraft(i, { estimated_minutes: e.target.value ? Math.min(10080, Math.max(0, Math.round(Number(e.target.value)))) : null })}
+                            className={`${previewInputClass} w-20`}
                           />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <PlayCircle className="w-3.5 h-3.5 text-slate-500" />
-                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Start:</span>
-                          <input
-                            type="datetime-local"
-                            value={toInputDt(task.start_date)}
-                            onChange={e => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, start_date: e.target.value ? e.target.value + 'Z' : null } : t) ?? null)}
-                            className="input-skeu text-[10px] rounded-lg px-2 py-1 text-slate-700 focus:outline-none"
-                          />
-                        </div>
+                        </label>
                       </div>
 
                       {/* Row 2: priority + recurring */}
@@ -479,7 +471,7 @@ export default function AddTaskPage() {
                             {([1, 2, 3, 4] as const).map(p => (
                               <button
                                 key={p}
-                                onClick={() => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, priority: p } : t) ?? null)}
+                                onClick={() => updateDraft(i, { priority: p })}
                                 className={`text-[9px] px-2 py-0.5 rounded-md font-black transition-all border ${
                                   task.priority === p
                                     ? p === 1 ? 'bg-red-100 text-red-700 border-red-300'
@@ -501,7 +493,7 @@ export default function AddTaskPage() {
                             {(['none', 'daily', 'weekly', 'monthly', 'yearly'] as const).map(mode => (
                               <button
                                 key={mode}
-                                onClick={() => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, recurring: mode, recurring_hours: null } : t) ?? null)}
+                                onClick={() => updateDraft(i, { recurring: mode, recurring_hours: null, recurring_days: null, times_per_day: 1 })}
                                 className={`text-[9px] px-2 py-0.5 rounded-md font-black transition-all ${
                                   (task.recurring || 'none') === mode && !task.recurring_hours
                                     ? 'bg-white/90 text-sky-800 shadow-inner'
@@ -512,7 +504,7 @@ export default function AddTaskPage() {
                               </button>
                             ))}
                             <button
-                              onClick={() => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, recurring: 'daily', recurring_hours: task.recurring_hours ?? 8 } : t) ?? null)}
+                              onClick={() => updateDraft(i, { recurring: 'daily', recurring_hours: task.recurring_hours ?? 8, recurring_days: null, times_per_day: 1 })}
                               className={`text-[9px] px-2 py-0.5 rounded-md font-black transition-all ${
                                 task.recurring_hours
                                   ? 'bg-white/90 text-violet-800 shadow-inner'
@@ -528,22 +520,38 @@ export default function AddTaskPage() {
                               <input
                                 type="number"
                                 min="1"
-                                max="23"
+                                max="168"
                                 value={task.recurring_hours}
-                                onChange={e => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, recurring_hours: parseInt(e.target.value) || 1 } : t) ?? null)}
+                                aria-label="Hours between repeats"
+                                onChange={e => updateDraft(i, { recurring_hours: Math.min(168, Math.max(1, Math.trunc(Number(e.target.value)) || 1)) })}
                                 className="input-skeu w-10 text-[10px] rounded-lg px-2 py-1 text-slate-700 focus:outline-none"
                               />
                               <span className="text-[10px] text-slate-500 font-bold">h</span>
                             </div>
+                          ) : task.recurring_days !== null ? (
+                            <label className="flex items-center gap-1 text-xs font-bold text-slate-600">
+                              Every
+                              <input
+                                type="number"
+                                aria-label="Repeat interval"
+                                min={1}
+                                max={366}
+                                value={task.recurring_days}
+                                onChange={e => updateDraft(i, { recurring_days: Math.min(366, Math.max(1, Math.trunc(Number(e.target.value)) || 1)) })}
+                                className={`${previewInputClass} w-14`}
+                              />
+                              {task.recurring === 'monthly' ? 'months' : task.recurring === 'yearly' ? 'years' : 'days'}
+                            </label>
                           ) : task.recurring === 'daily' && (
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Times/day:</span>
                               <input
                                 type="number"
                                 min="1"
-                                max="10"
+                                max="24"
                                 value={task.times_per_day || 1}
-                                onChange={e => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, times_per_day: parseInt(e.target.value) || 1 } : t) ?? null)}
+                                aria-label="Times per day"
+                                onChange={e => updateDraft(i, { times_per_day: Math.min(24, Math.max(1, Math.trunc(Number(e.target.value)) || 1)) })}
                                 className="input-skeu w-10 text-[10px] rounded-lg px-2 py-1 text-slate-700 focus:outline-none"
                               />
                             </div>
@@ -558,7 +566,9 @@ export default function AddTaskPage() {
                           type="text"
                           placeholder="Notes (optional)"
                           value={task.notes}
-                          onChange={e => setPreview(prev => prev?.map((t, j) => j === i ? { ...t, notes: e.target.value } : t) ?? null)}
+                          aria-label="Notes"
+                          maxLength={2000}
+                          onChange={e => updateDraft(i, { notes: e.target.value })}
                           className="input-skeu flex-1 text-[10px] rounded-lg px-2 py-1 text-slate-700 focus:outline-none"
                         />
                       </div>
@@ -574,16 +584,16 @@ export default function AddTaskPage() {
                   </div>
                 ) : (
                   <>
-                    <button onClick={confirm} className="glow-button font-black px-6 py-2.5 text-sm flex items-center gap-2">
-                      <Plus className="w-4 h-4" /> Save {preview.length} Task{preview.length !== 1 ? 's' : ''}
+                    <button disabled={saving || !preview.length || preview.some(task => !task.name.trim())} onClick={confirm} className="glow-button font-black px-6 py-2.5 text-sm flex items-center gap-2">
+                      <Plus className="w-4 h-4" /> {saving ? 'Saving…' : `Save ${preview.length} Task${preview.length === 1 ? '' : 's'}`}
                     </button>
-                    <button onClick={() => { setPreview(null); setInput('') }} className="vista-btn-secondary font-bold text-sm" style={{ padding: '8px 16px' }}>
+                    <button disabled={saving} onClick={() => { setPreview(null); setInput(''); setError(null) }} className="vista-btn-secondary font-bold text-sm" style={{ padding: '8px 16px' }}>
                       Discard
                     </button>
                   </>
                 )}
               </div>
-              <p className="text-[10px] text-slate-500 font-bold mt-3 italic">AI-generated · all fields editable before saving</p>
+              <p className="text-[10px] text-slate-500 font-bold mt-3 italic">{offlineDraft ? 'Drafted with local rules.' : 'AI draft. Check the details before saving.'}</p>
             </div>
           )}
 

@@ -27,12 +27,6 @@ const I = ({ d, className, style, title, onClick }: IconProps & { d: string | st
   </svg>
 )
 
-const C = ({ cx, cy, r, className, style }: { cx: number; cy: number; r: number } & IconProps) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
-    <circle cx={cx} cy={cy} r={r} />
-  </svg>
-)
-
 // ── Navigation ──────────────────────────────────────────────────────────────
 export const LayoutDashboard = (p: IconProps) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...p}>

@@ -1,14 +1,16 @@
 import type { Task } from '@/lib/data/tasks'
+import { dayKey } from './workload'
 
 export type BalanceVerdict = 'too_much' | 'ok' | 'too_little'
 export interface RemoveItem { id: string; name: string; reason: string }
-export interface AddItem { name: string; category: string; reason: string }
+export interface AddItem { name: string; category: string; reason: string; estimatedMinutes?: number }
 export interface BalanceResult {
   verdict: BalanceVerdict
   headline: string
   reason: string
   remove: RemoveItem[]
   add: AddItem[]
+  source?: 'gemini' | 'rules'
 }
 
 export type TaskInsert = Omit<Task, 'id' | 'createdAt'>
@@ -29,7 +31,7 @@ function demandTypeFor(category: string): string {
 }
 
 /** Map an AI "add" suggestion into a real task insert with safe defaults. */
-export function addSuggestionToTask(item: { name: string; category: string }): TaskInsert {
+export function addSuggestionToTask(item: Pick<AddItem, 'name' | 'category' | 'estimatedMinutes'>, now = new Date()): TaskInsert {
   return {
     name: item.name,
     category: item.category || 'Personal',
@@ -38,9 +40,9 @@ export function addSuggestionToTask(item: { name: string; category: string }): T
     difficulty: 2,
     priority: 3,
     // Suggestions are for today — a concrete date, no invented clock time
-    deadline: new Date().toISOString().split('T')[0],
-    startDate: null,
-    estimatedMinutes: 30,
+    deadline: null,
+    startDate: dayKey(now),
+    estimatedMinutes: item.estimatedMinutes ?? 30,
     notes: '',
     status: 'active',
     recurring: 'none',

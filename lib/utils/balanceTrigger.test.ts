@@ -134,11 +134,11 @@ describe('buildTooLittleResult', () => {
     expect(buildTooLittleResult([])).toBeNull()
   })
 
-  it('builds a too_little verdict naming the missing areas', () => {
+  it('describes the ideas as optional and carries their actual durations', () => {
     const r = buildTooLittleResult(['physical activity', 'social time'])!
     expect(r.verdict).toBe('too_little')
-    expect(r.reason.toLowerCase()).toContain('physical activity')
-    expect(r.reason.toLowerCase()).toContain('social time')
+    expect(r.reason).toContain('optional')
+    expect(r.add).toMatchObject([{ estimatedMinutes: 20 }, { estimatedMinutes: 10 }])
   })
 
   it('suggests one activity per missing area (max 3)', () => {

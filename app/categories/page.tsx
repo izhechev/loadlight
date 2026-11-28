@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import {
   Plus, Trash2, Tag, RefreshCw, Palette, ChevronDown, ChevronRight, ChevronUp,
   CheckCircle, LayoutGrid, CalendarDays, Calendar, ChevronLeft,
@@ -44,7 +44,6 @@ function targetWorkPct(mode: BalanceMode) {
   return mode === 'beast' ? 70 : mode === 'chill' ? 30 : 50
 }
 
-const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 export default function CategoriesPage() {
   const { categories, addCategory, deleteCategory, resetToDefaults, reorderCategories } = useCategoryStore()
@@ -63,12 +62,7 @@ export default function CategoriesPage() {
   useEffect(() => {
     getTasks()
       .then(data => setTasks(data as unknown as Task[]))
-      .catch(() => {
-        try {
-          const t = localStorage.getItem('loadlight-tasks')
-          if (t) setTasks(JSON.parse(t))
-        } catch { /* ignore */ }
-      })
+      .catch(() => setTasks([]))
     try {
       const u = localStorage.getItem('loadlight-user')
       if (u) {
