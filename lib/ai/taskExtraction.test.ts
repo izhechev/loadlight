@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { extractTaskDrafts } from './taskExtraction'
 
 const provider = vi.hoisted(() => ({
@@ -84,7 +84,10 @@ describe('extract route', () => {
     provider.getGeminiAccess.mockReset()
     provider.fetchGemini.mockReset()
     provider.recordAiCall.mockReset()
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
   })
+
+  afterEach(() => vi.restoreAllMocks())
 
   it('returns editable preview fields and uses the browser date without Gemini', async () => {
     const response = await extract('Submit lab report by Monday at 15:00 for 45 minutes')
@@ -123,6 +126,9 @@ describe('extract route', () => {
       { name: 'Review notes', category: 'Study', deadline: '2026-11-29T13:00', notes: 'Physics' },
     ])
     const response = await extract('Review notes today at 13:00\nReview notes tomorrow at 15:00')
+    expect(console.warn).toHaveBeenCalledWith('LoadLight Gemini extraction', {
+      model: expect.any(String), reason: 'unmatched_tasks',
+    })
     expect(await response.json()).toMatchObject({
       offline: true,
       tasks: [
@@ -130,6 +136,21 @@ describe('extract route', () => {
         { deadline: '2026-11-30T15:00', notes: '' },
       ],
     })
+  })
+
+  it('keeps invalid model output out of diagnostics and returns local drafts', async () => {
+    provider.getGeminiAccess.mockResolvedValue({ apiKey: 'fixture' })
+    provider.fetchGemini.mockImplementation(async () => Response.json({
+      candidates: [{ content: { parts: [{ text: 'private text rather than JSON' }] } }],
+    }))
+    const response = await extract('Review notes')
+    const preview = await response.json()
+    expect(preview).toMatchObject({ offline: true, tasks: [{ name: 'Review notes' }] })
+    expect(Object.keys(preview).sort()).toEqual(['offline', 'tasks'])
+    expect(vi.mocked(console.warn).mock.calls).toEqual([
+      ['LoadLight Gemini extraction', { model: expect.any(String), reason: 'invalid_json' }],
+      ['LoadLight Gemini extraction', { model: expect.any(String), reason: 'invalid_json' }],
+    ])
   })
 
   it('matches same-name occurrences only when their times identify each one', async () => {

@@ -107,21 +107,32 @@ export async function POST(request: Request) {
       }
 
       const raw = geminiText(data)
-      if (!raw) continue
+      if (!raw) {
+        console.warn('LoadLight Gemini extraction', { model, reason: 'empty_output' })
+        continue
+      }
       const parsed = extractOutputSchema.safeParse(readGeminiJson(raw))
-      if (!parsed.success) continue
+      if (!parsed.success) {
+        console.warn('LoadLight Gemini extraction', { model, reason: 'invalid_schema' })
+        continue
+      }
 
       const { tasks, clarification } = parsed.data
       const aligned = alignTasks(localTasks, tasks)
       await recordAiCall(access, 'extraction', model, start, data.usageMetadata)
-      if (!aligned) return offline()
+      if (!aligned) {
+        console.warn('LoadLight Gemini extraction', { model, reason: 'unmatched_tasks' })
+        return offline()
+      }
       return Response.json({
         tasks: aligned.map(taskPreview),
         clarification,
         offline: false,
       })
-    } catch {
-      console.warn('LoadLight received no usable task extraction response.')
+    } catch (error) {
+      const reason = error instanceof SyntaxError ? 'invalid_json'
+        : error instanceof Error && error.name === 'TimeoutError' ? 'provider_timeout' : 'request_failed'
+      console.warn('LoadLight Gemini extraction', { model, reason })
     }
   }
 

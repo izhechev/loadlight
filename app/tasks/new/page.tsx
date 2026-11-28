@@ -158,7 +158,7 @@ export default function AddTaskPage() {
       }
       if (!data.tasks?.length) throw new Error('No tasks extracted')
       setPreview(data.tasks)
-      setOfflineDraft(!!data.offline)
+      setOfflineDraft(data.offline !== false)
       if (data.clarification?.question) setClarification(data.clarification)
     } catch {
       const tasks = extractTaskDrafts(input, today, categoryNames).map(taskPreview)
@@ -593,7 +593,7 @@ export default function AddTaskPage() {
                   </>
                 )}
               </div>
-              <p className="text-[10px] text-slate-500 font-bold mt-3 italic">{offlineDraft ? 'Drafted with local rules.' : 'AI draft. Check the details before saving.'}</p>
+              <p className="text-[10px] text-slate-500 font-bold mt-3 italic">{offlineDraft ? 'Drafted with local rules.' : 'Drafted with Gemini. Check the details before saving.'}</p>
             </div>
           )}
 

@@ -25,7 +25,8 @@ Open [localhost:3000](http://localhost:3000) and choose **Try without an account
 1. Copy [`.env.example`](.env.example) to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 2. For a new Supabase database, run the SQL block in [`lib/db/schema.ts`](lib/db/schema.ts) in the Supabase SQL Editor. Then run [`supabase/MIGRATIONS.sql`](supabase/MIGRATIONS.sql) for both new and existing databases. It sets up recurring tasks, checklists and the shared AI quota.
 3. Enable email sign-in in Supabase Auth. Add `http://localhost:3000/auth/callback` for local development and your production callback to the [allowed redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls).
-4. To enable Gemini, set the server-only `GOOGLE_API_KEY`. LoadLight uses [Gemini 3.5 Flash-Lite](https://aistudio.google.com/docs/models/gemini-3.5-flash-lite). Gemini requests require a signed-in account and are limited to 20 app requests per account every 10 minutes.
+4. Set `GOOGLE_API_KEY` or `GEMINI_API_KEY` on the server. If both are set, LoadLight uses `GOOGLE_API_KEY`. On Vercel, set the variable for Production and redeploy after changing it. [Google’s API key guide](https://aistudio.google.com/docs/api-key) · [Vercel environment variables](https://vercel.com/docs/environment-variables/managing-environment-variables)
+5. Sign in and preview a task. The preview says which source drafted it. Each account can make up to 20 AI requests per 10 minutes.
 
 ## Development
 
