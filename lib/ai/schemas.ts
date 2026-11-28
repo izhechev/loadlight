@@ -138,9 +138,44 @@ const extractedTask = z.object({
 export type ExtractedTask = z.infer<typeof extractedTask>
 
 export const extractOutputSchema = z.object({
-  tasks: z.array(extractedTask).min(1).max(60),
+  tasks: z.array(z.preprocess(task => {
+    if (!task || typeof task !== 'object' || Array.isArray(task)) return task
+    return Object.fromEntries(Object.entries(task).filter(([, value]) => value !== null))
+  }, extractedTask)).min(1).max(60),
   clarification,
 })
+
+export const geminiExtractSchema = z.toJSONSchema(extractOutputSchema, {
+  override: ({ zodSchema, jsonSchema }) => {
+    // Validate full dates and size limits locally to keep Gemini's output grammar small.
+    if (zodSchema === dateOrTime) {
+      delete jsonSchema.anyOf
+      jsonSchema.type = 'string'
+    }
+    if (jsonSchema.type === 'object') jsonSchema.required = Object.keys(jsonSchema.properties ?? {})
+    const [value, empty] = jsonSchema.anyOf ?? []
+    if (empty?.type === 'null' && typeof value?.type === 'string') {
+      delete jsonSchema.anyOf
+      Object.assign(jsonSchema, value, { type: [value.type, 'null'] })
+    }
+    delete jsonSchema.default
+    delete jsonSchema.pattern
+    delete jsonSchema.minLength
+    delete jsonSchema.maxLength
+    delete jsonSchema.maxItems
+  },
+})
+delete geminiExtractSchema.$schema
+
+export function extractIssueCodes(error: z.ZodError) {
+  return [...new Set(error.issues.map(({ path, code }) => {
+    const field = path[2]
+    if (path[0] === 'tasks' && typeof field === 'string' && Object.hasOwn(extractedTask.shape, field)) {
+      return field + ':' + code
+    }
+    return (path[0] === 'clarification' ? 'clarification' : 'tasks') + ':' + code
+  }))].slice(0, 6)
+}
 
 const analysisOutput = z.object({
   verdict: z.enum(['overloaded', 'balanced', 'light']),

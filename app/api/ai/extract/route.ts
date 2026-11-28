@@ -1,5 +1,5 @@
 import { readAiRequest } from '@/lib/ai/request'
-import { extractOutputSchema, extractRequestSchema, type ExtractedTask } from '@/lib/ai/schemas'
+import { extractIssueCodes, extractOutputSchema, extractRequestSchema, geminiExtractSchema, type ExtractedTask } from '@/lib/ai/schemas'
 import { fetchGemini, GEMINI_MODELS, geminiText, getGeminiAccess, readGeminiJson, recordAiCall, type GeminiResponse } from '@/lib/ai/server'
 import { extractTaskDrafts, taskPreview, type TaskDraft } from '@/lib/ai/taskExtraction'
 
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
   const requestBody = JSON.stringify({
     systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
     contents: [{ parts: [{ text: JSON.stringify({ today, categories, text }) }] }],
-    generationConfig: { maxOutputTokens: 8192, responseMimeType: 'application/json' },
+    generationConfig: { maxOutputTokens: 8192, responseMimeType: 'application/json', responseJsonSchema: geminiExtractSchema },
     safetySettings: SAFETY_SETTINGS,
   })
   const start = Date.now()
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       }
       const parsed = extractOutputSchema.safeParse(readGeminiJson(raw))
       if (!parsed.success) {
-        console.warn('LoadLight Gemini extraction', { model, reason: 'invalid_schema' })
+        console.warn('LoadLight Gemini extraction', { model, reason: 'invalid_schema', issues: extractIssueCodes(parsed.error) })
         continue
       }
 

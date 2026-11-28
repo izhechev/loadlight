@@ -120,6 +120,38 @@ describe('extract route', () => {
     })
   })
 
+  it('uses structured output on the backup model and accepts null optional details', async () => {
+    provider.fetchGemini.mockResolvedValueOnce(Response.json({}, { status: 503 }))
+    respondFromGemini([{
+      name: 'Review checklist', category: 'Study', notes: null, lifeDomain: null, timesPerDay: null,
+      priority: null, difficulty: null, demandType: null, recurring: null, estimatedMinutes: null, startDate: null, deadline: null,
+    }])
+    const response = await extract('Review checklist')
+    expect(await response.json()).toMatchObject({
+      offline: false,
+      tasks: [{ name: 'Review checklist', notes: '', deadline: null, start_date: null, estimated_minutes: null, times_per_day: 1 }],
+    })
+    for (const [, , body] of provider.fetchGemini.mock.calls) {
+      const { responseJsonSchema } = JSON.parse(body).generationConfig
+      const task = responseJsonSchema.properties.tasks.items
+      expect(task.required).toContain('name')
+      expect(task.properties.deadline.type).toEqual(['string', 'null'])
+      expect(task.properties.recurring.enum).toContain('weekly')
+      expect(responseJsonSchema.properties.clarification.properties.options.items.properties.label.type).toBe('string')
+      expect(JSON.stringify(responseJsonSchema)).not.toMatch(/"pattern"|"default"|"\$schema"/)
+    }
+  })
+
+  it('rejects an invalid date and logs only its field and validation code', async () => {
+    respondFromGemini([{ name: 'Review checklist', category: 'Study', deadline: 'private invalid value' }])
+    provider.fetchGemini.mockResolvedValueOnce(Response.json({}, { status: 503 }))
+    const response = await extract('Review checklist')
+    expect(await response.json()).toMatchObject({ offline: true, tasks: [{ deadline: null }] })
+    expect(vi.mocked(console.warn).mock.calls).toEqual([[
+      'LoadLight Gemini extraction', { model: expect.any(String), reason: 'invalid_schema', issues: ['deadline:invalid_union'] },
+    ]])
+  })
+
   it('uses the original draft when same-name model results cannot be distinguished', async () => {
     respondFromGemini([
       { name: 'Review notes', category: 'Study', deadline: '2026-11-29T13:00', notes: 'Chemistry' },

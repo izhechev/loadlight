@@ -18,32 +18,42 @@ type ChatGeneration = {
 async function generateWithGemini(options: ChatGeneration) {
   const access = await getGeminiAccess()
   if (access) {
-    try {
-      const response = await fetchGemini(GEMINI_MODELS[0], access.apiKey, JSON.stringify({
-        systemInstruction: { parts: [{ text: options.system }] },
-        contents: [{
-          parts: [{
-            text: `${options.prompt}
+    const body = JSON.stringify({
+      systemInstruction: { parts: [{ text: options.system }] },
+      contents: [{
+        parts: [{
+          text: `${options.prompt}
 
 Return a JSON object with this structure:
 ${options.jsonSchemaText}`,
-          }],
         }],
-        generationConfig: {
-          maxOutputTokens: 8_192,
-          responseMimeType: 'application/json',
-        },
-      }))
-      if (response.ok) {
-        const data: GeminiResponse = await response.json()
+      }],
+      generationConfig: { maxOutputTokens: 8_192, responseMimeType: 'application/json' },
+    })
+    for (const model of GEMINI_MODELS) {
+      let data: GeminiResponse
+      try {
+        const response = await fetchGemini(model, access.apiKey, body)
+        if ([404, 408, 429].includes(response.status) || response.status >= 500) continue
+        if (!response.ok) break
+        data = await response.json()
+      } catch (error) {
+        console.warn('LoadLight chat could not read the Gemini response.', { model })
+        if (error instanceof SyntaxError) break
+        continue
+      }
+      try {
+        const finishReason = data.candidates?.[0]?.finishReason
+        if (finishReason && finishReason !== 'STOP') break
         const raw = geminiText(data)
         if (raw) {
           const parsed = chatOutputSchemas[options.mode].safeParse(readGeminiJson(raw))
           if (parsed.success) return { object: parsed.data }
         }
+      } catch {
+        console.warn('LoadLight chat received no usable Gemini response.', { model })
       }
-    } catch {
-      console.warn('LoadLight chat received no usable Gemini response.')
+      break
     }
   }
 
