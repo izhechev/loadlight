@@ -217,7 +217,11 @@ export function buildSchedule(
       const target = anchorDate === date ? day : overflowDay
       const time = timestampTime(task.anchor)
       const start = time ? clockMinutes(time) : target.start
-      if (start >= target.start && firstFreeSlot(target.blocked, start, deadlineLimit(task, target), task.duration) === start) {
+      const inProgress = target === day && anchorDate === today && start < now && now < start + task.duration
+      const fits = firstFreeSlot(target.blocked, start, deadlineLimit(task, target), task.duration) === start
+      if (inProgress && fits) {
+        target.blocked.push({ start, end: start + task.duration })
+      } else if (start >= target.start && fits) {
         add(task, target, start)
       } else {
         target.blocked.push({ start, end: start + task.duration })

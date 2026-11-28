@@ -305,6 +305,8 @@ export default function DashboardPage() {
             urgentCount: dueSoon,
             todayMinutes: day.minutes,
             capacityMinutes: day.capacity,
+            effortPoints: day.effortPoints,
+            demandingTasks: day.demandingTasks,
             plan: { ...advicePlan, conflicts: advicePlan.conflicts?.slice(0, 5) },
           }),
         }).then(res => res.ok ? res.json() as Promise<{ advice: string | null }> : null),
@@ -315,10 +317,10 @@ export default function DashboardPage() {
     } finally {
       if (request === summaryRequest.current) setIsAnalysing(false)
     }
-  }, [week, balanceMode, pending.length, dueSoon, day.minutes, day.capacity, advicePlan])
+  }, [week, balanceMode, pending.length, dueSoon, day.minutes, day.capacity, day.effortPoints, day.demandingTasks, advicePlan])
 
   // Refresh when the work or the next commitment changes, including an appointment starting.
-  const summaryKey = JSON.stringify([state, balanceMode, pending.length, dueSoon, day.minutes, day.capacity, week,
+  const summaryKey = JSON.stringify([state, balanceMode, pending.length, dueSoon, day.minutes, day.capacity, day.effortPoints, day.demandingTasks, week,
     advicePlan.today, advicePlan.next, advicePlan.appointment, advicePlan.flexible, advicePlan.conflicts, advicePlan.resolutions])
   useEffect(() => {
     if (!loaded || lastSummary.current === summaryKey) return
@@ -568,6 +570,9 @@ export default function DashboardPage() {
               <ScheduleConflicts conflicts={advicePlan.conflicts} />
               {nextStep && <p className="font-semibold">{nextStep}</p>}
             </div>
+          )}
+          {day.tasks.length > 0 && (
+            <p className="mb-3 text-sm"><strong>{day.effortPoints} effort points</strong> · {day.demandingTasks} higher-effort {day.demandingTasks === 1 ? 'task' : 'tasks'} today</p>
           )}
           {isAnalysing && !weeklyAnalysis ? (
             <div className="skeu-inset rounded-2xl p-6 text-center">

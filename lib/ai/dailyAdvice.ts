@@ -47,13 +47,17 @@ export function describeDailyPlan(plan: DailyPlan) {
   return booking ? `${first} ${booking}` : first
 }
 
-export function dailyAdviceOptions({ plan, todayMinutes, capacityMinutes, urgentCount, taskCount }: DailyAdviceRequest) {
+export function dailyAdviceOptions({ plan, todayMinutes, capacityMinutes, urgentCount, taskCount, demandingTasks }: DailyAdviceRequest) {
   if (plan?.resolutions?.length) return plan.resolutions
   if (plan?.conflicts?.length) return [
     'Review the flagged commitments first. Confirm any appointment change with the people involved and agree on a new deadline if needed.',
     'Check whether part of the work can be handed off. Keep the listed appointment times until you confirm any change.',
   ]
   const options: string[] = []
+  if (demandingTasks) {
+    const wording = demandingTasks === 1 ? '1 higher-effort task' : `${demandingTasks} higher-effort tasks`
+    options.push(`Today includes ${wording}. Consider grouping routine work around those tasks while keeping the deadlines and appointments.`)
+  }
   if (todayMinutes != null && capacityMinutes != null) {
     const excess = todayMinutes - capacityMinutes
     if (excess > 0) {

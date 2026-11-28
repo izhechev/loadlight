@@ -29,6 +29,14 @@ describe('nextCommitmentTime', () => {
 })
 
 describe('getDailyWorkload', () => {
+  it('distinguishes different work with the same task count and minutes', () => {
+    const work = { deadline: '2026-11-28', estimatedMinutes: 30 }
+    const routine = getDailyWorkload([{ ...work, name: 'Upload a PDF' }], 'average', now)
+    const demanding = getDailyWorkload([{ ...work, name: 'Debug a failing build' }], 'average', now)
+    expect(demanding.minutes).toBe(routine.minutes)
+    expect(demanding.effortPoints).toBeGreaterThan(routine.effortPoints)
+    expect([routine.demandingTasks, demanding.demandingTasks]).toEqual([0, 1])
+  })
   it('uses only today’s planned tasks and open deadlines up to today, excluding hidden rows', () => {
     const day = getDailyWorkload([
       { name: 'Important submission', deadline: '2026-11-28', estimatedMinutes: 180 },

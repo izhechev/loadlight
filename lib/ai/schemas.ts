@@ -89,6 +89,8 @@ export const adviseRequestSchema = z.object({
   urgentCount: count,
   todayMinutes: z.number().nonnegative().max(3_024_000).optional(),
   capacityMinutes: z.number().positive().max(1_440).optional(),
+  effortPoints: count.optional(),
+  demandingTasks: count.optional(),
   plan: z.object({
     today: day,
     currentTime: clockTime,
@@ -162,6 +164,7 @@ export const extractOutputSchema = z.object({
     return Object.fromEntries(Object.entries(task).filter(([, value]) => value !== null))
   }, extractedTask)).min(1).max(60),
   clarification,
+  unclearTasks: z.array(name).max(60).nullish(),
 })
 
 export const geminiExtractSchema = z.toJSONSchema(extractOutputSchema, {

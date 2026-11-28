@@ -3,13 +3,15 @@
 
 import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Brain, Loader2, CheckCircle, Trash2, Plus, ArrowLeft, Zap, AlertTriangle, RefreshCw, Flag, StickyNote, HelpCircle } from "@/lib/icons"
+import { Brain, Loader2, CheckCircle, Trash2, Plus, ArrowLeft, Zap, AlertTriangle, RefreshCw, Flag, StickyNote } from "@/lib/icons"
 import { AppLayout } from "@/components/app-layout"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 import { addTasks, type Task } from "@/lib/data/tasks"
-import { extractTaskDrafts, LIFE_DOMAINS, taskPreview, type TaskPreview as ExtractedTask } from "@/lib/ai/taskExtraction"
+import { extractTaskDrafts, LIFE_DOMAINS, needsTaskDetails, taskPreview, type TaskPreview as ExtractedTask } from "@/lib/ai/taskExtraction"
+import { inferTitleEffort } from "@/lib/utils/taskEffort"
+import { TaskClarificationDialog } from "@/components/task-clarification-dialog"
 import { localDateStr } from "@/lib/utils/scheduling"
 import { isPastDeadline } from "@/lib/utils/recurrence"
 import { CrisisRedirect } from "@/components/rest-mode-overlay"
@@ -99,6 +101,7 @@ export default function AddTaskPage() {
   const [isExtracting, setIsExtracting] = useState(false)
   const [preview, setPreview] = useState<ExtractedTask[] | null>(null)
   const [clarification, setClarification] = useState<Clarification | null>(null)
+  const [unclear, setUnclear] = useState<number[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -114,6 +117,17 @@ export default function AddTaskPage() {
   function updateDraft(index: number, changes: Partial<ExtractedTask>) {
     setPreview(drafts => drafts?.map((draft, i) => i === index ? { ...draft, ...changes } : draft) ?? null)
   }
+
+  function showDrafts(drafts: ExtractedTask[], modelUnclear?: string[]) {
+    setPreview(drafts)
+    setUnclear(drafts.flatMap((draft, index) =>
+      needsTaskDetails(draft.name) || modelUnclear?.includes(draft.name) ? [index] : [],
+    ))
+  }
+
+  const unclearIndex = unclear[0]
+  const unclearDraft = preview?.[unclearIndex]
+  const skipUnclear = () => setUnclear(current => current.slice(1))
 
   function applyClarification(option: Clarification['options'][number]) {
     if (!clarification) return
@@ -137,6 +151,7 @@ export default function AddTaskPage() {
     setIsExtracting(true)
     setPreview(null)
     setClarification(null)
+    setUnclear([])
     setError(null)
     const today = localDateStr()
     const categoryNames = categories.map(category => category.name)
@@ -151,18 +166,18 @@ export default function AddTaskPage() {
         }),
       })
       if (!res.ok) throw new Error('API error')
-      const data = await res.json() as { tasks?: ExtractedTask[]; clarification?: Clarification | null; blocked?: boolean; category?: string; offline?: boolean }
+      const data = await res.json() as { tasks?: ExtractedTask[]; clarification?: Clarification | null; unclearTasks?: string[]; blocked?: boolean; category?: string; offline?: boolean }
       if (data.blocked) {
         if (data.category === 'self_harm') { setShowCrisisModal(true) } else { setShowBlockedModal(true) }
         return
       }
       if (!data.tasks?.length) throw new Error('No tasks extracted')
-      setPreview(data.tasks)
+      showDrafts(data.tasks, data.unclearTasks)
       setOfflineDraft(data.offline !== false)
       if (data.clarification?.question) setClarification(data.clarification)
     } catch {
       const tasks = extractTaskDrafts(input, today, categoryNames).map(taskPreview)
-      setPreview(tasks)
+      showDrafts(tasks)
       setOfflineDraft(true)
       if (!tasks.length) setError('Enter at least one task.')
     } finally {
@@ -370,27 +385,6 @@ export default function AddTaskPage() {
                 Review {preview.length} {preview.length === 1 ? 'task' : 'tasks'}
               </p>
 
-              {/* Clarifying question */}
-                {clarification && (
-                  <div className="mb-4 bg-sky-50 border border-sky-200 rounded-2xl p-4 anim-fade-in-down">
-                    <p className="text-xs font-black text-sky-600 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-                      <HelpCircle className="w-3.5 h-3.5" /> Quick question
-                    </p>
-                    <p className="text-sm font-semibold text-sky-900 mb-3">{clarification.question}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {clarification.options.map(opt => (
-                        <button
-                          key={opt.label}
-                          onClick={() => applyClarification(opt)}
-                          className="px-3 py-1.5 rounded-full text-xs font-black bg-white border border-sky-200 text-sky-700 hover:bg-sky-100 transition-colors shadow-sm"
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
               <div className="space-y-3">
                 {preview.map((task, i) => {
                   const catName = (task.category || 'Personal').toLowerCase()
@@ -596,6 +590,39 @@ export default function AddTaskPage() {
               <p className="text-[10px] text-slate-500 font-bold mt-3 italic">{offlineDraft ? 'Drafted with local rules.' : 'Drafted with Gemini. Check the details before saving.'}</p>
             </div>
           )}
+
+        {unclearDraft ? (
+          <TaskClarificationDialog key={unclearIndex} question={`What do you need to do for “${unclearDraft.name}”?`} onSkip={skipUnclear}>
+            <form onSubmit={event => {
+              event.preventDefault()
+              const name = String(new FormData(event.currentTarget).get('description') ?? '').trim()
+              if (!name || needsTaskDetails(name)) {
+                const input = event.currentTarget.elements.namedItem('description') as HTMLInputElement
+                input.setCustomValidity('Describe the action and what it applies to.')
+                input.reportValidity()
+                return
+              }
+              const effort = inferTitleEffort(name)
+              updateDraft(unclearIndex, { name, ...(effort && { demand_type: effort.type, difficulty: effort.difficulty }) })
+              skipUnclear()
+            }}>
+              <label className="block text-sm font-semibold" htmlFor="task-detail-description">What needs doing?</label>
+              <input id="task-detail-description" name="description" required maxLength={512}
+                onInput={event => event.currentTarget.setCustomValidity('')}
+                className="input-skeu block w-full px-3 py-2 my-2 rounded-lg text-sm" />
+              <button className="glow-button px-3 py-2 text-sm font-bold" type="submit">Update task</button>
+            </form>
+          </TaskClarificationDialog>
+        ) : preview && clarification && (
+          <TaskClarificationDialog question={clarification.question} onSkip={() => setClarification(null)}>
+            <div className="flex flex-wrap gap-2">
+              {clarification.options.map(opt => (
+                <button key={opt.label} type="button" onClick={() => applyClarification(opt)}
+                  className="vista-btn-secondary px-3 py-2 text-sm">{opt.label}</button>
+              ))}
+            </div>
+          </TaskClarificationDialog>
+        )}
 
         {currentPastDeadlineTask && (
           <PastDeadlineModal

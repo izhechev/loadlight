@@ -1,5 +1,6 @@
 import { nextDateForWeekday, requestedWeekday } from '@/lib/utils/dateWords'
 import { parseEveryNDays } from '@/lib/utils/recurrence'
+import { inferTitleEffort } from '@/lib/utils/taskEffort'
 
 export const LIFE_DOMAINS = ['work', 'study', 'personal', 'health', 'finance', 'social', 'creativity', 'home'] as const
 export type LifeDomain = typeof LIFE_DOMAINS[number]
@@ -141,6 +142,8 @@ function extractLine(line: string, today: string, categories?: string[]): TaskDr
   name = name[0].toUpperCase() + name.slice(1)
 
   const rule = RULES.find(([pattern]) => pattern.test(name))
+  const inferred = inferTitleEffort(name)
+  const effort = inferred?.type === 'routine' && rule && rule[2] !== 'routine' ? undefined : inferred
   const preferred = rule?.[3] ?? 'Personal'
   const category = categories?.find(value => value.toLowerCase() === preferred.toLowerCase())
     ?? categories?.find(value => value.toLowerCase() === 'personal')
@@ -155,8 +158,8 @@ function extractLine(line: string, today: string, categories?: string[]): TaskDr
     name,
     category,
     lifeDomain: rule?.[1] ?? 'personal',
-    demandType: rule?.[2] ?? 'routine',
-    difficulty: 2,
+    demandType: effort?.type ?? rule?.[2] ?? 'routine',
+    difficulty: effort?.difficulty ?? 2,
     priority: 3,
     deadline: appointment ? null : time ? `${baseDate}T${time}` : dates ?? (recurring !== 'none' ? today : null),
     startDate: appointment ? `${baseDate}T${time}` : startDate,
@@ -194,3 +197,9 @@ export function taskPreview({
 }
 
 export type TaskPreview = ReturnType<typeof taskPreview>
+export function needsTaskDetails(name: string) {
+  const title = name.trim().replace(/[.!?]+$/, '')
+  return /^(?:(?:do|handle|fix|sort out|finish|review|check|work on|take care of|deal with)\s+)?(?:(?:the|that|this|some|my)\s+)?(?:it|stuff|things?|something|task|whatever|tbd|todo|[?]+)$/i.test(title)
+    || /^(?:do|handle|fix|finish|review|check|work(?: on)?|prepare|send|submit|call|email|buy|book|sort out)$/i.test(title)
+    || /^[A-Z\d_-]{2,12}$/.test(title)
+}

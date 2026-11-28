@@ -1,5 +1,6 @@
 import type { DemandType, TaskSignalData } from '@/lib/store/overwhelmedStore'
 import { localDeadlineMs } from './recurrence'
+import { taskEffort } from './taskEffort'
 import { toughDayThreshold } from './toughDays'
 import { effectiveDeadline } from './taskUtils'
 
@@ -79,8 +80,11 @@ export function getDailyWorkload<T extends WorkloadTask>(tasks: readonly T[], mo
     return plannedDay(task) === today || (!!due && due <= today)
   })
   const minutes = active.reduce((total, task) => total + taskMinutes(task), 0)
+  const efforts = active.map(task => taskEffort(task.name, task.demandType ?? task.demand_type, task.difficulty))
+  const effortPoints = efforts.reduce((total, task) => total + task.points, 0)
+  const demandingTasks = efforts.filter(task => task.points >= 4).length
   const capacity = toughDayThreshold(mode)
-  return { today, tasks: active, minutes, capacity, heavy: minutes >= capacity }
+  return { today, tasks: active, minutes, capacity, heavy: minutes >= capacity, effortPoints, demandingTasks }
 }
 
 export function getWeeklyWorkload(tasks: readonly WorkloadTask[], now = Date.now()) {
@@ -134,8 +138,8 @@ export function getTaskSignals(tasks: readonly WorkloadTask[], now = Date.now())
     const ms = new Date(timestamp).getTime()
     return ms >= oldest && ms <= now
   }
-  for (const task of active) {
-    const type = ('demandType' in task ? task.demandType : task.demand_type) ?? 'routine'
+  const effort = active.map(task => taskEffort(task.name, task.demandType ?? task.demand_type, task.difficulty))
+  for (const { demand: type } of effort) {
     demandTypeCounts[Object.hasOwn(demandTypeCounts, type) ? type as DemandType : 'routine']++
   }
   return {
@@ -146,7 +150,7 @@ export function getTaskSignals(tasks: readonly WorkloadTask[], now = Date.now())
     tasksWithDeadlines: active.filter(task => task.deadline).length,
     tasksDueWithin48h: active.filter(task => dueIn48Hours(workloadDeadline(task, now), now)).length,
     demandTypeCounts,
-    totalUndoneDifficulty: active.reduce((total, task) => total + (task.difficulty ?? 2), 0),
+    totalUndoneDifficulty: effort.reduce((total, task) => total + task.points, 0),
     totalUndoneMinutes: active.reduce((total, task) => total + taskMinutes(task), 0),
   }
 }

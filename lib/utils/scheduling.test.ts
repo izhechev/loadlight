@@ -119,6 +119,7 @@ describe('buildSchedule', () => {
       task('Flexible', { estimated_minutes: 30 }),
     ], { today, currentTime: '09:15' })
     expect(plan.scheduled[0]?.start_date).toBe(at('10:00'))
+    expect(plan.unscheduled).toEqual([])
   })
 
   it('keeps an ongoing recurring slot occupied until its end', () => {

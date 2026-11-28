@@ -7,7 +7,8 @@ const SYSTEM_PROMPT = `Extract tasks in the order they appear. Return a JSON obj
 Each task has name, category, lifeDomain, demandType, difficulty, priority, deadline, startDate, estimatedMinutes, notes, recurring, recurringHours, recurringDays and timesPerDay.
 - Keep the original wording of each task name, removing only its scheduling details. Keep separate lines and distinct actions as separate tasks.
 - Use the provided category names. lifeDomain is work, study, personal, health, finance, social, creativity or home.
-- demandType is cognitive, emotional, creative, routine or physical. Difficulty is 1–5 and priority is 1–4.
+- demandType is cognitive, emotional, creative, routine or physical. Difficulty is 1–5 and priority is 1–4. Judge effort by the work described, such as troubleshooting or a difficult conversation versus uploading a file, independently of the duration.
+- Put the exact extracted names of all tasks whose action, subject, or meaning is unclear into unclearTasks. Keep them as drafts and leave their unclear details unset. Return an empty array when no task needs explanation.
 - Use YYYY-MM-DD for date-only deadlines and YYYY-MM-DDTHH:mm for a date with a time. Use the provided date as the reference for relative days and weekdays. Use null when there is no date or time. Use startDate for an appointment at a fixed time. Use deadline for an action that needs to finish by a time.
 - estimatedMinutes is minutes only when the user gives a duration. Use null otherwise.
 - recurring is none, daily, weekly, monthly or yearly. Preserve explicit cadence. Use recurringHours for every N hours and recurringDays for every N days, or the month/year interval for monthly/yearly tasks.
@@ -117,7 +118,7 @@ export async function POST(request: Request) {
         continue
       }
 
-      const { tasks, clarification } = parsed.data
+      const { tasks, clarification, unclearTasks } = parsed.data
       const aligned = alignTasks(localTasks, tasks)
       await recordAiCall(access, 'extraction', model, start, data.usageMetadata)
       if (!aligned) {
@@ -127,6 +128,7 @@ export async function POST(request: Request) {
       return Response.json({
         tasks: aligned.map(taskPreview),
         clarification,
+        unclearTasks: aligned.filter(task => unclearTasks?.includes(task.name)).map(task => task.name),
         offline: false,
       })
     } catch (error) {

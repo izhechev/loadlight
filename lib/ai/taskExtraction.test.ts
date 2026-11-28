@@ -80,6 +80,17 @@ describe('extract route', () => {
     }))
   }
 
+  it('returns unclear task names only when they belong to the draft', async () => {
+    provider.getGeminiAccess.mockResolvedValue({ apiKey: 'fixture' })
+    provider.fetchGemini.mockResolvedValueOnce(Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({
+      tasks: [{ name: 'Handle the thing', category: 'Personal' }],
+      unclearTasks: ['Handle the thing', 'Made-up task'],
+    }) }] } }] }))
+    expect(await (await extract('Handle the thing today')).json()).toMatchObject({
+      unclearTasks: ['Handle the thing'], offline: false,
+    })
+  })
+
   beforeEach(() => {
     provider.getGeminiAccess.mockReset()
     provider.fetchGemini.mockReset()
