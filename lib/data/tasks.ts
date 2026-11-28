@@ -22,6 +22,12 @@ export function enableGuestMode(): void {
   }
 }
 
+export function disableGuestMode(): void {
+  if (typeof document !== 'undefined') {
+    document.cookie = 'll-guest=; path=/; max-age=0; samesite=lax'
+  }
+}
+
 /** Data stays in localStorage when Supabase is absent (demo) or the user is a guest. */
 export function isLocalMode(): boolean {
   return IS_DEMO || isGuestMode()

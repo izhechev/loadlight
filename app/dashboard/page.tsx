@@ -10,6 +10,7 @@ import { useOverwhelmedStore, type DemandType, type TaskSignalData } from "@/lib
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
 import { ClassicIcon, categoryIconName } from "@/lib/classic-icons"
 import { getTasks, updateTask, isLocalMode } from "@/lib/data/tasks"
+import styles from "./dashboard.module.css"
 
 type BalanceMode = 'beast' | 'average' | 'chill'
 
@@ -76,7 +77,7 @@ function saveSparkHistory(entries: SparkEntry[]) {
 
 // ── Classic bar mini-chart (chunky bars, 2008 style) ──
 function Spark({ data, dataKey, color }: { data: SparkEntry[]; dataKey: keyof SparkEntry; color: string }) {
-  if (data.length < 2) return <div className="h-8 flex items-center text-[10px]" style={{ color: '#9ab0c8' }}>no history</div>
+  if (data.length < 2) return null
   const values = data.map(d => d[dataKey] as number)
   const max = Math.max(...values, 1)
   return (
@@ -119,12 +120,12 @@ function StatCard({ label, value, color, sparkData, sparkKey, sparkColor, deltaF
       : (delta > 0 ? `+${delta}` : String(delta))
 
   return (
-    <div className="skeu-card p-4 flex flex-col gap-1.5">
-      <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: '#5a7a9a' }}>{label}</span>
+    <div className={styles.stat}>
+      <span className={styles.statLabel}>{label}</span>
       <span className={`text-2xl font-bold ${color}`} style={{ lineHeight: 1 }}>{value}</span>
       <Spark data={sparkData} dataKey={sparkKey} color={sparkColor} />
       {deltaStr !== null && (
-        <span className="text-[10px]" style={{ color: delta! > 0 ? '#a83232' : delta! < 0 ? '#1a7a50' : '#7a8a9a' }}>
+        <span className="text-[10px]" style={{ color: delta! > 0 ? '#a83232' : delta! < 0 ? '#196244' : '#3e5a6d' }}>
           {deltaStr} since last week
         </span>
       )}
@@ -132,44 +133,48 @@ function StatCard({ label, value, color, sparkData, sparkKey, sparkColor, deltaF
   )
 }
 
-// ── Overwhelmed Feedback (no emoji faces) ──
-function OverwhelmedFeedback({ score, state }: { score: number; state: 'normal' | 'elevated' | 'overwhelmed' }) {
-  const cfg = {
-    normal:      { dot: '#34d399', label: 'Light',    headline: "You're managing well",      sub: "Your workload looks balanced. Keep it up!" },
-    elevated:    { dot: '#fbbf24', label: 'Moderate', headline: "Your plate is getting full", sub: "Things are building up. Consider completing a task before adding more." },
-    overwhelmed: { dot: '#f87171', label: 'Heavy',    headline: "Time to take a breather",   sub: "Rest mode is active. Focus on what truly matters right now." },
+function OverwhelmedFeedback({ score, state, activeCount }: {
+  score: number
+  state: 'normal' | 'elevated' | 'overwhelmed'
+  activeCount: number
+}) {
+  const { label, headline, description } = {
+    normal: {
+      label: 'Light',
+      headline: "You're managing well",
+      description: 'Your workload looks balanced.',
+    },
+    elevated: {
+      label: 'Moderate',
+      headline: 'Your plate is getting full',
+      description: 'Consider completing a task before adding more.',
+    },
+    overwhelmed: {
+      label: 'Heavy',
+      headline: 'Time to take a breather',
+      description: 'Rest mode is active. Focus on what truly matters right now.',
+    },
   }[state]
+  const scorePercent = Math.round(score * 100)
 
   return (
-    <div className="flex items-center gap-4">
-      {/* Dot + label */}
-      <div className="flex flex-col items-center gap-1 shrink-0">
-        <span className="w-4 h-4 rounded-full shadow-sm" style={{ background: cfg.dot, boxShadow: `0 0 6px ${cfg.dot}88`, border: '1px solid rgba(0,0,0,0.15)' }} />
-        <span className="text-[10px] font-bold" style={{ color: '#6a8aaa' }}>Load</span>
-        <span className="text-xs font-black" style={{ color: '#1a1a1a' }}>{cfg.label}</span>
+    <section className={styles.loadPanel} data-state={state} aria-labelledby="load-status-title">
+      <div className={styles.loadStatus}>
+        <div className={styles.loadOrb} aria-hidden="true" />
+        <span>{label} load</span>
       </div>
-
-      {/* Text */}
-      <div className="flex-1 min-w-0">
-        <p className="font-black text-xl" style={{ color: '#1a1a1a' }}>{cfg.headline}</p>
-        <p className="text-sm mt-0.5" style={{ color: '#4a6a8a' }}>{cfg.sub}</p>
-        {/* Score bar — Aero aqua progress */}
-        <div className="mt-2 h-3 progress-track rounded-full overflow-hidden">
-          <div
-            className={`h-full progress-aero transition-all duration-700 ${
-              state === 'elevated' ? '!bg-gradient-to-r from-amber-300 via-amber-400 to-orange-500' :
-              state === 'overwhelmed' ? '!bg-gradient-to-r from-rose-400 via-red-500 to-rose-600' : ''
-            }`}
-            style={{ width: `${Math.round(score * 100)}%` }}
-          />
+      <div className={styles.loadDetails}>
+        <h2 id="load-status-title">{headline}</h2>
+        <p>{description}</p>
+        <div className={styles.loadTrack} aria-hidden="true">
+          <div className={styles.loadFill} style={{ width: `${scorePercent}%` }} />
         </div>
-        <div className="flex justify-between text-[10px] mt-0.5 font-medium" style={{ color: '#7a9ab8' }}>
-          <span>0</span>
-          <span>score: {Math.round(score * 100)}/100</span>
-          <span>100</span>
+        <div className={styles.loadMeta}>
+          <span>Load score {scorePercent}/100</span>
+          <span>{activeCount} {activeCount === 1 ? 'task' : 'tasks'} left</span>
         </div>
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -489,24 +494,8 @@ export default function DashboardPage() {
 
       <div className="space-y-4 max-w-4xl mx-auto">
 
-        {/* ── Wellbeing card (OverwhelmedFeedback — no emoji faces) ── */}
-        <div
-          className={`skeu-card p-5 anim-fade-in-up ${
-            state === 'overwhelmed' ? 'aero-danger'  :
-            state === 'elevated'    ? 'aero-warning' :
-                                      'aero-success'
-          }`}
-        >
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <OverwhelmedFeedback score={compositeScore} state={state} />
-            </div>
-            <div className="hidden sm:flex flex-col items-end gap-1 shrink-0">
-              <span className="text-xs" style={{ color: '#6a8aaa', fontWeight: 700 }}>Tasks left</span>
-              <span className="text-2xl font-black" style={{ color: '#1a1a1a' }}>{undoneTasks.length}</span>
-            </div>
-          </div>
-        </div>
+        <h1 className={styles.pageTitle}>Workload overview</h1>
+        <OverwhelmedFeedback score={compositeScore} state={state} activeCount={undoneTasks.length} />
 
         {/* ── Chill Mode suggestions (only in chill balance mode) ── */}
         {balanceMode === 'chill' && tasks.length > 0 && (
@@ -518,10 +507,10 @@ export default function DashboardPage() {
 
         {/* ── Stats row with sparklines ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 anim-fade-in-up" style={{ animationDelay: '0.05s' }}>
-          <StatCard label="Total tasks"      value={tasks.length}                                      color="text-sky-600"                                    sparkData={sparkHistory} sparkKey="undone"   sparkColor="#0ea5e9" />
-          <StatCard label="Completed"        value={tasks.filter(t => t.done).length}                  color="text-emerald-600"                                sparkData={sparkHistory} sparkKey="done"    sparkColor="#10b981" />
-          <StatCard label="Hours estimated"  value={`${Math.round(activeMin / 60 * 10) / 10}h`}        color="text-purple-600"                                 sparkData={sparkHistory} sparkKey="minutes" sparkColor="#a855f7" deltaFormat={m => `${Math.round(m / 60 * 10) / 10}h`} />
-          <StatCard label="Due soon"         value={dueSoon.length}                                     color={dueSoon.length > 0 ? 'text-red-500' : 'text-slate-500'} sparkData={sparkHistory} sparkKey="dueSoon" sparkColor="#ef4444" />
+          <StatCard label="Total tasks"      value={tasks.length}                                      color="text-sky-800"                                    sparkData={sparkHistory} sparkKey="undone"   sparkColor="#0ea5e9" />
+          <StatCard label="Completed"        value={tasks.filter(t => t.done).length}                  color="text-emerald-800"                                sparkData={sparkHistory} sparkKey="done"    sparkColor="#10b981" />
+          <StatCard label="Hours estimated"  value={`${Math.round(activeMin / 60 * 10) / 10}h`}        color="text-purple-800"                                 sparkData={sparkHistory} sparkKey="minutes" sparkColor="#a855f7" deltaFormat={m => `${Math.round(m / 60 * 10) / 10}h`} />
+          <StatCard label="Due soon"         value={dueSoon.length}                                     color={dueSoon.length > 0 ? 'text-red-800' : 'text-slate-700'} sparkData={sparkHistory} sparkKey="dueSoon" sparkColor="#ef4444" />
         </div>
 
         <div className="grid md:grid-cols-2 gap-4">

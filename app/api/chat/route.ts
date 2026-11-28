@@ -1,44 +1,52 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { readAiRequest } from '@/lib/ai/request'
 import { parseEveryNDays } from '@/lib/utils/recurrence'
+import { chatOutputSchemas, chatRequestSchema, type ChatTask } from '@/lib/ai/schemas'
+import { fetchGemini, GEMINI_MODELS, geminiText, getGeminiAccess, readGeminiJson, type GeminiResponse } from '@/lib/ai/server'
 
-export const runtime = 'edge'
+type ChatGeneration = {
+  mode: keyof typeof chatOutputSchemas
+  jsonSchemaText: string
+  system: string
+  prompt: string
+  tasks?: ChatTask[]
+}
 
-// Direct Gemini API call using simple fetch
-async function generateWithGemini(options: any) {
-  const apiKey = process.env.GOOGLE_API_KEY
-  const model = "gemini-2.5-flash"
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+async function generateWithGemini(options: ChatGeneration) {
+  const access = await getGeminiAccess()
+  if (access) {
+    try {
+      const response = await fetchGemini(GEMINI_MODELS[0], access.apiKey, JSON.stringify({
+        systemInstruction: { parts: [{ text: options.system }] },
         contents: [{
           parts: [{
-            text: `${options.system}\n\n${options.prompt}\n\nCRITICAL: You must output ONLY a valid JSON object matching this exact structure:\n${options.jsonSchemaText}`
-          }]
+            text: `${options.prompt}
+
+Return a JSON object with this structure:
+${options.jsonSchemaText}`,
+          }],
         }],
         generationConfig: {
-          temperature: 0.2,
-          responseMimeType: 'application/json'
+          maxOutputTokens: 8_192,
+          responseMimeType: 'application/json',
+        },
+      }))
+      if (response.ok) {
+        const data: GeminiResponse = await response.json()
+        const raw = geminiText(data)
+        if (raw) {
+          const parsed = chatOutputSchemas[options.mode].safeParse(readGeminiJson(raw))
+          if (parsed.success) return { object: parsed.data }
         }
-      })
-    })
-
-    const data = await response.json()
-    let textContent = data.candidates?.[0]?.content?.parts?.[0]?.text
-
-    if (textContent) {
-      // Strip any residual markdown code blocks just in case
-      textContent = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-      return { object: JSON.parse(textContent) }
+      }
+    } catch {
+      console.warn('LoadLight chat received no usable Gemini response.')
     }
-  } catch (err) {
-    console.error('Gemini direct fetch error:', err)
   }
 
-  // Smart Mock Fallback if API fails
+  if (options.mode === 'breakdown') return { object: null }
+
+  // Rule-based fallback when the AI service is unavailable.
   if (options.mode === 'extract') {
     const match = options.prompt.match(/<user_input>\s*([\s\S]*?)\s*<\/user_input>/)
     const text = match ? match[1] : ''
@@ -127,61 +135,12 @@ async function generateWithGemini(options: any) {
     return { object: { tasks } } as any
   }
 
-  // Schedule fallback — runs the greedy algorithm locally when AI is unavailable
-  if (options.mode === 'schedule') {
-    const taskList: Array<{ id: string; name: string; priority?: number; estimated_minutes?: number | null; done?: boolean }> = options.scheduleTasks ?? []
-
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
-    const overflowDate = tomorrow.toISOString().split('T')[0]
-
-    // Start from current time clamped into working hours (08:00–23:00)
-    const nowMin = Math.max(today.getHours() * 60 + today.getMinutes(), 8 * 60)
-    const endOfDayMin = 23 * 60
-    const fmt = (min: number) =>
-      `${Math.floor(min / 60).toString().padStart(2, '0')}:${(min % 60).toString().padStart(2, '0')}`
-
-    const toSchedule = taskList
-      .filter(t => !t.done)
-      .sort((a, b) => {
-        const pa = a.priority ?? 3
-        const pb = b.priority ?? 3
-        if (pa !== pb) return pa - pb
-        return (a.estimated_minutes ?? 30) - (b.estimated_minutes ?? 30)
-      })
-
-    const scheduled: { id: string; start_date: string; deadline: string }[] = []
-    const overflow:  { id: string; deadline: string }[] = []
-    let cursor = nowMin
-
-    for (const task of toSchedule) {
-      const dur = task.estimated_minutes ?? 30
-      if (cursor + dur <= endOfDayMin) {
-        scheduled.push({
-          id: task.id,
-          start_date: `${todayStr}T${fmt(cursor)}`,
-          deadline:   `${todayStr}T${fmt(cursor + dur)}`,
-        })
-        cursor += dur
-      } else {
-        overflow.push({ id: task.id, deadline: `${overflowDate}T09:00` })
-      }
-    }
-
-    const message = scheduled.length
-      ? `Scheduled ${scheduled.length} task${scheduled.length !== 1 ? 's' : ''} from ${fmt(nowMin)}. Moved ${overflow.length} to ${overflowDate}.`
-      : `Nothing fits today. All ${overflow.length} tasks moved to ${overflowDate}.`
-
-    return { object: { scheduled, overflow, message } } as any
-  }
-
   if (options.mode === 'triage') {
     return { object: { canSkip: [], urgent: [], question: null } } as any
   }
 
   if (options.mode === 'chill-snooze') {
-    const taskList: any[] = options.tasks ?? []
+    const taskList = options.tasks ?? []
     const now = Date.now()
     const in48h = now + 172800000
     const HEALTH = /pill|medication|medicine|vitamin|supplement|therapy|doctor|medical|lamictal|lithium/i
@@ -199,8 +158,8 @@ async function generateWithGemini(options: any) {
   return { object: {
     verdict: 'balanced',
     trend: 'AI is currently in offline mode.',
-    advice: 'Your workload looks manageable based on recent data.',
-    suggestion: 'Keep maintaining your current pace.'
+    advice: '',
+    suggestion: ''
   }} as any
 }
 
@@ -224,32 +183,9 @@ function sanitise(input: string): string {
 
 
 export async function POST(req: Request) {
-  const body = await req.json() as {
-    text?: string
-    mode: string
-    categories?: string[]
-    tasks?: Array<{
-      id?: string
-      name: string
-      category?: string
-      demand_type?: string
-      estimated_minutes?: number | null
-      priority?: number
-      done?: boolean
-      deadline?: string | null
-      start_date?: string | null
-    }>
-    balanceMode?: string
-    state?: string             // overwhelmed-state suppression for balance-check
-    dayLoadMinutes?: number    // total estimated minutes of today's active tasks
-    toughDayThreshold?: number // tough-day cutoff in minutes (scales with balance mode)
-    recentToughDays?: number   // consecutive tough days ending today (incl. today)
-    missingAreas?: string[]    // life areas with no active task (balance-check)
-    overflowDate?: string // "YYYY-MM-DD" — schedule mode
-    todayStr?: string     // client's LOCAL date — server clock is UTC
-    currentTime?: string  // "HH:MM" — current wall-clock time
-    history?: { role: 'assistant' | 'user'; text: string }[] // schedule_chat conversation
-  }
+  const body = await readAiRequest(req, chatRequestSchema)
+  if (body instanceof Response) return body
+
   const { mode, tasks, balanceMode } = body
   const categories = body.categories ?? ['Work', 'Study', 'Personal', 'Exercise', 'Creative', 'Admin']
   const text = body.text ? sanitise(body.text) : ''
@@ -445,8 +381,8 @@ Give a trend observation, one piece of advice, and one specific actionable sugge
   }
 
   if (mode === 'breakdown') {
-    return Response.json((await generateWithGemini({
-      mode: 'extract', // Reuse the extract mock logic if it fails
+    const result = await generateWithGemini({
+      mode: 'breakdown',
       jsonSchemaText: `{ "tasks": [{ "name": "string", "category": "string", "demand_type": "cognitive" | "emotional" | "creative" | "routine" | "physical", "difficulty": number (1-5), "deadline": "YYYY-MM-DDTHH:mm" or null, "start_date": "YYYY-MM-DDTHH:mm" or null, "priority": 1 | 2 | 3 | 4, "notes": "string", "estimated_minutes": number or null, "recurring": "none" | "daily" | "weekly" | "monthly" | "yearly", "times_per_day": number }] }`,
       system: `You are a productivity expert for LoadLight. Your job is to break down a single, large, overwhelming task into 3 to 5 smaller, highly actionable sub-tasks.`,
       prompt: `Please break down this large task into smaller steps:
@@ -464,7 +400,9 @@ RULES:
 2. Keep the original category if possible, or use the most relevant one from the list.
 3. Make the estimated_minutes for each sub-task smaller (e.g., 10-30 mins).
 4. Use sentence case for task names and start with a clear action verb.`,
-    })).object)
+    })
+    if (!result.object) return Response.json({ error: 'Task breakdown is unavailable.' }, { status: 503 })
+    return Response.json(result.object)
   }
 
   if (mode === 'schedule_chat') {
@@ -494,7 +432,7 @@ RULES:
     }
     const conversationSummary = qaPairs.join('\n---\n')
     const taskList_str = undoneTasks.map((t, i) => {
-      const rec = (t as any).recurring
+      const rec = t.recurring
       const recLabel = rec && rec !== 'none' ? ` | ${rec}` : ''
       return `[${i}] "${t.name}" | ~${t.estimated_minutes ?? 30}min | priority ${t.priority ?? 3}${recLabel}`
     }).join('\n')
@@ -744,7 +682,7 @@ Rules:
       while (fi < flexTasks.length) {
         const task = flexTasks[fi]
         const dur = task.estimated_minutes ?? 30
-        if (cursor + dur <= 24 * 60) {
+        if (cursor + dur <= endOfDayMin) {
           scheduled.push({ id: task.id ?? '', name: task.name, start_date: `${scheduleDate}T${fmt(cursor)}`, deadline: `${scheduleDate}T${fmt(cursor + dur)}` })
           cursor += dur
         } else {
@@ -791,7 +729,7 @@ Rules:
 Today: ${todayStr}
 
 Tasks:
-${undoneTasks.map((t, i) => `[${i}] "${t.name}" | priority ${(t as any).priority ?? 3}/4 | difficulty ${(t as any).difficulty ?? 2}/5 | ~${t.estimated_minutes ?? 30}min | deadline: ${t.deadline ?? 'none'} | type: ${t.demand_type ?? 'routine'}`).join('\n')}
+${undoneTasks.map((t, i) => `[${i}] "${t.name}" | priority ${t.priority ?? 3}/4 | difficulty ${t.difficulty ?? 2}/5 | ~${t.estimated_minutes ?? 30}min | deadline: ${t.deadline ?? 'none'} | type: ${t.demand_type ?? 'routine'}`).join('\n')}
 
 Instructions:
 1. canSkip: tasks with no deadline, priority 3-4, or routine tasks with no time constraint. These can wait until tomorrow or later. Limit to the 3 best candidates.
@@ -808,7 +746,7 @@ Instructions:
     const activeTasks = taskList.filter(t => !t.done)
     const now = new Date()
     const taskSummary = activeTasks.map(t =>
-      `- id:"${(t as any).id ?? ''}" name:"${t.name}" [cat:${t.category ?? 'Unknown'}, priority:${(t as any).priority ?? 3}/4, deadline:${t.deadline ?? 'none'}]`
+      `- id:"${t.id ?? ''}" name:"${t.name}" [cat:${t.category ?? 'Unknown'}, priority:${t.priority ?? 3}/4, deadline:${t.deadline ?? 'none'}]`
     ).join('\n')
 
     if (activeTasks.length === 0) {

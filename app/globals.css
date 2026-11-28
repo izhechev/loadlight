@@ -1,11 +1,6 @@
 @import "tailwindcss";
 
-/* =============================================
-   WINDOWS VISTA 2008 — Authentic Aero Theme
-   Written in the style of CSS circa 2008.
-   No CSS variables. No backdrop-filter.
-   No CSS Grid. Vendor prefixes throughout.
-   ============================================= */
+/* Shared styles for the LoadLight Aero theme */
 
 /* ── Font stack (classic Windows UI — Tahoma / MS Sans Serif) ── */
 * {
@@ -24,31 +19,29 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* =============================================
-   AURORA DESKTOP BACKGROUND
-   Vista's signature wallpaper: dark teal
-   with glowing blue-green aurora streaks
-   ============================================= */
+/* Daylight desktop wallpaper */
 .aero-bg {
   min-height: 100vh;
+  min-height: 100svh;
   position: relative;
-  overflow-x: hidden;
-  background-color: #062030;
-  background-image: url('/background.png');
+  overflow-x: clip;
+  background-color: #398051;
+  background-image:
+    linear-gradient(180deg, rgb(7 57 98 / 15%), transparent 42%, rgb(45 85 39 / 23%)),
+    url('/aero-landscape.webp'),
+    linear-gradient(175deg, #419ed7, #d9fbff 63%, #79bc47 78%, #398051);
   background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
   background-attachment: fixed;
-  background-position: center center;
 }
 
-/* Aurora overlay — teal glow on dark blue */
-.aero-bg::before {
-  content: '';
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-color: transparent;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3CradialGradient id='a' cx='30%25' cy='60%25' r='55%25'%3E%3Cstop offset='0%25' stop-color='%23006644' stop-opacity='0.45'/%3E%3Cstop offset='100%25' stop-color='%23000000' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='b' cx='75%25' cy='35%25' r='45%25'%3E%3Cstop offset='0%25' stop-color='%230066aa' stop-opacity='0.30'/%3E%3Cstop offset='100%25' stop-color='%23000000' stop-opacity='0'/%3E%3C/radialGradient%3E%3Crect width='100%25' height='100%25' fill='url(%23a)'/%3E%3Crect width='100%25' height='100%25' fill='url(%23b)'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 0;
+@media (max-width: 767px) {
+  .aero-bg {
+    background-attachment: scroll;
+    background-position: 60% top;
+    background-size: auto max(100svh, 640px);
+  }
 }
 
 /* =============================================
@@ -135,86 +128,6 @@ body {
 }
 
 /* =============================================
-   VISTA TITLE BAR (window header)
-   The iconic blue gradient header.
-   Active: medium blue → darker blue
-   ============================================= */
-.vista-header {
-  background-color: #3a85c8;
-  background-image: -webkit-gradient(linear, left top, left bottom, from(#7fc0e8), color-stop(45%, #2e7cc8), color-stop(50%, #1f6ab8), to(#2878c8));
-  background-image: -moz-linear-gradient(top, #7fc0e8 0%, #2e7cc8 45%, #1f6ab8 50%, #2878c8 100%);
-  background-image: linear-gradient(to bottom, #7fc0e8 0%, #2e7cc8 45%, #1f6ab8 50%, #2878c8 100%);
-  border: 1px solid #1a5598;
-  border-top-color: #8ecae8;
-  border-bottom-color: #0e3d7a;
-  -webkit-border-radius: 10px;
-  -moz-border-radius: 10px;
-  border-radius: 10px;
-  -webkit-box-shadow: 0 4px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.55), 0 0 0 1px rgba(10,50,120,0.30);
-  -moz-box-shadow: 0 4px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.55), 0 0 0 1px rgba(10,50,120,0.30);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.55), 0 0 0 1px rgba(10,50,120,0.30);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Gloss highlight on header */
-.vista-header::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 45%;
-  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.30)), to(rgba(255,255,255,0.00)));
-  background-image: -moz-linear-gradient(top, rgba(255,255,255,0.30), rgba(255,255,255,0.00));
-  background-image: linear-gradient(to bottom, rgba(255,255,255,0.30), rgba(255,255,255,0.00));
-  -webkit-border-radius: 10px 10px 0 0;
-  -moz-border-radius: 10px 10px 0 0;
-  border-radius: 10px 10px 0 0;
-  pointer-events: none;
-}
-
-/* Text in header */
-.vista-header,
-.vista-header * {
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.60);
-}
-
-/* =============================================
-   VISTA SIDEBAR NAVIGATION
-   Left navigation panel — light frosted glass
-   ============================================= */
-.vista-sidebar {
-  background-color: #d0e4f4;
-  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.85)), to(rgba(190,218,244,0.80)));
-  background-image: -moz-linear-gradient(top, rgba(255,255,255,0.85), rgba(190,218,244,0.80));
-  background-image: linear-gradient(to bottom, rgba(255,255,255,0.85), rgba(190,218,244,0.80));
-  border: 1px solid #7aadd0;
-  border-top-color: #a8cce0;
-  -webkit-border-radius: 10px;
-  -moz-border-radius: 10px;
-  border-radius: 10px;
-  -webkit-box-shadow: 0 4px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.85);
-  -moz-box-shadow: 0 4px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.85);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.85);
-  position: relative;
-  overflow: hidden;
-}
-
-.vista-sidebar::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 30%;
-  background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(255,255,255,0.35)), to(rgba(255,255,255,0.00)));
-  background-image: -moz-linear-gradient(top, rgba(255,255,255,0.35), rgba(255,255,255,0.00));
-  background-image: linear-gradient(to bottom, rgba(255,255,255,0.35), rgba(255,255,255,0.00));
-  -webkit-border-radius: 10px 10px 0 0;
-  -moz-border-radius: 10px 10px 0 0;
-  border-radius: 10px 10px 0 0;
-  pointer-events: none;
-}
-
-/* =============================================
    NAV ITEMS — Active state (Vista blue glow)
    ============================================= */
 .nav-item-active {
@@ -244,23 +157,6 @@ body {
   border-radius: inherit;
   pointer-events: none;
 }
-
-/* =============================================
-   VISTA TASKBAR (bottom mobile nav)
-   Dark blue — almost black, like XP/Vista taskbar
-   ============================================= */
-.vista-taskbar {
-  background-color: #0a1830;
-  background-image: -webkit-gradient(linear, left bottom, left top, from(#060e1e), color-stop(70%, #0e2040), to(#162850));
-  background-image: -moz-linear-gradient(bottom, #060e1e 0%, #0e2040 70%, #162850 100%);
-  background-image: linear-gradient(to top, #060e1e 0%, #0e2040 70%, #162850 100%);
-  border-top: 1px solid #2a4870;
-  -webkit-box-shadow: 0 -2px 8px rgba(0,0,0,0.70), inset 0 1px 0 rgba(100,150,220,0.20);
-  -moz-box-shadow: 0 -2px 8px rgba(0,0,0,0.70), inset 0 1px 0 rgba(100,150,220,0.20);
-  box-shadow: 0 -2px 8px rgba(0,0,0,0.70), inset 0 1px 0 rgba(100,150,220,0.20);
-}
-
-.vista-taskbar * { color: #d0e0f0; }
 
 /* =============================================
    VISTA BUTTONS
@@ -797,57 +693,6 @@ body {
 .float-med  { -webkit-animation: logoFloat 5s ease-in-out infinite; animation: logoFloat 5s ease-in-out infinite; }
 
 /* =============================================
-   ORB LAYER (decorative — keep in place)
-   ============================================= */
-.orb-layer {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  pointer-events: none;
-  z-index: 1;
-  overflow: hidden;
-}
-
-/* Vista-style shimmer waves (subtle, bottom) */
-@-webkit-keyframes waveFlow { 0% { left: 0; } 100% { left: -50%; } }
-@keyframes         waveFlow { 0% { left: 0; } 100% { left: -50%; } }
-
-.wave-layer {
-  position: fixed;
-  bottom: 0; left: 0;
-  width: 200%;
-  height: 80px;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0.15;
-  background-repeat: repeat-x;
-  background-position: bottom;
-  background-size: 720px 80px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 80'%3E%3Cpath fill='%2338bdf8' d='M0,40 C180,80 360,0 540,40 C720,80 900,0 1080,40 C1260,80 1350,15 1440,40 L1440,80 L0,80 Z'/%3E%3C/svg%3E");
-  -webkit-animation: waveFlow 14s linear infinite;
-  animation: waveFlow 14s linear infinite;
-}
-
-.wave-layer-2 {
-  position: fixed;
-  bottom: 0; left: 0;
-  width: 200%;
-  height: 55px;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0.10;
-  background-repeat: repeat-x;
-  background-position: bottom;
-  background-size: 960px 55px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1920 55'%3E%3Cpath fill='%230ea5e9' d='M0,28 C240,55 480,0 720,28 C960,55 1200,0 1440,28 C1680,55 1800,12 1920,28 L1920,55 L0,55 Z'/%3E%3C/svg%3E");
-  -webkit-animation: waveFlow 20s linear infinite reverse;
-  animation: waveFlow 20s linear infinite reverse;
-}
-
-/* Shockwave rings (keep as decorative element) */
-.shockwave { display: none; }
-.orb       { display: none; }
-
-/* =============================================
    CALENDAR CELLS
    ============================================= */
 .cal-cell       { background-color: #eef4fa; border: 1px solid #c0d4e8; -webkit-border-radius: 6px; border-radius: 6px; }
@@ -1165,4 +1010,284 @@ a:focus-visible, button:focus-visible, input:focus-visible,
 select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   outline: 1px dotted #1a3a60;
   outline-offset: 1px;
+}
+
+/* Shared LoadLight workspace */
+.workspace-desktop {
+  --workspace-width: 1160px;
+  --workspace-gutter: clamp(12px, 3vw, 28px);
+  --workspace-ink: #113550;
+  --workspace-rule: #79a9be;
+  --workspace-rim: inset 0 0 0 1px #ffffffa6, 0 8px 20px #164c6540;
+  padding: var(--workspace-gutter);
+}
+
+.workspace-header,
+.workspace-body,
+.workspace-rest-banner {
+  max-width: var(--workspace-width);
+  margin-inline: auto;
+}
+
+.workspace-header {
+  position: sticky;
+  top: 10px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 62px;
+  padding: 5px clamp(9px, 2vw, 18px);
+  border: 1px solid #639fb8;
+  border-radius: 13px;
+  color: var(--workspace-ink);
+  background: linear-gradient(#f4fdfff5, #ccecfbf0 48%, #93ccebef 51%, #daf6fbf7);
+  box-shadow: var(--workspace-rim);
+  backdrop-filter: blur(12px);
+}
+
+.workspace-brand,
+.workspace-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.workspace-brand {
+  min-height: 44px;
+  flex: none;
+  padding-right: 4px;
+  border-radius: 5px;
+  color: var(--workspace-ink);
+  font: 700 clamp(1rem, 2.7vw, 1.3rem)/1 "Segoe UI", Tahoma, sans-serif;
+  letter-spacing: -0.04em;
+  text-decoration: none;
+  text-shadow: 0 1px 0 white;
+}
+
+.workspace-brand span {
+  font: inherit;
+}
+
+.workspace-brand img {
+  flex: none;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px #1550713d);
+}
+
+.workspace-header-actions {
+  justify-content: flex-end;
+}
+
+.workspace-state,
+.workspace-rest-count {
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.workspace-rest-button {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 4px clamp(6px, 1.1vw, 12px);
+  border: 1px solid #a882a0;
+  border-radius: 6px;
+  background: linear-gradient(#fffdfd 2%, #f9e6ef 49%, #efccde 51%, #fff4f3);
+  box-shadow: inset 0 1px 0 white, 0 2px 3px #623a5926;
+  color: #64214b;
+  cursor: pointer;
+  font-size: clamp(0.68rem, 2.7vw, 0.82rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.workspace-rest-button:hover {
+  background: linear-gradient(#fff 4%, #fce9f4 49%, #f2c2db 51%, #ffdcef);
+}
+
+.workspace-rest-button:active {
+  background: linear-gradient(#ebc6d9, #fff4f3);
+  box-shadow: inset 0 2px 4px #7a496144;
+}
+
+.workspace-rest-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 3px 12px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.workspace-rest-banner button {
+  min-height: 34px;
+  padding-inline: 4px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.workspace-body {
+  display: grid;
+  grid-template-columns: minmax(0, 192px) minmax(0, 1fr);
+  gap: clamp(14px, 2vw, 24px);
+  margin-top: clamp(14px, 3vw, 26px);
+  padding-bottom: 22px;
+}
+
+.workspace-nav,
+.workspace-main {
+  border: 1px solid var(--workspace-rule);
+  border-radius: 12px;
+  color: var(--workspace-ink);
+  box-shadow: var(--workspace-rim);
+}
+
+.workspace-nav {
+  position: sticky;
+  top: 86px;
+  z-index: 20;
+  align-self: start;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  background: linear-gradient(150deg, #f8ffffed, #baddede8);
+  backdrop-filter: blur(12px);
+}
+
+.workspace-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--workspace-ink);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.workspace-nav-link img {
+  flex: none;
+  filter: drop-shadow(0 1px 1px #244e7240);
+}
+
+.workspace-nav-link:hover {
+  border-color: #8fb9d0;
+  background: linear-gradient(#f7fdff, #cbe7f6);
+}
+
+.workspace-nav-link[aria-current="page"] {
+  border-color: #478da9;
+  background: linear-gradient(#f2fdff, #b3e7ff 49%, #8bd2f3 51%, #c9f2fb);
+  box-shadow: inset 0 0 0 1px #ffffffb5, 0 2px 3px #15507129;
+}
+
+.workspace-main {
+  position: relative;
+  min-width: 0;
+  padding: clamp(12px, 2.4vw, 26px);
+  background: linear-gradient(150deg, #f8fcfff5, #e1eff7fa 75%, #e5f4edf5);
+  scroll-margin-top: 86px;
+}
+
+.workspace-skip {
+  position: fixed;
+  z-index: 49;
+  inset: 8px auto auto 8px;
+  min-height: 44px;
+  padding: 12px;
+  transform: translateY(calc(-100% - 12px));
+  border-radius: 5px;
+  color: var(--workspace-ink);
+  background: white;
+}
+
+.workspace-skip:focus {
+  transform: none;
+}
+
+.workspace-desktop :focus-visible {
+  outline: 2px solid #083f66;
+  outline-offset: 2px;
+}
+
+.workspace-desktop .glow-button {
+  border: 1px solid #478bab;
+  background: linear-gradient(#f1fdff, #b8eaff 48%, #79c9ed 51%, #c0effb);
+  box-shadow: inset 0 0 0 1px #ffffffaa, 0 2px 4px #21648833;
+  color: #103b58;
+  text-shadow: 0 1px 0 #def5ff;
+}
+
+.workspace-desktop .glow-button:hover {
+  background: linear-gradient(#f7feff, #c4f3ff 48%, #92def9 51%, #daf9ff);
+}
+
+.workspace-desktop .glow-button:active {
+  background: linear-gradient(#8ac7e4, #d1f4fe);
+  box-shadow: inset 0 2px 5px #27618555;
+}
+
+.workspace-desktop .glow-button::after {
+  opacity: 0.2;
+}
+
+@media (max-width: 767px) {
+  .workspace-body {
+    grid-template-columns: minmax(0, 1fr);
+    padding-bottom: calc(65px + env(safe-area-inset-bottom));
+  }
+
+  .workspace-header {
+    top: 4px;
+    min-height: 54px;
+  }
+
+  .workspace-nav {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 40;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 2px;
+    padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
+    border-radius: 11px 11px 0 0;
+    background: linear-gradient(#e4f5fff7, #a9ccdef8 48%, #98bacefa 51%, #cbe5f4ff);
+    box-shadow: 0 -3px 14px #1747634d, inset 0 1px 0 white;
+  }
+
+  .workspace-nav-link {
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-height: 48px;
+    padding: 3px 1px;
+    font-size: clamp(0.62rem, 2.5vw, 0.78rem);
+    text-align: center;
+  }
+}
+
+@media (max-width: 415px) {
+  .workspace-header .workspace-state {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aero-bg :is(.anim-fade-in, .anim-fade-in-up, .anim-fade-in-down, .anim-fade-in-left, .anim-overlay-in, .anim-scale-in, .logo-float, .float-med) {
+    animation: none;
+  }
 }

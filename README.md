@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LoadLight
 
-## Getting Started
+LoadLight is a task planner that helps you see how much time your plans will take. Write a note, review the tasks it produces, and adjust deadlines and time estimates before saving. The dashboard shows what’s due and how much work you have left.
 
-First, run the development server:
+## Try it locally
 
-```bash
+Use [Node.js 20.9 or later](https://nextjs.org/docs/app/getting-started/installation).
+
+```sh
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [localhost:3000](http://localhost:3000) and choose **Try without an account** on the sign-in page. In guest mode, your tasks are stored in the browser and task suggestions use local rules. It works without API keys.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Set up accounts and Gemini
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Copy [`.env.example`](.env.example) to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+2. For a new Supabase database, run the SQL block in [`lib/db/schema.ts`](lib/db/schema.ts) in the Supabase SQL Editor. For an existing database, check [`supabase/MIGRATIONS.sql`](supabase/MIGRATIONS.sql) and apply any recurrence changes you’re missing.
+3. Enable email sign-in in Supabase Auth. Add `http://localhost:3000/auth/callback` for local development and your production callback to the [allowed redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls).
+4. To enable Gemini, apply the AI quota block in [`supabase/MIGRATIONS.sql`](supabase/MIGRATIONS.sql) and set the server-only `GOOGLE_API_KEY`. LoadLight uses [Gemini 3.5 Flash-Lite](https://aistudio.google.com/docs/models/gemini-3.5-flash-lite). Gemini requests require a signed-in account and are limited to 20 app requests per account every 10 minutes.
 
-## Learn More
+## Development
 
-To learn more about Next.js, take a look at the following resources:
+```sh
+npm run lint
+npm test
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See [Operations and management](docs/operations-and-management.md) for deployment and monitoring.

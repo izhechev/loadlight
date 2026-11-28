@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { logAiCall } from '@/lib/data/tasks'
+import { readAiRequest } from '@/lib/ai/request'
+import { extractOutputSchema, extractRequestSchema, type ExtractedTask } from '@/lib/ai/schemas'
+import { fetchGemini, GEMINI_MODELS, geminiText, getGeminiAccess, readGeminiJson, recordAiCall, type GeminiResponse } from '@/lib/ai/server'
 import { parseEveryNDays } from '@/lib/utils/recurrence'
 import { correctWeekdayDeadline } from '@/lib/utils/dateWords'
 
@@ -48,15 +50,35 @@ const SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
 ]
 
+function extractionResponse(
+  tasks: ExtractedTask[],
+  offline = false,
+  clarification?: ReturnType<typeof extractOutputSchema.parse>['clarification'],
+) {
+  return NextResponse.json({
+    tasks: tasks.map(({ demandType, startDate, estimatedMinutes, recurringHours, recurringDays, ...task }) => ({
+      ...task,
+      deadline: task.deadline ?? null,
+      demand_type: demandType,
+      start_date: startDate ?? null,
+      estimated_minutes: estimatedMinutes ?? null,
+      recurring_hours: recurringHours ?? null,
+      recurring_days: recurringDays ?? null,
+    })),
+    offline,
+    clarification,
+  })
+}
+
 function offlineFallback(input: string) {
   const today = new Date().toISOString().split('T')[0]
   const isDaily = /\b(daily|every\s*day|everyday)\b/i.test(input)
-  const times = [...input.matchAll(/\b(\d{1,2}):(\d{2})\b/g)].map(m => ({
+  const times = [...input.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].map(m => ({
     h: m[1].padStart(2, '0'), min: m[2],
   }))
 
   // If recurring daily with explicit times: one task per time
-  if (isDaily && times.length > 0) {
+  if (isDaily && times.length > 0 && !input.trim().includes('\n')) {
     // Strip time references and recurring words to get a clean task name
     const baseName = input
       .replace(/\b(daily|every\s*day|everyday)\b/gi, '')
@@ -65,10 +87,9 @@ function offlineFallback(input: string) {
       .replace(/\s{2,}/g, ' ')
       .trim()
       .replace(/^[,\s]+|[,\s]+$/g, '')
-    const tasks = times.map(t => ({
+    const tasks = times.slice(0, 60).map<ExtractedTask>(t => ({
       name: baseName || input.trim(),
       category: 'Personal',
-      lifeDomain: 'personal',
       demandType: 'routine',
       difficulty: 2,
       priority: 3,
@@ -79,19 +100,20 @@ function offlineFallback(input: string) {
       recurring: 'daily',
       recurringHours: null,
     }))
-    return NextResponse.json({ tasks, offline: true })
+    return extractionResponse(tasks, true)
   }
 
   const tasks = input
     .split('\n')
     .map(l => l.trim())
     .filter(Boolean)
-    .map(line => {
-      const nDays = parseEveryNDays(line)
+    .slice(0, 60)
+    .map<ExtractedTask>(line => {
+      const days = parseEveryNDays(line)
+      const nDays = days && days <= 366 ? days : null
       return {
         name: line,
         category: 'Personal',
-        lifeDomain: 'personal',
         demandType: 'routine',
         difficulty: 2,
         priority: 3,
@@ -105,15 +127,17 @@ function offlineFallback(input: string) {
       }
     })
   // offline flag lets the client show a visible warning
-  return NextResponse.json({ tasks, offline: true })
+  return extractionResponse(tasks, true)
 }
 
 export async function POST(request: NextRequest) {
-  const { text, categories } = await request.json() as { text: string; categories?: string[] }
-  if (!text?.trim()) return NextResponse.json({ tasks: [] })
+  const body = await readAiRequest(request, extractRequestSchema)
+  if (body instanceof Response) return body
+  const { text, categories } = body
+  if (!text.trim()) return NextResponse.json({ tasks: [] })
 
-  const apiKey = process.env.GOOGLE_API_KEY
-  if (!apiKey) return offlineFallback(text)
+  const access = await getGeminiAccess()
+  if (!access) return offlineFallback(text)
 
   // LLMs miscompute weekdays from a bare date — spell out the next week
   const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -130,48 +154,29 @@ Available categories: ${(categories ?? ['Work', 'Study', 'Personal', 'Exercise',
 User input:
 ${text}`
 
-  const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
   const start = Date.now()
 
   const requestBody = JSON.stringify({
-    contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents: [{ parts: [{ text: userPrompt }] }],
+    generationConfig: { maxOutputTokens: 8192, responseMimeType: 'application/json' },
     safetySettings: SAFETY_SETTINGS,
   })
 
-  type GeminiResponse = {
-    error?: { message: string; code: number; status?: string }
-    candidates?: {
-      finishReason?: string
-      safetyRatings?: { category: string; probability: string }[]
-      content?: { parts?: { thought?: boolean; text?: string }[] }
-    }[]
-  }
-
-  // Try each model in order; retry once on 503 before moving to the next model
-  async function callWithFallback(): Promise<{ data: GeminiResponse; model: string } | null> {
-    for (const model of MODELS) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
-      for (let attempt = 0; attempt <= 1; attempt++) {
-        if (attempt > 0) await new Promise(r => setTimeout(r, 1500))
-        try {
-          const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody })
-          const data = await res.json() as GeminiResponse
-          const isTransient = data.error?.status === 'UNAVAILABLE' || data.error?.code === 503
-          if (!data.error) return { data, model }
-          if (!isTransient) break // hard error — skip remaining retries for this model
-          console.warn(`${model} 503 attempt ${attempt + 1}`)
-        } catch (e) {
-          console.warn(`${model} fetch error:`, e)
-        }
+  async function callWithFallback(apiKey: string): Promise<{ data: GeminiResponse; model: string } | null> {
+    for (const model of GEMINI_MODELS) {
+      try {
+        const res = await fetchGemini(model, apiKey, requestBody)
+        if (res.ok) return { data: await res.json(), model }
+      } catch {
+        console.warn('LoadLight received no Gemini extraction response.')
       }
-      console.warn(`${model} failed, trying next model`)
     }
     return null
   }
 
   try {
-    const result = await callWithFallback()
+    const result = await callWithFallback(access.apiKey)
 
     if (!result) {
       console.error('All Gemini models failed — using offline fallback')
@@ -193,82 +198,43 @@ ${text}`
       return NextResponse.json({ blocked: true, category })
     }
 
-    // Thinking models emit a thought part first — find the actual response part
-    const parts: { thought?: boolean; text?: string }[] = candidate?.content?.parts ?? []
-    const responsePart = parts.find(p => !p.thought) ?? parts[0]
-    const raw = responsePart?.text?.trim()
-    if (!raw) {
-      console.error('Gemini extraction: empty response', JSON.stringify(data).slice(0, 500))
-      return offlineFallback(text)
-    }
+    const raw = geminiText(data)
+    if (!raw) return offlineFallback(text)
 
-    // Strip markdown code fences if present
-    const clean = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
-    const parsed = JSON.parse(clean) as { tasks: unknown[] }
-
-    logAiCall({
-      userId: '',
-      callType: 'extraction',
-      model,
-      tokensIn: 0,
-      tokensOut: 0,
-      latencyMs: Date.now() - start,
-    }).catch(() => {})
+    const parsed = extractOutputSchema.safeParse(readGeminiJson(raw))
+    if (!parsed.success) return offlineFallback(text)
 
     const today = new Date().toISOString().split('T')[0]
 
     // Collect ALL HH:mm times mentioned in the original user input (fallback pool)
-    const inputTimes = [...text.matchAll(/\b(\d{1,2}):(\d{2})\b/g)].map(m => ({
+    const inputTimes = [...text.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].map(m => ({
       h: m[1].padStart(2, '0'),
       min: m[2],
     }))
 
-    // For recurring tasks, always use times from the user's raw input — the AI's
-    // deadline minutes are unreliable (e.g. returns "22:00" instead of "22:30").
-    // inputTimes is consumed in order: first recurring task gets first input time, etc.
-    const inputTimesForRecurring = [...inputTimes] // separate copy so non-recurring tasks aren't affected
-
-    // Safety net: if the raw input says "every N days" and the AI missed it,
-    // apply it — only for single-task input where the phrase is unambiguous
+    // Apply corrections only when matching the user input to one task is unambiguous.
     const everyN = parseEveryNDays(text)
 
-    const patched = (parsed.tasks as Record<string, unknown>[]).map(task => {
-      const name = (task.name as string) ?? ''
-
-      if (everyN && parsed.tasks.length === 1 && !task.recurringDays) {
+    const tasks = parsed.data.tasks
+    if (tasks.length === 1) {
+      const [task] = tasks
+      if (everyN && everyN <= 366 && !task.recurringDays) {
         task.recurringDays = everyN
         task.recurring = 'daily'
         if (!task.deadline) task.deadline = today
       }
-
-      const recurring = task.recurring as string | undefined
-      const dl = task.deadline as string | null
-      const dateStr = dl ? dl.split('T')[0] : today
-
-      // For recurring tasks: always override time with the next input time (ground truth)
-      if (recurring && recurring !== 'none' && inputTimesForRecurring.length > 0) {
-        const time = inputTimesForRecurring.shift()!
-        task.deadline = `${dateStr}T${time.h}:${time.min}`
-        return task
+      if (inputTimes.length === 1 && task.recurring !== 'none') {
+        const [{ h, min }] = inputTimes
+        const dateStr = task.deadline?.split('T')[0] ?? today
+        task.deadline = `${dateStr}T${h}:${min}`
       }
+      task.deadline = correctWeekdayDeadline(task.deadline ?? null, text, Date.now())
+    }
 
-      // For non-recurring tasks: fall back to time in name, then AI deadline
-      const nameMatch = name.match(/\b(\d{1,2}):(\d{2})\b/)
-      if (nameMatch) {
-        task.deadline = `${dateStr}T${nameMatch[1].padStart(2, '0')}:${nameMatch[2]}`
-      }
-
-      return task
-    }).map(task => {
-      // Safety net: snap the date to the weekday the user actually named
-      // ("monday" must not land on a Wednesday), preserving the time portion
-      task.deadline = correctWeekdayDeadline(task.deadline as string | null, text, Date.now())
-      return task
-    })
-    return NextResponse.json({ tasks: patched })
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    console.error('Gemini extraction failed:', msg)
+    await recordAiCall(access, 'extraction', model, start, data.usageMetadata)
+    return extractionResponse(tasks, false, parsed.data.clarification)
+  } catch {
+    console.warn('LoadLight received no usable Gemini extraction response.')
     return offlineFallback(text)
   }
 }

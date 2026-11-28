@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { logAiCall } from '@/lib/data/tasks'
+import { readAiRequest } from '@/lib/ai/request'
+import { pastDeadlineOutputSchema, pastDeadlineRequestSchema } from '@/lib/ai/schemas'
+import { fetchGemini, GEMINI_MODELS, geminiText, getGeminiAccess, readGeminiJson, recordAiCall, type GeminiResponse } from '@/lib/ai/server'
 
 const SYSTEM_PROMPT = `You are a scheduling assistant inside LoadLight, a task management app.
 
@@ -29,10 +31,15 @@ Return ONLY valid JSON — no markdown, no explanation — matching this exact s
 
 // ─── local fallback ──────────────────────────────────────────────────────────
 
-function localFallback(deadlineWas: string, recurring: string | undefined): NextResponse {
+function localFallback(deadlineWas: string, recurring: string | undefined, now: string): NextResponse {
   const base = new Date(deadlineWas)
-  const daysToAdd = recurring === 'weekly' ? 7 : 1
-  const next = new Date(base.getTime() + daysToAdd * 24 * 60 * 60 * 1000)
+  const today = new Date(now)
+  const dayMs = 24 * 60 * 60 * 1000
+  const daysToAdd = recurring === 'weekly'
+    ? 7 - ((today.getUTCDay() - base.getUTCDay() + 7) % 7)
+    : 1
+  const next = new Date(today.getTime() + daysToAdd * dayMs)
+  next.setUTCHours(base.getUTCHours(), base.getUTCMinutes(), 0, 0)
 
   // Format as "YYYY-MM-DDTHH:mmZ"
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -62,10 +69,12 @@ function localFallback(deadlineWas: string, recurring: string | undefined): Next
 // ─── route ───────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  const { taskName, deadlineWas, now, category, recurring, userReply } = await request.json()
+  const body = await readAiRequest(request, pastDeadlineRequestSchema)
+  if (body instanceof Response) return body
+  const { taskName, deadlineWas, now, category, recurring, userReply } = body
 
-  const apiKey = process.env.GOOGLE_API_KEY
-  if (!apiKey) return localFallback(deadlineWas, recurring)
+  const access = await getGeminiAccess()
+  if (!access) return localFallback(deadlineWas, recurring, now)
 
   const overdueMs = new Date(now).getTime() - new Date(deadlineWas).getTime()
   const overdueHours = Math.round(overdueMs / (1000 * 60 * 60))
@@ -80,52 +89,32 @@ export async function POST(request: NextRequest) {
     userReply ? `User clarification: ${userReply}` : null,
   ].filter(Boolean).join('\n')
 
-  const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
   const start = Date.now()
   const requestBody = JSON.stringify({
-    contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] }],
-    generationConfig: { temperature: 0.3, maxOutputTokens: 512 },
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents: [{ parts: [{ text: userPrompt }] }],
+    generationConfig: { maxOutputTokens: 1024, responseMimeType: 'application/json' },
   })
 
-  for (const model of MODELS) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+  for (const model of GEMINI_MODELS) {
     try {
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody })
-      const data = await res.json() as {
-        error?: { code: number; status?: string }
-        candidates?: { content?: { parts?: { thought?: boolean; text?: string }[] } }[]
-      }
-      if (data.error) {
-        console.warn(`PastDeadline: ${model} error ${data.error.code} — ${data.error.status}`)
-        continue
-      }
-      const parts = data.candidates?.[0]?.content?.parts ?? []
-      const raw = (parts.find(p => !p.thought) ?? parts[0])?.text?.trim()
-      if (!raw) { console.warn(`PastDeadline: ${model} returned empty response`); continue }
+      const res = await fetchGemini(model, access.apiKey, requestBody)
+      if (!res.ok) continue
 
-      // Strip markdown code fences
-      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+      const data: GeminiResponse = await res.json()
+      const raw = geminiText(data)
+      if (!raw) continue
 
-      let parsed: {
-        observation: string | null
-        clarification: string | null
-        suggestedTime: string | null
-        suggestedLabel: string | null
-        stillNeeded: boolean | null
-      }
-      try {
-        parsed = JSON.parse(cleaned)
-      } catch {
-        console.warn(`PastDeadline: ${model} returned unparseable JSON`)
-        continue
-      }
+      const parsed = pastDeadlineOutputSchema.safeParse(readGeminiJson(raw))
+      if (!parsed.success) continue
+      if (parsed.data.suggestedTime && Date.parse(parsed.data.suggestedTime) <= Date.parse(now)) continue
 
-      logAiCall({ userId: '', callType: 'past-deadline', model, tokensIn: 0, tokensOut: 0, latencyMs: Date.now() - start }).catch(() => {})
-      return NextResponse.json(parsed)
-    } catch (err) {
-      console.warn(`PastDeadline: ${model} fetch error:`, err)
+      await recordAiCall(access, 'past-deadline', model, start, data.usageMetadata)
+      return NextResponse.json(parsed.data)
+    } catch {
+      console.warn('LoadLight received no usable Gemini deadline response.')
     }
   }
 
-  return localFallback(deadlineWas, recurring)
+  return localFallback(deadlineWas, recurring, now)
 }

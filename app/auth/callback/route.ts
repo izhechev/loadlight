@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
           .single()
 
         const destination = profile?.onboarding_complete ? '/dashboard' : '/onboarding'
-        return NextResponse.redirect(`${origin}${destination}`)
+        const response = NextResponse.redirect(`${origin}${destination}`)
+        response.cookies.set('ll-guest', '', { path: '/', maxAge: 0 })
+        return response
       }
     }
   }

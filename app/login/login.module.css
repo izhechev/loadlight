@@ -1,0 +1,222 @@
+.desktop {
+  display: grid;
+  place-items: center;
+  padding: clamp(14px, 5vw, 40px);
+}
+
+.window {
+  width: min(100%, 430px);
+  border: 1px solid #6199b4;
+  border-radius: 13px;
+  background: linear-gradient(143deg, #f9fefff9, #e4f4faf5 64%, #e9f7e9f5);
+  box-shadow: inset 0 0 0 1px #ffffffb8, 0 12px 32px #1b4b6563;
+  color: #153852;
+  backdrop-filter: blur(12px);
+}
+
+.titleBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 49px;
+  padding: 4px 12px;
+  border-bottom: 1px solid #88bbc9;
+  border-radius: 12px 12px 0 0;
+  background: linear-gradient(#fcfeff, #d6effc 47%, #a9d8f0 51%, #d4f4fb);
+  font-weight: 700;
+  text-shadow: 0 1px 0 white;
+}
+
+.titleBar img {
+  object-fit: contain;
+}
+
+.homeLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  margin-left: auto;
+  padding-inline: 8px;
+  border-radius: 4px;
+  color: #214964;
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+
+.homeLink:hover,
+.guest button:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.homeLink svg {
+  width: 14px;
+  height: 14px;
+}
+
+.body {
+  padding: clamp(16px, 5vw, 28px);
+}
+
+.body h1 {
+  margin: 0 0 16px;
+  font: 650 clamp(1.6rem, 5vw, 2.2rem)/1.15 "Segoe UI", Tahoma, sans-serif;
+  letter-spacing: -0.04em;
+}
+
+.switcher {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 3px;
+  margin-bottom: 20px;
+  border: 1px solid #8fb6ca;
+  border-radius: 7px;
+  background: linear-gradient(#cfe6f2, #edfaff);
+  box-shadow: inset 0 1px 2px #193b5126;
+}
+
+.switcher button {
+  min-height: 39px;
+  padding-inline: 4px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: #284c63;
+  font-size: 0.83rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.switcher button[aria-pressed="true"] {
+  border-color: #74a9c0;
+  background: linear-gradient(#faffff, #c1ebfc 50%, #a7dcf2 51%, #dcf6fe);
+  box-shadow: inset 0 1px 0 white, 0 1px 2px #1d50652f;
+  color: #113851;
+}
+
+.form {
+  display: grid;
+  gap: 6px;
+}
+
+.form label {
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.form > input,
+.password input {
+  width: 100%;
+  min-height: 43px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  font-size: 1rem;
+}
+
+.form > input {
+  margin-bottom: 8px;
+}
+
+.password {
+  position: relative;
+}
+
+.password input {
+  padding-right: 66px;
+}
+
+.password button {
+  position: absolute;
+  inset: 4px 4px 4px auto;
+  width: 56px;
+  border-radius: 3px;
+  color: #244e68;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.password button:hover {
+  background: #ddf0f9;
+}
+
+.hint {
+  margin: 0 0 3px;
+  color: #36596b;
+  font-size: 0.78rem;
+}
+
+.error {
+  margin: 7px 0 0;
+  padding: 8px;
+  border: 1px solid #c3818c;
+  border-radius: 5px;
+  background: #ffeded;
+  color: #812a38;
+  font-size: 0.82rem;
+}
+
+.primary {
+  min-height: 44px;
+  padding: 5px 14px;
+  margin-top: 9px;
+  border: 1px solid #5596ab;
+  border-radius: 6px;
+  background: linear-gradient(#f1fdff, #b8eaff 48%, #86cdeb 51%, #c7f4fa);
+  box-shadow: inset 0 0 0 1px #ffffffba, 0 2px 3px #21648829;
+  color: #133d55;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-shadow: 0 1px 0 #e3faff;
+  cursor: pointer;
+}
+
+.primary:hover {
+  background: linear-gradient(#fff, #c4f3ff 48%, #92dcf9 51%, #ddfbff);
+}
+
+.primary:active {
+  background: linear-gradient(#89c9e4, #d5f9fb);
+  box-shadow: inset 0 2px 5px #27618555;
+}
+
+.primary:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.guest {
+  margin-top: 20px;
+  padding-top: 9px;
+  border-top: 1px solid #a9c9ce;
+  text-align: center;
+}
+
+.guest button {
+  min-height: 36px;
+  padding-inline: 6px;
+  border-radius: 4px;
+  color: #194e57;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.guest p,
+.verify p {
+  margin: 0;
+  color: #36596b;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.verify .primary {
+  margin-top: 16px;
+}
+
+.window :focus-visible {
+  outline: 2px solid #083f66;
+  outline-offset: 2px;
+}
