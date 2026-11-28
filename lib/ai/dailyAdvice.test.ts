@@ -33,7 +33,9 @@ describe('daily advice', () => {
     expect(describeDailyPlan(plan)).toBe('Start with “Print proof” (25 min, due by 12:30). Keep 13:00–13:45 for “Design review”.')
     expect(plan.flexible.map(task => task.name)).toEqual(['Draft slides'])
     const duringReview = dailyAdvicePlan(tasks, new Date(2026, 10, 28, 13, 10).getTime())
-    expect(describeDailyPlan(duringReview)).toBe('Keep 13:00–13:45 for “Design review”.')
+    expect(duringReview.appointment?.name).toBe('Design review')
+    expect(duringReview.conflicts).toEqual(['“Print proof” (25 min, due 12:30) is past due.'])
+    expect(describeDailyPlan(duringReview)).toBe('')
   })
 
   it('never offers postponement for a fixed booking or a deadline due today', () => {
@@ -57,6 +59,18 @@ describe('daily advice', () => {
     gemini.fetchGemini.mockImplementation(async () => Response.json({ candidates: [{ content: { parts: [{ text: '{"choice":99,"text":"Skip the meeting"}' }] } }] }))
     expect(await request(busy)).toEqual({ advice: null, aiDisclosure: true })
     expect(gemini.recordAiCall).not.toHaveBeenCalled()
+  })
+
+  it('sends both conflict facts to Gemini and offers only conflict follow-ups', async () => {
+    const conflicts = ['“Review” overlaps with “Call”.', '“Permit” has no room before its deadline.']
+    const conflictPlan = { ...plan, conflicts }
+    gemini.fetchGemini.mockResolvedValue(Response.json({ candidates: [{ content: { parts: [{ text: '{"choice":0}' }] } }] }))
+    expect(describeDailyPlan(conflictPlan)).toBe('')
+    expect(await request({ ...busy, plan: conflictPlan })).toMatchObject({
+      source: 'gemini', advice: expect.stringContaining('Review the flagged commitments first'),
+    })
+    const prompt = JSON.parse(gemini.fetchGemini.mock.calls[0][2]).contents[0].parts[0].text
+    expect(JSON.parse(prompt).plan.conflicts).toEqual(conflicts)
   })
 
   it('keeps the original aggregate-only request and rest-mode guard', async () => {

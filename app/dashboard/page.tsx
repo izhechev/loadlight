@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import Link from "next/link"
 import { Loader2, RefreshCw, Plus, ChevronRight, CheckCircle, AlertTriangle, Lock } from "@/lib/icons"
 import { AppLayout } from "@/components/app-layout"
+import { ScheduleConflicts } from "@/components/schedule-conflicts"
 import { ChillSuggestions } from "@/components/chill-suggestions"
 import { useOverwhelmedStore } from "@/lib/store/overwhelmedStore"
 import { useCategoryStore, getCategoryClasses } from "@/lib/store/categoryStore"
@@ -304,7 +305,7 @@ export default function DashboardPage() {
             urgentCount: dueSoon,
             todayMinutes: day.minutes,
             capacityMinutes: day.capacity,
-            plan: advicePlan,
+            plan: { ...advicePlan, conflicts: advicePlan.conflicts?.slice(0, 5) },
           }),
         }).then(res => res.ok ? res.json() as Promise<{ advice: string | null }> : null),
       ])
@@ -318,7 +319,7 @@ export default function DashboardPage() {
 
   // Refresh when the work or the next commitment changes, including an appointment starting.
   const summaryKey = JSON.stringify([state, balanceMode, pending.length, dueSoon, day.minutes, day.capacity, week,
-    advicePlan.today, advicePlan.next, advicePlan.appointment, advicePlan.flexible])
+    advicePlan.today, advicePlan.next, advicePlan.appointment, advicePlan.flexible, advicePlan.conflicts])
   useEffect(() => {
     if (!loaded || lastSummary.current === summaryKey) return
     lastSummary.current = summaryKey
@@ -562,7 +563,12 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          {nextStep && state !== 'overwhelmed' && <p className="font-semibold mb-3">{nextStep}</p>}
+          {state !== 'overwhelmed' && (
+            <div className={advicePlan.conflicts?.length || nextStep ? 'mb-3' : undefined}>
+              <ScheduleConflicts conflicts={advicePlan.conflicts} />
+              {nextStep && <p className="font-semibold">{nextStep}</p>}
+            </div>
+          )}
           {isAnalysing && !weeklyAnalysis ? (
             <div className="skeu-inset rounded-2xl p-6 text-center">
               <Loader2 className="w-8 h-8 mx-auto mb-2 text-purple-500/50 animate-spin" />

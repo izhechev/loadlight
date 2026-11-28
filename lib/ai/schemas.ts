@@ -95,6 +95,7 @@ export const adviseRequestSchema = z.object({
     next: adviceTask.nullable(),
     appointment: adviceTask.nullable(),
     flexible: z.array(adviceTask).max(3),
+    conflicts: z.array(basicText).max(5).optional(),
   }).optional(),
   signals: z.object({
     taskAccumulation: z.number().min(0).max(1).optional(),

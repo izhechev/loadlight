@@ -10,7 +10,7 @@ export function dailyAdvicePlan(tasks: readonly Task[], now: number): DailyPlan 
   const date = new Date(now)
   const today = dayKey(date)
   const currentTime = date.toTimeString().slice(0, 5)
-  const { next, appointment, commitments, flexible } = triageTasks(tasks.map(toTriageTask), today, currentTime)
+  const { next, appointment, commitments, flexible, conflicts } = triageTasks(tasks.map(toTriageTask), today, currentTime)
   const protectedNames = new Set(commitments.map(task => task.name))
   for (const task of flexible) {
     if (task.start) protectedNames.add(task.name)
@@ -21,6 +21,7 @@ export function dailyAdvicePlan(tasks: readonly Task[], now: number): DailyPlan 
     next: next && details(next),
     appointment: appointment && details(appointment),
     flexible: flexible.filter(task => !task.start && !protectedNames.has(task.name)).slice(0, 3).map(details),
+    conflicts,
   }
 }
 
@@ -31,6 +32,7 @@ function bookingTime(task: PlanTask) {
 }
 
 export function describeDailyPlan(plan: DailyPlan) {
+  if (plan.conflicts?.length) return ''
   const { next, appointment } = plan
   const time = appointment && bookingTime(appointment)
   const booking = appointment && time ? `Keep ${time} for “${appointment.name}”.` : ''
@@ -45,6 +47,10 @@ export function describeDailyPlan(plan: DailyPlan) {
 }
 
 export function dailyAdviceOptions({ plan, todayMinutes, capacityMinutes, urgentCount, taskCount }: DailyAdviceRequest) {
+  if (plan?.conflicts?.length) return [
+    'Review the flagged commitments first. Confirm any appointment change with the people involved and agree on a new deadline if needed.',
+    'Check whether part of the work can be handed off. Keep the listed appointment times until you confirm any change.',
+  ]
   const options: string[] = []
   if (todayMinutes != null && capacityMinutes != null) {
     const excess = todayMinutes - capacityMinutes

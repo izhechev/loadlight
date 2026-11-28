@@ -1,5 +1,5 @@
 import type { Task } from '@/lib/data/tasks'
-import { resolveFixedStart } from '@/lib/utils/scheduling'
+import { buildSchedule, DEADLINE_NO_ROOM, resolveFixedStart, WORK_END_MIN } from '@/lib/utils/scheduling'
 import { effectiveDeadline, normalizeDt } from '@/lib/utils/taskUtils'
 import { activeWorkload } from '@/lib/utils/workload'
 import type { ChatTask } from './schemas'
@@ -26,6 +26,10 @@ function wallTime(value?: string | null) {
 function addMinutes(stamp: string, minutes: number) {
   // LoadLight stores the entered wall clock, including when the database appends a zone.
   return new Date(Date.parse(stamp + 'Z') + minutes * 60_000).toISOString().slice(0, 16)
+}
+
+function showTime(stamp: string, today: string) {
+  return stamp.startsWith(today) ? stamp.slice(11) || 'end of today' : stamp.replace('T', ' ')
 }
 
 export function triageTasks(tasks: readonly ChatTask[], today: string, currentTime: string) {
@@ -66,16 +70,42 @@ export function triageTasks(tasks: readonly ChatTask[], today: string, currentTi
   })
   const commitments = rows.filter(row => row.committed).sort((a, b) => a.when.localeCompare(b.when) || a.priority - b.priority)
   const flexible = rows.filter(row => !row.committed)
+  const overlaps: string[] = []
+  const bookings = commitments.flatMap(task =>
+    task.start && task.end && task.end > now ? [{ ...task, start: task.start, end: task.end }] : [],
+  ).sort((a, b) => a.start.localeCompare(b.start))
+  let furthestBooking: (typeof bookings)[number] | undefined
+  for (const task of bookings) {
+    if (furthestBooking && task.start < furthestBooking.end) {
+      const label = (booking: typeof task) => `“${booking.name}” (${showTime(booking.start, today)}–${showTime(booking.end, today)})`
+      overlaps.push(`${label(furthestBooking)} overlaps with ${label(task)}.`)
+    }
+    if (!furthestBooking || task.end > furthestBooking.end) furthestBooking = task
+  }
+  const plan = buildSchedule(commitments.map(task => ({
+    id: String(task.index), name: task.name, start_date: task.start,
+    deadline: task.start && task.start === task.deadline ? null : task.deadline,
+    estimated_minutes: task.minutes, priority: task.priority, difficulty: task.difficulty,
+  })), { today, currentTime })
+  const missed = new Set(plan.unscheduled.filter(task => task.reason === DEADLINE_NO_ROOM).map(task => task.id))
+  const deadlineWarnings = commitments.flatMap(task => {
+    if (!task.deadline || !missed.has(String(task.index))) return []
+    const due = showTime(task.deadline, today)
+    const reason = task.when < now ? 'is past due' : 'has no room before its deadline'
+    return [`“${task.name}” (${task.minutes} min, due ${due}) ${reason}.`]
+  })
+  const conflicts = [...overlaps.slice(0, 1), ...deadlineWarnings, ...overlaps.slice(1)]
   const booking = commitments.find(row => row.start && row.end && row.end > now && row.start.slice(0, 10) <= today)
+  const closing = addMinutes(today + 'T00:00', WORK_END_MIN)
   const work = commitments.find(row => {
-    if (row.end || (row.start && row.start > today)) return false
+    if (row.end || missed.has(String(row.index)) || (row.start && row.start > today)) return false
     const finish = addMinutes(now, row.minutes)
-    return (!booking?.start || finish <= booking.start) && finish <= row.when
+    return (!booking?.start || finish <= booking.start) && finish <= row.when && finish <= closing
   })
   const next = work ?? booking ?? null
   if (next && commitments[0] !== next) {
     commitments.splice(commitments.indexOf(next), 1)
     commitments.unshift(next)
   }
-  return { commitments, flexible, next, appointment: booking ?? null }
+  return { commitments, flexible, next, appointment: booking ?? null, conflicts }
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { getTasks } from '@/lib/data/tasks'
+import { ScheduleConflicts } from '@/components/schedule-conflicts'
 import { toTriageTask } from '@/lib/ai/triage'
 import { localDateStr } from '@/lib/utils/scheduling'
 import { useState, useEffect } from "react"
@@ -13,6 +14,7 @@ interface RestModeOverlayProps {
 
 interface TriageItem { name: string; reason: string }
 interface TriageResult {
+  conflicts?: string[]
   canSkip: TriageItem[]
   urgent: TriageItem[]
   question: string | null
@@ -201,7 +203,7 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
     runTriage()
   }, [])
 
-  const hasResults = triage && (triage.canSkip.length > 0 || triage.urgent.length > 0 || triage.question)
+  const hasResults = triage && (triage.conflicts?.length || triage.canSkip.length > 0 || triage.urgent.length > 0 || triage.question)
 
   return (
     <div className="anim-overlay-in" style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.55)', padding: 16 }}>
@@ -231,6 +233,7 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
             </div>
           ) : hasResults ? (
             <div className="space-y-3">
+              <ScheduleConflicts conflicts={triage!.conflicts} />
               {triage!.urgent.length > 0 && (
                 <div className="aero-warning rounded-2xl p-3.5">
                   <p className="text-xs font-black uppercase tracking-wide mb-2 flex items-center gap-1.5">

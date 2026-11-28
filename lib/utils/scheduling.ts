@@ -48,6 +48,7 @@ export function orderByEnergy<T extends SchedulableTask>(tasks: T[]): T[] {
 }
 
 type Slot = { start: number; end: number }
+export const DEADLINE_NO_ROOM = 'No room before its deadline.'
 type TimedTask = { id: string; name: string; start_date: string; end_date: string }
 
 export interface DaySchedule {
@@ -240,7 +241,7 @@ export function buildSchedule(
     }
     const fitLater = firstFreeSlot(overflowDay.blocked, overflowDay.start, deadlineLimit(task, overflowDay), task.duration)
     if (fitLater !== null) add(task, overflowDay, fitLater)
-    else unscheduled(task, task.deadline ? 'No room before its deadline.' : 'No room on either planning day.')
+    else unscheduled(task, task.deadline ? DEADLINE_NO_ROOM : 'No room on either planning day.')
   }
   for (const note of notes) {
     const remaining = note.matched.reduce((value, match) => value.replace(match, ' '), note.text)

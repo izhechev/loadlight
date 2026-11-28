@@ -19,6 +19,21 @@ const tasks = [
   { name: 'Organize files', priority: 4 },
 ]
 
+it('names the fixed overlap and deadline that cannot fit, while allowing a task after the bookings', () => {
+  const { conflicts, next } = triageTasks([
+    { name: 'Supplier call', start_date: today + 'T12:00', estimated_minutes: 45 },
+    { name: 'Site walkthrough', start_date: today + 'T12:20', estimated_minutes: 35 },
+    { name: 'Handoff', start_date: today + 'T12:55', estimated_minutes: 5 },
+    { name: 'Permit packet', deadline: today + 'T12:45', estimated_minutes: 50 },
+    { name: 'Send estimate', deadline: today + 'T16:00', estimated_minutes: 60 },
+  ], today, '11:40')
+  expect(conflicts).toEqual([
+    '“Supplier call” (12:00–12:45) overlaps with “Site walkthrough” (12:20–12:55).',
+    '“Permit packet” (50 min, due 12:45) has no room before its deadline.',
+  ])
+  expect(next?.name).toBe('Supplier call')
+})
+
 describe('task triage', () => {
   it('puts actionable deadlines and fixed appointments ahead of tomorrow', () => {
     const { commitments, flexible, next } = triageTasks(tasks, today, '11:20')

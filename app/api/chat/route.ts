@@ -313,17 +313,18 @@ Use the exact task name. If the notes already provide the needed times or have n
     const now = new Date()
     const today = body.todayStr ?? localDateStr(0, now.getTime())
     const clock = body.currentTime ?? now.toTimeString().slice(0, 5)
-    const { commitments, flexible, next } = triageTasks(tasks ?? [], today, clock)
+    const { commitments, flexible, next, conflicts } = triageTasks(tasks ?? [], today, clock)
     const result = flexible.length ? await generateWithGemini({
       mode: 'triage',
       jsonSchemaText: '{ "canSkip": [integer task indices], "urgent": [integer task indices], "questionTask": integer task index or null }',
       system: ETHICAL_SYSTEM_PROMPT,
       prompt: `At ${today} ${clock} local time, the app has already reserved fixed appointments and ranked today's deadlines.
 Keep those commitments ahead of tomorrow's work. Consider the listed durations and remaining time.
+Treat the listed scheduling conflicts as confirmed. Keep the affected commitments under review.
 Choose up to three flexible task indices for each list. Only use urgent for other important work worth reviewing after the commitments.
 Only use canSkip for work that can wait today. Keep fixed bookings out of canSkip.
 For one ambiguous flexible task, return its index as questionTask, otherwise null.
-${JSON.stringify({ commitments, next: next?.index ?? null, flexible })}`,
+${JSON.stringify({ commitments, next: next?.index ?? null, flexible, conflicts: conflicts.slice(0, 5) })}`,
     }) : { object: null }
     const choice = chatOutputSchemas.triage.safeParse(result.object)
     const suggested = choice.success ? choice.data : null
@@ -346,7 +347,7 @@ ${JSON.stringify({ commitments, next: next?.index ?? null, flexible })}`,
     const question = clarify && !clarify.end && !usedNames.has(clarify.name) ? `Does ${clarify.name} need attention today?` : null
     return Response.json({
       urgent: [...commitments.map(({ name, reason }) => ({ name, reason })), ...extra],
-      canSkip, question,
+      canSkip, question, conflicts,
       source: extra.length || canSkip.length || question ? 'gemini' : 'rules',
     })
   }
