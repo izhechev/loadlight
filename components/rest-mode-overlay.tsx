@@ -14,6 +14,7 @@ interface RestModeOverlayProps {
 
 interface TriageItem { name: string; reason: string }
 interface TriageResult {
+  resolution?: string | null
   conflicts?: string[]
   canSkip: TriageItem[]
   urgent: TriageItem[]
@@ -234,6 +235,7 @@ export function RestModeOverlay({ onDismiss, onExitRestMode }: RestModeOverlayPr
           ) : hasResults ? (
             <div className="space-y-3">
               <ScheduleConflicts conflicts={triage!.conflicts} />
+              {triage!.resolution && <p className="text-sm font-semibold">{triage!.resolution}</p>}
               {triage!.urgent.length > 0 && (
                 <div className="aero-warning rounded-2xl p-3.5">
                   <p className="text-xs font-black uppercase tracking-wide mb-2 flex items-center gap-1.5">

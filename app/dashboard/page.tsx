@@ -319,7 +319,7 @@ export default function DashboardPage() {
 
   // Refresh when the work or the next commitment changes, including an appointment starting.
   const summaryKey = JSON.stringify([state, balanceMode, pending.length, dueSoon, day.minutes, day.capacity, week,
-    advicePlan.today, advicePlan.next, advicePlan.appointment, advicePlan.flexible, advicePlan.conflicts])
+    advicePlan.today, advicePlan.next, advicePlan.appointment, advicePlan.flexible, advicePlan.conflicts, advicePlan.resolutions])
   useEffect(() => {
     if (!loaded || lastSummary.current === summaryKey) return
     lastSummary.current = summaryKey

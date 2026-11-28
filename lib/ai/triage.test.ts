@@ -34,6 +34,23 @@ it('names the fixed overlap and deadline that cannot fit, while allowing a task 
   expect(next?.name).toBe('Supplier call')
 })
 
+it('offers a verified appointment move and a work slot before the revised deadline', () => {
+  const taskList = [
+    { name: 'Supplier call', start_date: today + 'T12:00', estimated_minutes: 45 },
+    { name: 'Site walkthrough', start_date: today + 'T12:20', estimated_minutes: 35 },
+    { name: 'Permit packet', deadline: today + 'T12:45', estimated_minutes: 50 },
+  ]
+  const result = triageTasks(taskList, today, '11:55')
+  expect(result.resolutions[0]).toBe('Ask to move “Site walkthrough” to 12:45–13:20. Ask to extend “Permit packet” to 14:10 and work on it 13:20–14:10.')
+  const changedTasks = [
+    taskList[0],
+    { ...taskList[1], start_date: today + 'T12:45' },
+    { ...taskList[2], deadline: today + 'T14:10' },
+  ]
+  expect(triageTasks(changedTasks, today, '11:55').conflicts).toEqual([])
+  expect(triageTasks(taskList, today, '12:25').resolutions.join(' ')).not.toContain('Ask to move')
+})
+
 describe('task triage', () => {
   it('puts actionable deadlines and fixed appointments ahead of tomorrow', () => {
     const { commitments, flexible, next } = triageTasks(tasks, today, '11:20')

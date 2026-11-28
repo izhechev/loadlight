@@ -3,6 +3,7 @@ import { buildSchedule, DEADLINE_NO_ROOM, resolveFixedStart, WORK_END_MIN } from
 import { effectiveDeadline, normalizeDt } from '@/lib/utils/taskUtils'
 import { activeWorkload } from '@/lib/utils/workload'
 import type { ChatTask } from './schemas'
+import { conflictOptions } from './conflictOptions'
 
 export function toTriageTask(task: Task): ChatTask {
   const cadence = task.recurring
@@ -71,6 +72,7 @@ export function triageTasks(tasks: readonly ChatTask[], today: string, currentTi
   const commitments = rows.filter(row => row.committed).sort((a, b) => a.when.localeCompare(b.when) || a.priority - b.priority)
   const flexible = rows.filter(row => !row.committed)
   const overlaps: string[] = []
+  const movable = new Map<number, (typeof commitments)[number]>()
   const bookings = commitments.flatMap(task =>
     task.start && task.end && task.end > now ? [{ ...task, start: task.start, end: task.end }] : [],
   ).sort((a, b) => a.start.localeCompare(b.start))
@@ -79,6 +81,8 @@ export function triageTasks(tasks: readonly ChatTask[], today: string, currentTi
     if (furthestBooking && task.start < furthestBooking.end) {
       const label = (booking: typeof task) => `“${booking.name}” (${showTime(booking.start, today)}–${showTime(booking.end, today)})`
       overlaps.push(`${label(furthestBooking)} overlaps with ${label(task)}.`)
+      movable.set(task.index, task)
+      movable.set(furthestBooking.index, furthestBooking)
     }
     if (!furthestBooking || task.end > furthestBooking.end) furthestBooking = task
   }
@@ -107,5 +111,10 @@ export function triageTasks(tasks: readonly ChatTask[], today: string, currentTi
     commitments.splice(commitments.indexOf(next), 1)
     commitments.unshift(next)
   }
-  return { commitments, flexible, next, appointment: booking ?? null, conflicts }
+  const resolutions = conflictOptions(
+    [...commitments, ...flexible.filter(task => task.end || task.deadline)],
+    [...movable.values()].sort((a, b) => (b.start ?? '').localeCompare(a.start ?? '')),
+    missed, plan, today, currentTime,
+  )
+  return { commitments, flexible, next, appointment: booking ?? null, conflicts, resolutions }
 }

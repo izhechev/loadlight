@@ -73,6 +73,14 @@ describe('daily advice', () => {
     expect(JSON.parse(prompt).plan.conflicts).toEqual(conflicts)
   })
 
+  it('returns a checked time option rather than any times supplied by the model', async () => {
+    const resolutions = ['Ask to move the walkthrough to 17:00.', 'Ask to move the walkthrough to 16:45.']
+    gemini.fetchGemini.mockResolvedValue(Response.json({ candidates: [{ content: { parts: [{ text: '{"choice":1,"time":"03:00"}' }] } }] }))
+    expect(await request({ ...busy, plan: { ...plan, resolutions } })).toMatchObject({
+      source: 'gemini', advice: resolutions[1],
+    })
+  })
+
   it('keeps the original aggregate-only request and rest-mode guard', async () => {
     gemini.fetchGemini.mockResolvedValue(Response.json({ candidates: [{ content: { parts: [{ text: '{"choice":0}' }] } }] }))
     expect((await request({ ...busy, plan: undefined })).advice).toContain('10 min over capacity')

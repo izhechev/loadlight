@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { CheckCircle, Circle, Trash2, Calendar, Plus, Filter, RefreshCw, Loader2, List, LayoutGrid, CalendarDays, ChevronLeft, ChevronRight, CalendarClock, Pencil, X, AlertTriangle } from "@/lib/icons"
 import Link from "next/link"
 import { AppLayout } from "@/components/app-layout"
@@ -86,7 +86,22 @@ export default function TasksPage() {
   const [overdueQueue, setOverdueQueue] = useState<Task[]>([])
   const overdueScanned = useRef(false)
 
-  const [pendingSchedule, setPendingSchedule] = useState<DaySchedule | null>(null)
+  const [preview, setPreview] = useState<{ text: string; overflowDate: string; openedAt: number } | null>(null)
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(() => new Set())
+  const pendingSchedule = useMemo(() => {
+    if (!preview) return null
+    const at = new Date(Math.max(now, preview.openedAt))
+    const plan = buildSchedule(tasks, {
+      today: localDateStr(0, at.getTime()), currentTime: at.toTimeString().slice(0, 5), nowMs: at.getTime(),
+      overflowDate: preview.overflowDate, text: preview.text,
+    })
+    return {
+      ...plan,
+      scheduled: plan.scheduled.filter(item => !resolvedIds.has(item.id)),
+      overflow: plan.overflow.filter(item => !resolvedIds.has(item.id)),
+      unscheduled: plan.unscheduled.filter(item => !resolvedIds.has(item.id)),
+    }
+  }, [tasks, now, preview, resolvedIds])
 
   const reloadTasks = useCallback(async () => {
     const version = ++loadVersion.current
@@ -149,7 +164,7 @@ export default function TasksPage() {
   // Start conversation
   async function handleSchedule() {
     setScheduleMsg(null)
-    setPendingSchedule(null)
+    setPreview(null)
     setChatHistory([])
     setChatInput('')
     if (isLocalMode() || !scheduleText.trim()) {
@@ -203,15 +218,8 @@ export default function TasksPage() {
   }
 
   function showPlan(text: string) {
-    const at = new Date()
-    const plan = buildSchedule(tasks, {
-      today: localDateStr(0, at.getTime()),
-      currentTime: nowHHMM(at),
-      nowMs: at.getTime(),
-      overflowDate,
-      text,
-    })
-    setPendingSchedule(plan)
+    setResolvedIds(new Set())
+    setPreview({ text, overflowDate, openedAt: Date.now() })
     setChatPhase('confirming')
   }
 
@@ -249,10 +257,10 @@ export default function TasksPage() {
     }
     if (!next.scheduled.length && !next.overflow.length && !next.unscheduled.length && !next.unusedNotes.length) {
       setScheduleMsg(apply ? 'Plan saved.' : 'Schedule review complete.')
-      setPendingSchedule(null)
+      setPreview(null)
       setChatPhase('done')
     } else {
-      setPendingSchedule(next)
+      setResolvedIds(current => new Set([...current, ...resolved]))
     }
   }
 
@@ -297,6 +305,16 @@ export default function TasksPage() {
         notes: edited.notes, recurring: edited.recurring ?? 'none', recurringHours: edited.recurring_hours,
         recurringDays: edited.recurring_days ?? null, snoozedUntil: edited.snoozedUntil ?? null,
       })
+      setTasks(current => current.map(task => task.id === edited.id ? {
+        ...edited, startDate: edited.start_date, estimatedMinutes: edited.estimated_minutes,
+      } : task))
+      setResolvedIds(current => {
+        if (!current.has(edited.id)) return current
+        const next = new Set(current)
+        next.delete(edited.id)
+        return next
+      })
+      setNow(Date.now())
       setEditingTask(null)
     } catch { setError('Could not save your changes. Try again.') }
   }
@@ -747,7 +765,7 @@ export default function TasksPage() {
                       </button>
                     )}
                     <button type="button" disabled={isScheduling}
-                      onClick={() => { setPendingSchedule(null); setChatPhase('idle'); setChatHistory([]); setScheduleMsg(null) }}
+                      onClick={() => { setPreview(null); setChatPhase('idle'); setChatHistory([]); setScheduleMsg(null) }}
                       className="vista-btn-secondary text-xs font-bold px-4 py-1.5 disabled:opacity-50">
                       Close
                     </button>

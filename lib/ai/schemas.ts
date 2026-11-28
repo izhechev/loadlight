@@ -96,6 +96,7 @@ export const adviseRequestSchema = z.object({
     appointment: adviceTask.nullable(),
     flexible: z.array(adviceTask).max(3),
     conflicts: z.array(basicText).max(5).optional(),
+    resolutions: z.array(z.string().max(2400)).max(2).optional(),
   }).optional(),
   signals: z.object({
     taskAccumulation: z.number().min(0).max(1).optional(),
@@ -224,6 +225,7 @@ export const chatOutputSchemas = {
     canSkip: z.array(count).max(3),
     urgent: z.array(count).max(3),
     questionTask: count.nullish(),
+    resolutionChoice: z.number().int().min(0).max(1).nullish(),
   }),
   'chill-snooze': z.object({
     taskIds: z.array(id).max(4),
